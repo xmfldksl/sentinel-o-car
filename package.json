@@ -1,0 +1,18 @@
+{
+  "name": "sentinel-o-car",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sentinel-o-car personal vehicle listing watcher using GitHub Actions and Telegram",
+  "scripts": {
+    "scrape": "node src/index.mjs",
+    "test": "node --test",
+    "chat-id": "node src/get-chat-id.mjs",
+    "doctor": "bash scripts/check-env.sh",
+    "codex": "bash scripts/start-codex.sh",
+    "codex:review": "bash scripts/codex-review.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
