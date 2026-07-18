@@ -1,11 +1,16 @@
 import {
   DEFAULT_SEARCH_URL,
   analyzeDetail,
+  createListingEvent,
   evaluateListing,
   formatTelegramMessage,
+  getListingInspection,
   loadJson,
   matchesBasicCriteria,
   parseListHtml,
+  recordDetailFailure,
+  recordListObservation,
+  recordDetailSuccess,
   saveJson,
   setPage,
   sleep
@@ -100,60 +105,42 @@ for (const listing of listingsById.values()) {
   if (!matchesBasicCriteria(listing, config)) continue;
 
   const previous = state.listings[listing.id];
-  const isNew = !previous;
-  const priceChanged = previous && previous.priceKrw !== listing.priceKrw;
-  const priceDropped = priceChanged && listing.priceKrw < previous.priceKrw;
-  const priceIncreased = priceChanged && listing.priceKrw > previous.priceKrw;
-  const shouldInspect = runMode === "send_current" || isNew || priceChanged;
+  const inspection = getListingInspection(previous, listing, runMode);
 
-  state.listings[listing.id] = {
-    ...(previous ?? {}),
-    id: listing.id,
-    title: listing.title,
-    url: listing.url,
-    yearMonth: listing.yearMonth,
-    mileageKm: listing.mileageKm,
-    priceKrw: listing.priceKrw,
-    region: listing.region,
-    contracted: listing.contracted,
-    firstSeenAt: previous?.firstSeenAt ?? now,
-    lastSeenAt: now
-  };
-
-  if (!shouldInspect) continue;
+  if (!inspection.shouldInspect) {
+    state.listings[listing.id] = recordListObservation(previous, listing, now);
+    continue;
+  }
 
   await sleep(config.requestDelayMs);
-  let enriched = { ...listing, hasFsd: false, hasEap: false, option: "미확인", rental: false, smokingWarning: false, tuningWarning: false, redColor: false };
+  let detailHtml;
   try {
-    const detailHtml = await fetchText(listing.url);
-    enriched = analyzeDetail(detailHtml, listing, config);
+    detailHtml = await fetchText(listing.url);
   } catch (error) {
     console.warn(`Detail fetch failed for ${listing.id}:`, error.message);
+    state.listings[listing.id] = recordDetailFailure(previous, listing, now, error.message);
+    continue;
   }
+  const enriched = analyzeDetail(detailHtml, listing, config);
   const evaluated = evaluateListing(enriched, config);
 
-  state.listings[listing.id] = {
-    ...state.listings[listing.id],
-    option: evaluated.option,
-    rental: evaluated.rental,
-    eligible: evaluated.eligible,
-    lastEvaluatedAt: now
-  };
+  state.listings[listing.id] = recordDetailSuccess(previous, listing, evaluated, now);
 
   if (!evaluated.eligible) {
     console.log(`Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`);
     continue;
   }
 
-  if (runMode === "send_current") {
-    events.push({ type: "현재 조건 충족", listing: evaluated });
-  } else if (wasInitialized && isNew) {
-    events.push({ type: "신규", listing: evaluated });
-  } else if (wasInitialized && priceDropped) {
-    events.push({ type: `가격 인하 ${previous.priceKrw.toLocaleString("ko-KR")}원 → ${listing.priceKrw.toLocaleString("ko-KR")}원`, listing: evaluated });
-  } else if (wasInitialized && priceIncreased && config.notifyPriceIncrease) {
-    events.push({ type: `가격 인상 ${previous.priceKrw.toLocaleString("ko-KR")}원 → ${listing.priceKrw.toLocaleString("ko-KR")}원`, listing: evaluated });
-  }
+  const event = createListingEvent({
+    runMode,
+    wasInitialized,
+    inspection,
+    previous,
+    listing: evaluated,
+    detailSucceeded: true,
+    notifyPriceIncrease: config.notifyPriceIncrease
+  });
+  if (event) events.push(event);
 }
 
 if (!wasInitialized) {

@@ -173,6 +173,106 @@ export function evaluateListing(listing, config) {
   };
 }
 
+export function getListingInspection(previous, listing, runMode) {
+  const hasConfirmedState = Number.isFinite(previous?.priceKrw);
+  const isNew = !hasConfirmedState;
+  const priceChanged = hasConfirmedState && previous.priceKrw !== listing.priceKrw;
+
+  return {
+    isNew,
+    priceChanged,
+    priceDropped: priceChanged && listing.priceKrw < previous.priceKrw,
+    priceIncreased: priceChanged && listing.priceKrw > previous.priceKrw,
+    shouldInspect: runMode === "send_current" || isNew || priceChanged
+  };
+}
+
+export function recordDetailFailure(previous, listing, now, errorMessage) {
+  const { priceKrw: observedPriceKrw, listText: _listText, ...observation } = listing;
+  const record = previous
+    ? { ...previous }
+    : {
+        ...observation,
+        firstSeenAt: now
+      };
+
+  return {
+    ...record,
+    lastSeenAt: now,
+    lastObservedPriceKrw: observedPriceKrw,
+    lastDetailFetchFailedAt: now,
+    lastDetailFetchError: errorMessage
+  };
+}
+
+export function recordListObservation(previous, listing, now) {
+  return {
+    ...previous,
+    id: listing.id,
+    title: listing.title,
+    url: listing.url,
+    yearMonth: listing.yearMonth,
+    mileageKm: listing.mileageKm,
+    priceKrw: listing.priceKrw,
+    region: listing.region,
+    contracted: listing.contracted,
+    firstSeenAt: previous?.firstSeenAt ?? now,
+    lastSeenAt: now
+  };
+}
+
+export function recordDetailSuccess(previous, listing, evaluated, now) {
+  const record = {
+    ...(previous ?? {}),
+    id: listing.id,
+    title: listing.title,
+    url: listing.url,
+    yearMonth: listing.yearMonth,
+    mileageKm: listing.mileageKm,
+    priceKrw: listing.priceKrw,
+    region: listing.region,
+    contracted: listing.contracted,
+    firstSeenAt: previous?.firstSeenAt ?? now,
+    lastSeenAt: now,
+    option: evaluated.option,
+    rental: evaluated.rental,
+    eligible: evaluated.eligible,
+    lastEvaluatedAt: now
+  };
+
+  delete record.lastObservedPriceKrw;
+  delete record.lastDetailFetchFailedAt;
+  delete record.lastDetailFetchError;
+  return record;
+}
+
+export function createListingEvent({
+  runMode,
+  wasInitialized,
+  inspection,
+  previous,
+  listing,
+  detailSucceeded,
+  notifyPriceIncrease = false
+}) {
+  if (!detailSucceeded || !listing.eligible) return null;
+  if (runMode === "send_current") return { type: "현재 조건 충족", listing };
+  if (wasInitialized && inspection.isNew) return { type: "신규", listing };
+  if (wasInitialized && inspection.priceDropped) {
+    return {
+      type: `가격 인하 ${previous.priceKrw.toLocaleString("ko-KR")}원 → ${listing.priceKrw.toLocaleString("ko-KR")}원`,
+      listing
+    };
+  }
+  if (wasInitialized && inspection.priceIncreased && notifyPriceIncrease) {
+    return {
+      type: `가격 인상 ${previous.priceKrw.toLocaleString("ko-KR")}원 → ${listing.priceKrw.toLocaleString("ko-KR")}원`,
+      listing
+    };
+  }
+  return null;
+}
+
 export function formatKrw(value) {
   return `${Math.round(value).toLocaleString("ko-KR")}원`;
 }
