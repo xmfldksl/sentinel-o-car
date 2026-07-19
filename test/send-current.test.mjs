@@ -70,22 +70,24 @@ test("send_current 모드는 조건 미충족 매물도 알림 이벤트를 만�
   const event = eventFor({ runMode: "send_current", listing: sendCurrentListing, detailSucceeded: true });
 
   assert.equal(sendCurrentListing.conditionStatus, "조건 미충족");
-  assert.equal(event.type, "현재 검색 결과 · 조건 미충족");
+  assert.equal(event.type, "현재 검색 결과");
 });
 
-test("send_current 메시지에는 조건 충족 표시가 포함된다", () => {
+test("send_current 조건 충족 메시지는 제목과 본문 판정을 분리한다", () => {
   const enriched = analyzeDetail("<html>FSD 포함</html>", baseListing, config);
   const evaluated = evaluateListing(enriched, config);
   const sendCurrentListing = prepareSendCurrentListing(evaluated, config, { detailSucceeded: true });
   const event = eventFor({ runMode: "send_current", listing: sendCurrentListing, detailSucceeded: true });
   const message = formatTelegramMessage(event.type, event.listing);
+  const firstLine = message.split("\n")[0];
 
-  assert.match(message, /^\[현재 검색 결과 · 조건 충족\]/);
+  assert.equal(firstLine, "[현재 검색 결과]");
+  assert.doesNotMatch(firstLine, /조건 충족|조건 미충족/);
   assert.doesNotMatch(message, /Sentinel-o-car/i);
   assert.match(message, /판정: 조건 충족/);
 });
 
-test("send_current 메시지에는 조건 미충족 사유가 포함된다", () => {
+test("send_current 조건 미충족 메시지는 제목과 본문 판정을 분리하고 사유를 유지한다", () => {
   const overLimit = {
     ...baseListing,
     yearMonth: "2023-01",
@@ -97,7 +99,10 @@ test("send_current 메시지에는 조건 미충족 사유가 포함된다", () 
   const sendCurrentListing = prepareSendCurrentListing(evaluated, config, { detailSucceeded: true });
   const event = eventFor({ runMode: "send_current", listing: sendCurrentListing, detailSucceeded: true });
   const message = formatTelegramMessage(event.type, event.listing);
+  const firstLine = message.split("\n")[0];
 
+  assert.equal(firstLine, "[현재 검색 결과]");
+  assert.doesNotMatch(firstLine, /조건 충족|조건 미충족/);
   assert.match(message, /판정: 조건 미충족/);
   assert.match(message, /사유: .*연월 범위 초과/);
   assert.match(message, /사유: .*주행거리 초과/);
@@ -112,7 +117,7 @@ test("상세 조회 실패 매물도 send_current에서는 목록 정보와 실�
   const event = eventFor({ runMode: "send_current", listing: sendCurrentListing, detailSucceeded: false });
   const message = formatTelegramMessage(event.type, event.listing);
 
-  assert.equal(event.type, "현재 검색 결과 · 조건 미충족");
+  assert.equal(event.type, "현재 검색 결과");
   assert.match(message, /2022\/09 모델 3 롱 레인지 AWD/);
   assert.match(message, /38,500,000원/);
   assert.match(message, /상세: 상세 확인 실패/);

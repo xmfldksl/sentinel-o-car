@@ -77,7 +77,7 @@ test("normal과 send_current 알림은 같은 출력 규칙을 사용한다", ()
       ...baseListing,
       option: "EAP"
     }),
-    formatTelegramMessage("현재 검색 결과 · 조건 충족", {
+    formatTelegramMessage("현재 검색 결과", {
       ...baseListing,
       option: "EAP",
       conditionStatus: "조건 충족",

@@ -545,7 +545,7 @@ export function createListingEvent({
 }) {
   if (runMode === "send_current") {
     return {
-      type: `현재 검색 결과 · ${listing.conditionStatus ?? (listing.eligible ? "조건 충족" : "조건 미충족")}`,
+      type: "현재 검색 결과",
       listing
     };
   }
