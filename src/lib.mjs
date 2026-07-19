@@ -417,9 +417,23 @@ export function formatKm(value) {
   return `${Math.round(value).toLocaleString("ko-KR")}㎞`;
 }
 
+export function createTelegramMessageRequest(chatId, text) {
+  return {
+    chat_id: chatId,
+    text,
+    link_preview_options: { is_disabled: true }
+  };
+}
+
+function formatTelegramOption(option) {
+  if (option === "FSD") return "옵션: FSD 확인";
+  if (option === "EAP") return "옵션: EAP 확인";
+  return "옵션: 미확인";
+}
+
 export function formatTelegramMessage(eventType, listing) {
   const lines = [
-    `[Sentinel-o-car ${eventType}]`,
+    `[${eventType}]`,
     `${listing.yearMonth.replace("-", "/")} ${listing.title}`,
     ...(listing.conditionStatus
       ? [
@@ -428,13 +442,11 @@ export function formatTelegramMessage(eventType, listing) {
         ]
       : []),
     `${formatKm(listing.mileageKm)} | ${formatKrw(listing.priceKrw)} | ${listing.region}`,
-    `옵션 판정: ${listing.option}`,
-    `적용 기준: ${listing.priceRule} ${formatKrw(listing.limitKrw)}`
+    formatTelegramOption(listing.option)
   ];
 
   if (listing.detailFailed) lines.push("상세: 상세 확인 실패");
   if (listing.rental) lines.push(`렌트 감가 반영 평가가격: ${formatKrw(listing.adjustedPriceKrw)}`);
-  if (listing.warnings.length) lines.push(`확인사항: ${listing.warnings.join(" / ")}`);
   lines.push(listing.url);
   return lines.join("\n");
 }

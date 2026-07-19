@@ -80,7 +80,8 @@ test("send_current 메시지에는 조건 충족 표시가 포함된다", () => 
   const event = eventFor({ runMode: "send_current", listing: sendCurrentListing, detailSucceeded: true });
   const message = formatTelegramMessage(event.type, event.listing);
 
-  assert.match(message, /\[Sentinel-o-car 현재 검색 결과 · 조건 충족\]/);
+  assert.match(message, /^\[현재 검색 결과 · 조건 충족\]/);
+  assert.doesNotMatch(message, /Sentinel-o-car/i);
   assert.match(message, /판정: 조건 충족/);
 });
 

@@ -1,5 +1,6 @@
 import {
   analyzeDetail,
+  createTelegramMessageRequest,
   createListingEvent,
   evaluateListing,
   formatSearchUrlSummary,
@@ -66,12 +67,7 @@ async function sendTelegram(text) {
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      protect_content: true,
-      link_preview_options: { is_disabled: true }
-    })
+    body: JSON.stringify(createTelegramMessageRequest(chatId, text))
   });
   const result = await response.json();
   if (!response.ok || !result.ok) {
@@ -80,7 +76,7 @@ async function sendTelegram(text) {
 }
 
 if (runMode === "telegram_test") {
-  await sendTelegram("Sentinel-o-car 텔레그램 연결 테스트가 성공했습니다.");
+  await sendTelegram("텔레그램 연결 테스트가 성공했습니다.");
   console.log("Telegram test sent.");
   process.exit(0);
 }
@@ -170,7 +166,7 @@ for (const listing of listingsById.values()) {
 if (!wasInitialized && !isSendCurrent) {
   state.initializedAt = now;
   await sendTelegram(
-    `Sentinel-o-car 매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 인하를 알립니다.`
+    `매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 인하를 알립니다.`
   );
 } else {
   for (const event of events) {
