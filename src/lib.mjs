@@ -1,7 +1,82 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 
 export const DEFAULT_SEARCH_URL =
   "https://car.encar.com/list/car?page=1&search=%7B%22type%22%3A%22car%22%2C%22action%22%3A%22%28And.Hidden.N._.MultiView2Hidden.N._.MultiViewHidden.N._.%28C.CarType.N._.%28C.Manufacturer.%ED%85%8C%EC%8A%AC%EB%9D%BC._.%28C.ModelGroup.%EB%AA%A8%EB%8D%B8+3._.Model.%EB%AA%A8%EB%8D%B8+3.%29%29%29%29%22%2C%22toggle%22%3A%7B%7D%2C%22layer%22%3A%22%22%2C%22sort%22%3A%22MobileModifiedDate%22%7D";
+
+function singleLine(value) {
+  return String(value).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function createSearchUrlFingerprint(urlString) {
+  return createHash("sha256").update(urlString, "utf8").digest("hex").slice(0, 12);
+}
+
+export function summarizeSearchUrl(urlString) {
+  let url;
+  try {
+    url = new URL(urlString);
+  } catch {
+    throw new Error("ENCAR_SEARCH_URL이 올바른 URL이 아닙니다.");
+  }
+
+  const encodedSearch = url.searchParams.get("search");
+  if (encodedSearch === null) {
+    throw new Error("ENCAR_SEARCH_URL에 search 파라미터가 없습니다.");
+  }
+
+  let search;
+  try {
+    search = JSON.parse(encodedSearch);
+  } catch {
+    throw new Error("ENCAR_SEARCH_URL의 search 파라미터가 올바른 JSON이 아닙니다.");
+  }
+
+  if (!search || typeof search !== "object" || Array.isArray(search)) {
+    throw new Error("ENCAR_SEARCH_URL의 search 파라미터는 JSON 객체여야 합니다.");
+  }
+
+  const action = typeof search.action === "string" ? search.action : "";
+  const yearRange = action.match(/Year\.range\([^)]*\)/)?.[0] ?? "없음";
+  const title =
+    typeof search.title === "string" && search.title.trim() ? singleLine(search.title) : "없음";
+  const normalizedUrl = url.toString();
+
+  return {
+    url: normalizedUrl,
+    host: url.host,
+    page: url.searchParams.get("page") ?? "없음",
+    title,
+    yearRange,
+    fingerprint: createSearchUrlFingerprint(normalizedUrl)
+  };
+}
+
+export function resolveSearchUrl(environment = process.env) {
+  const configuredUrl = environment.ENCAR_SEARCH_URL;
+  const hasConfiguredUrl = typeof configuredUrl === "string" && configuredUrl.trim().length > 0;
+
+  if (environment.GITHUB_ACTIONS === "true" && !hasConfiguredUrl) {
+    throw new Error("GitHub Actions에서는 ENCAR_SEARCH_URL repository variable이 필요합니다.");
+  }
+
+  const source = hasConfiguredUrl ? "repository variable" : "default";
+  return {
+    source,
+    ...summarizeSearchUrl(hasConfiguredUrl ? configuredUrl.trim() : DEFAULT_SEARCH_URL)
+  };
+}
+
+export function formatSearchUrlSummary(searchUrl) {
+  return [
+    `검색 URL 출처: ${searchUrl.source}`,
+    `검색 URL 호스트: ${searchUrl.host}`,
+    `검색 URL page: ${searchUrl.page}`,
+    `검색 조건 title: ${searchUrl.title}`,
+    `검색 조건 연식 범위: ${searchUrl.yearRange}`,
+    `검색 URL 지문: ${searchUrl.fingerprint}`
+  ].join("\n");
+}
 
 const HTML_ENTITIES = new Map([
   ["amp", "&"],

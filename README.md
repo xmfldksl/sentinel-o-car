@@ -74,7 +74,9 @@ TELEGRAM_BOT_TOKEN='발급받은토큰' npm run chat-id
 - `ENCAR_SEARCH_URL`: 복사한 엔카 검색 URL
 - `MAX_PAGES`: 확인할 페이지 수. 기본값은 `2`
 
-`ENCAR_SEARCH_URL`을 생략하면 프로젝트에 포함된 테슬라 모델 3 최신순 URL을 사용하고, 앱 내부 조건으로 2022년식 롱 레인지 AWD를 걸러냅니다. 정확성과 요청량을 위해 엔카에서 연식·트림·가격을 최대한 좁힌 검색 URL을 등록하는 편이 낫습니다.
+GitHub Actions에서는 `ENCAR_SEARCH_URL`이 필수입니다. 변수가 없거나 공백이거나, URL의 `search` 파라미터가 없거나 올바른 JSON이 아니면 네트워크 요청 전에 실행이 실패합니다. 로컬에서만 `ENCAR_SEARCH_URL`을 생략할 수 있으며, 이때 프로젝트에 포함된 테슬라 모델 3 최신순 URL을 사용하고 앱 내부 조건으로 2022년식 롱 레인지 AWD를 걸러냅니다.
+
+실행 시작 로그에는 전체 검색 URL 대신 URL 출처, 호스트, `page`, 검색 조건 `title`, `action`의 `Year.range(...)`, URL SHA-256 지문 앞 12자리만 표시됩니다.
 
 ## 5. 동작 확인
 

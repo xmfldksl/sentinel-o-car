@@ -1,8 +1,8 @@
 import {
-  DEFAULT_SEARCH_URL,
   analyzeDetail,
   createListingEvent,
   evaluateListing,
+  formatSearchUrlSummary,
   formatTelegramMessage,
   getListingInspection,
   loadJson,
@@ -12,6 +12,7 @@ import {
   recordDetailFailure,
   recordListObservation,
   recordDetailSuccess,
+  resolveSearchUrl,
   saveJson,
   setPage,
   sleep
@@ -20,11 +21,14 @@ import {
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36 PersonalListingMonitor/1.0";
 
+const searchUrlConfig = resolveSearchUrl();
+const searchUrl = searchUrlConfig.url;
+console.log(formatSearchUrlSummary(searchUrlConfig));
+
 const config = await loadJson(new URL("../config.json", import.meta.url));
 const statePath = process.env.STATE_PATH || "data/state.json";
 const state = await loadJson(statePath);
 const runMode = process.env.RUN_MODE || "normal";
-const searchUrl = process.env.ENCAR_SEARCH_URL || DEFAULT_SEARCH_URL;
 const maxPages = Number(process.env.MAX_PAGES || config.maxPages);
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -48,7 +52,7 @@ async function fetchText(url) {
       signal: controller.signal,
       redirect: "follow"
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.text();
   } finally {
     clearTimeout(timer);
@@ -84,7 +88,7 @@ if (runMode === "telegram_test") {
 const listingsById = new Map();
 for (let page = 1; page <= maxPages; page += 1) {
   const pageUrl = setPage(searchUrl, page);
-  console.log(`Fetching list page ${page}: ${pageUrl}`);
+  console.log(`Fetching list page ${page}.`);
   const html = await fetchText(pageUrl);
   const parsed = parseListHtml(html);
   console.log(`Parsed ${parsed.length} unique listings from page ${page}.`);
