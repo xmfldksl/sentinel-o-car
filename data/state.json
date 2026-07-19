@@ -1,7 +1,7 @@
 {
   "version": 1,
   "initializedAt": "2026-07-18T23:56:00.718Z",
-  "updatedAt": "2026-07-19T19:38:45.417Z",
+  "updatedAt": "2026-07-19T19:49:19.836Z",
   "listings": {
     "40395766": {
       "id": "40395766",
@@ -14,11 +14,11 @@
       "contracted": false,
       "vehicleNo": "66루6023",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "40502228": {
       "id": "40502228",
@@ -31,11 +31,11 @@
       "contracted": true,
       "vehicleNo": "13조4594",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "41991947": {
       "id": "41991947",
@@ -48,11 +48,11 @@
       "contracted": false,
       "vehicleNo": "48나1681",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42218041": {
       "id": "42218041",
@@ -65,11 +65,11 @@
       "contracted": true,
       "vehicleNo": "69가5207",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42298226": {
       "id": "42298226",
@@ -82,11 +82,11 @@
       "contracted": true,
       "vehicleNo": "54무6830",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42315123": {
       "id": "42315123",
@@ -99,11 +99,11 @@
       "contracted": true,
       "vehicleNo": "25도4917",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42334170": {
       "id": "42334170",
@@ -116,11 +116,11 @@
       "contracted": false,
       "vehicleNo": "19루0921",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42353242": {
       "id": "42353242",
@@ -133,11 +133,11 @@
       "contracted": false,
       "vehicleNo": "46보6360",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42353308": {
       "id": "42353308",
@@ -150,11 +150,11 @@
       "contracted": false,
       "vehicleNo": "49다8086",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42354882": {
       "id": "42354882",
@@ -167,11 +167,11 @@
       "contracted": false,
       "vehicleNo": "25거4708",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42358899": {
       "id": "42358899",
@@ -184,11 +184,11 @@
       "contracted": false,
       "vehicleNo": "21수3113",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42362138": {
       "id": "42362138",
@@ -201,11 +201,11 @@
       "contracted": false,
       "vehicleNo": "05주7359",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42365162": {
       "id": "42365162",
@@ -218,11 +218,11 @@
       "contracted": false,
       "vehicleNo": "13부4562",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42370470": {
       "id": "42370470",
@@ -235,11 +235,11 @@
       "contracted": false,
       "vehicleNo": "40부7790",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42371690": {
       "id": "42371690",
@@ -252,11 +252,11 @@
       "contracted": false,
       "vehicleNo": "42우8531",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42376181": {
       "id": "42376181",
@@ -269,11 +269,11 @@
       "contracted": false,
       "vehicleNo": "06보2106",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42381493": {
       "id": "42381493",
@@ -286,11 +286,11 @@
       "contracted": false,
       "vehicleNo": "16버3414",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42382611": {
       "id": "42382611",
@@ -303,11 +303,11 @@
       "contracted": false,
       "vehicleNo": "29노1998",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42383037": {
       "id": "42383037",
@@ -320,11 +320,11 @@
       "contracted": false,
       "vehicleNo": "29주9327",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42384042": {
       "id": "42384042",
@@ -337,11 +337,11 @@
       "contracted": false,
       "vehicleNo": "52부6159",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42386837": {
       "id": "42386837",
@@ -354,11 +354,11 @@
       "contracted": false,
       "vehicleNo": "26가0545",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42387993": {
       "id": "42387993",
@@ -371,11 +371,11 @@
       "contracted": false,
       "vehicleNo": "51루9371",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "FSD",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42389272": {
       "id": "42389272",
@@ -388,11 +388,11 @@
       "contracted": false,
       "vehicleNo": "16주3525",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42389465": {
       "id": "42389465",
@@ -405,11 +405,11 @@
       "contracted": false,
       "vehicleNo": "46구5467",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": true,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     },
     "42389558": {
       "id": "42389558",
@@ -422,11 +422,11 @@
       "contracted": false,
       "vehicleNo": "39너2022",
       "firstSeenAt": "2026-07-19T19:38:45.417Z",
-      "lastSeenAt": "2026-07-19T19:38:45.417Z",
+      "lastSeenAt": "2026-07-19T19:49:19.836Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T19:38:45.417Z"
+      "lastEvaluatedAt": "2026-07-19T19:49:19.836Z"
     }
   }
 }
