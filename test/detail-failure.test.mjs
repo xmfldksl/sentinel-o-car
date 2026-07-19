@@ -18,7 +18,8 @@ const listing = {
   mileageKm: 67235,
   priceKrw: 32700000,
   region: "경기",
-  contracted: false
+  contracted: false,
+  vehicleNo: "12가3456"
 };
 
 const evaluated = {
@@ -61,6 +62,7 @@ test("상세 조회 실패는 기존 정상 가격과 판정 결과를 덮어쓰
 
   assert.equal(failed.priceKrw, 34000000);
   assert.equal(failed.option, "FSD");
+  assert.equal(failed.vehicleNo, "12가3456");
   assert.equal(failed.rental, false);
   assert.equal(failed.eligible, true);
   assert.equal(failed.lastEvaluatedAt, firstSeenAt);

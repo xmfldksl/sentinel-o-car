@@ -1,8 +1,11 @@
 import {
   analyzeDetail,
+  applyRepresentativeState,
   createTelegramMessageRequest,
   createListingEvent,
   evaluateListing,
+  findPreviousListing,
+  formatDuplicateListingLog,
   formatSearchUrlSummary,
   formatTelegramMessage,
   getListingInspection,
@@ -15,6 +18,7 @@ import {
   recordDetailSuccess,
   resolveSearchUrl,
   saveJson,
+  selectRepresentativeCandidates,
   setPage,
   sleep
 } from "./lib.mjs";
@@ -102,15 +106,27 @@ const now = new Date().toISOString();
 const wasInitialized = Boolean(state.initializedAt);
 const isSendCurrent = runMode === "send_current";
 const events = [];
+const previousListings = { ...state.listings };
+const candidates = [];
+let listingOrder = 0;
 
 for (const listing of listingsById.values()) {
+  const order = listingOrder;
+  listingOrder += 1;
   if (!isSendCurrent && !matchesBasicCriteria(listing, config)) continue;
 
-  const previous = state.listings[listing.id];
-  const inspection = getListingInspection(previous, listing, runMode);
+  let { previous } = findPreviousListing(previousListings, listing);
+  let inspection = getListingInspection(previous, listing, runMode);
 
   if (!inspection.shouldInspect) {
-    state.listings[listing.id] = recordListObservation(previous, listing, now);
+    const observedListing = { ...listing, vehicleNo: previous?.vehicleNo ?? null };
+    candidates.push({
+      order,
+      listing: observedListing,
+      detailSucceeded: false,
+      stateRecord: recordListObservation(previous, observedListing, now),
+      event: null
+    });
     continue;
   }
 
@@ -120,35 +136,41 @@ for (const listing of listingsById.values()) {
     detailHtml = await fetchText(listing.url);
   } catch (error) {
     console.warn(`Detail fetch failed for ${listing.id}:`, error.message);
-    state.listings[listing.id] = recordDetailFailure(previous, listing, now, error.message);
-    if (isSendCurrent) {
-      const event = createListingEvent({
-        runMode,
-        wasInitialized,
-        inspection,
-        previous,
-        listing: prepareSendCurrentListing(listing, config, {
+    const failedListing = { ...listing, vehicleNo: previous?.vehicleNo ?? null };
+    const eventListing = isSendCurrent
+      ? prepareSendCurrentListing(failedListing, config, {
           detailSucceeded: false,
           errorMessage: error.message
-        }),
-        detailSucceeded: false,
-        notifyPriceIncrease: config.notifyPriceIncrease
-      });
-      if (event) events.push(event);
-    }
+        })
+      : failedListing;
+    const event = createListingEvent({
+      runMode,
+      wasInitialized,
+      inspection,
+      previous,
+      listing: eventListing,
+      detailSucceeded: false,
+      notifyPriceIncrease: config.notifyPriceIncrease
+    });
+    candidates.push({
+      order,
+      listing: eventListing,
+      detailSucceeded: false,
+      stateRecord: recordDetailFailure(previous, failedListing, now, error.message),
+      event
+    });
     continue;
   }
   const enriched = analyzeDetail(detailHtml, listing, config);
+  ({ previous } = findPreviousListing(previousListings, enriched));
+  inspection = getListingInspection(previous, enriched, runMode);
   const evaluated = evaluateListing(enriched, config);
   const eventListing = isSendCurrent
     ? prepareSendCurrentListing(evaluated, config, { detailSucceeded: true })
     : evaluated;
 
-  state.listings[listing.id] = recordDetailSuccess(previous, listing, evaluated, now);
-
   if (!isSendCurrent && !evaluated.eligible) {
     console.log(`Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`);
-    continue;
   }
 
   const event = createListingEvent({
@@ -160,7 +182,22 @@ for (const listing of listingsById.values()) {
     detailSucceeded: true,
     notifyPriceIncrease: config.notifyPriceIncrease
   });
-  if (event) events.push(event);
+  candidates.push({
+    order,
+    listing: eventListing,
+    detailSucceeded: true,
+    stateRecord: recordDetailSuccess(previous, enriched, evaluated, now),
+    event
+  });
+}
+
+const { representatives, duplicates } = selectRepresentativeCandidates(candidates);
+for (const { representative, duplicate } of duplicates) {
+  console.log(formatDuplicateListingLog(representative, duplicate));
+}
+for (const candidate of representatives) {
+  applyRepresentativeState(state.listings, candidate);
+  if (candidate.event) events.push(candidate.event);
 }
 
 if (!wasInitialized && !isSendCurrent) {

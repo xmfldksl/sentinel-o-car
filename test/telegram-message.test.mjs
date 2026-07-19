@@ -15,6 +15,7 @@ const baseListing = {
   priceKrw: 38500000,
   region: "서울",
   option: "미확인",
+  vehicleNo: "12가3456",
   rental: false,
   warnings: ["옵션 확인 필요", "흡연 여부 확인", "튜닝 여부 확인"],
   priceRule: "FSD 기준",
@@ -41,6 +42,7 @@ test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을
   assert.doesNotMatch(message, /적용 기준|가격 기준|허용 가격|확인사항/);
   assert.doesNotMatch(message, /옵션 확인 필요|흡연 여부 확인|튜닝 여부 확인/);
   assert.match(message, /2022\/09 모델 3 롱 레인지 AWD/);
+  assert.equal(message.split("\n")[2], "차량번호: 12가3456");
   assert.match(message, /92,000㎞ \| 38,500,000원 \| 서울/);
   assert.match(message, /옵션: FSD 확인/);
   assert.match(message, /https:\/\/fem\.encar\.com\/cars\/detail\/42023180$/);
@@ -50,6 +52,12 @@ test("FSD, EAP, 미확인 옵션은 정해진 세 가지 문구로만 출력한�
   assert.match(formatTelegramMessage("신규", { ...baseListing, option: "FSD" }), /옵션: FSD 확인/);
   assert.match(formatTelegramMessage("신규", { ...baseListing, option: "EAP" }), /옵션: EAP 확인/);
   assert.match(formatTelegramMessage("신규", baseListing), /옵션: 미확인/);
+});
+
+test("차량번호 미확인은 정해진 문구로 출력한다", () => {
+  const message = formatTelegramMessage("신규", { ...baseListing, vehicleNo: null });
+
+  assert.equal(message.split("\n")[2], "차량번호: 미확인");
 });
 
 test("FSD와 EAP가 함께 감지되면 FSD 표시를 우선한다", () => {
@@ -80,6 +88,7 @@ test("normal과 send_current 알림은 같은 출력 규칙을 사용한다", ()
   for (const message of messages) {
     assert.match(message, /^\[(?:가격 인하|현재 검색 결과)/);
     assert.match(message, /옵션: EAP 확인/);
+    assert.match(message, /차량번호: 12가3456/);
     assert.match(message, /모델 3 롱 레인지 AWD/);
     assert.match(message, /38,500,000원/);
     assert.match(message, /92,000㎞/);

@@ -105,6 +105,47 @@ export function stripHtml(value) {
     .trim();
 }
 
+export function normalizeVehicleNo(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/[\s-]+/g, "");
+  return /^\d{2,3}[가-힣]\d{4}$/u.test(normalized) ? normalized : null;
+}
+
+function normalizeListingId(value) {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return String(value);
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return value.trim();
+  return null;
+}
+
+export function parsePreloadedVehicleData(html) {
+  const unknown = { vehicleNo: null, vehicleId: null, queryCarId: null };
+  if (typeof html !== "string") return unknown;
+
+  const match = html.match(
+    /<script\b[^>]*>\s*__PRELOADED_STATE__\s*=\s*([\s\S]*?)<\/script>/i
+  );
+  if (!match) return unknown;
+
+  try {
+    const json = match[1].trim().replace(/;\s*$/, "");
+    const base = JSON.parse(json)?.cars?.base;
+    return {
+      vehicleNo: normalizeVehicleNo(base?.vehicleNo),
+      vehicleId: normalizeListingId(base?.vehicleId),
+      queryCarId: normalizeListingId(base?.queryCarId)
+    };
+  } catch {
+    return unknown;
+  }
+}
+
+export function maskVehicleNo(value) {
+  const normalized = normalizeVehicleNo(value);
+  return normalized ? normalized.replace(/\d{4}$/, "****") : "미확인";
+}
+
 export function parseListingText({ id, href, text }) {
   const normalized = text.replace(/\s+/g, " ").trim();
   const dateMatch = normalized.match(/(\d{2})\/(\d{2})식/);
@@ -173,6 +214,7 @@ export function parseListHtml(html) {
 
 export function analyzeDetail(html, listing, config) {
   const text = stripHtml(html);
+  const vehicleData = parsePreloadedVehicleData(html);
   const lower = text.toLowerCase();
   const hasFsd = /\bfsd\b|full self[- ]driving|완전\s*자율주행/i.test(text);
   const hasEap = /\beap\b|enhanced autopilot|향상된\s*오토파일럿|\bnoa\b/i.test(text);
@@ -185,6 +227,7 @@ export function analyzeDetail(html, listing, config) {
 
   return {
     ...listing,
+    ...vehicleData,
     option: hasFsd ? "FSD" : hasEap ? "EAP" : "미확인",
     hasFsd,
     hasEap,
@@ -318,6 +361,110 @@ export function getListingInspection(previous, listing, runMode) {
   };
 }
 
+export function findPreviousListing(listings, listing) {
+  const exact = listings?.[listing.id];
+  if (exact) {
+    return { previous: exact, previousListingId: listing.id, matchedBy: "listingId" };
+  }
+
+  const vehicleNo = normalizeVehicleNo(listing.vehicleNo);
+  if (!vehicleNo) return { previous: undefined, previousListingId: null, matchedBy: null };
+
+  const matches = Object.entries(listings ?? {})
+    .filter(([, previous]) => normalizeVehicleNo(previous?.vehicleNo) === vehicleNo)
+    .sort(([, left], [, right]) =>
+      String(right?.lastSeenAt ?? "").localeCompare(String(left?.lastSeenAt ?? ""))
+    );
+  const [match] = matches;
+  if (!match) return { previous: undefined, previousListingId: null, matchedBy: null };
+
+  return { previous: match[1], previousListingId: match[0], matchedBy: "vehicleNo" };
+}
+
+function isBetterRepresentative(candidate, current) {
+  if (Boolean(candidate.detailSucceeded) !== Boolean(current.detailSucceeded)) {
+    return Boolean(candidate.detailSucceeded);
+  }
+  if (Boolean(candidate.listing?.contracted) !== Boolean(current.listing?.contracted)) {
+    return !candidate.listing?.contracted;
+  }
+  return candidate.order < current.order;
+}
+
+export function selectRepresentativeCandidates(candidates) {
+  const groups = new Map();
+
+  for (const [index, candidate] of candidates.entries()) {
+    const order = candidate.order ?? index;
+    const vehicleNo = normalizeVehicleNo(candidate.listing?.vehicleNo);
+    const key = vehicleNo ? `vehicle:${vehicleNo}` : `listing:${candidate.listing.id}`;
+    const normalizedCandidate = { ...candidate, order };
+    const group = groups.get(key) ?? [];
+    group.push(normalizedCandidate);
+    groups.set(key, group);
+  }
+
+  const representatives = [];
+  const duplicates = [];
+  for (const group of groups.values()) {
+    const representative = group.reduce((current, candidate) =>
+      isBetterRepresentative(candidate, current) ? candidate : current
+    );
+    representatives.push(representative);
+    for (const candidate of group) {
+      if (candidate !== representative) duplicates.push({ representative, duplicate: candidate });
+    }
+  }
+
+  representatives.sort((left, right) => left.order - right.order);
+  duplicates.sort((left, right) => left.duplicate.order - right.duplicate.order);
+  return { representatives, duplicates };
+}
+
+export function applyRepresentativeState(listings, candidate) {
+  const currentListingId = String(candidate.listing.id);
+  const vehicleNo = normalizeVehicleNo(candidate.listing.vehicleNo);
+  const stateRecord = {
+    ...candidate.stateRecord,
+    id: currentListingId,
+    vehicleNo
+  };
+
+  if (!vehicleNo) {
+    listings[currentListingId] = stateRecord;
+    return { stateRecord, removedListingIds: [] };
+  }
+
+  const matchingPreviousEntries = Object.entries(listings)
+    .filter(
+      ([listingId, previous]) =>
+        listingId !== currentListingId && normalizeVehicleNo(previous?.vehicleNo) === vehicleNo
+    )
+    .sort(([, left], [, right]) =>
+      String(right?.lastSeenAt ?? "").localeCompare(String(left?.lastSeenAt ?? ""))
+    );
+  const removedListingIds = matchingPreviousEntries.map(([listingId]) => listingId);
+
+  for (const listingId of removedListingIds) delete listings[listingId];
+
+  const recordedPreviousListingId = candidate.stateRecord?.previousListingId
+    ? String(candidate.stateRecord.previousListingId)
+    : null;
+  const previousListingId = removedListingIds.includes(recordedPreviousListingId)
+    ? recordedPreviousListingId
+    : (removedListingIds[0] ?? recordedPreviousListingId);
+  if (previousListingId && previousListingId !== currentListingId) {
+    stateRecord.previousListingId = previousListingId;
+  }
+
+  listings[currentListingId] = stateRecord;
+  return { stateRecord, removedListingIds };
+}
+
+export function formatDuplicateListingLog(representative, duplicate) {
+  return `Duplicate listing suppressed: vehicle=${maskVehicleNo(representative.listing.vehicleNo)}, representative=${representative.listing.id}, duplicate=${duplicate.listing.id}`;
+}
+
 export function recordDetailFailure(previous, listing, now, errorMessage) {
   const { priceKrw: observedPriceKrw, listText: _listText, ...observation } = listing;
   const record = previous
@@ -329,6 +476,7 @@ export function recordDetailFailure(previous, listing, now, errorMessage) {
 
   return {
     ...record,
+    vehicleNo: normalizeVehicleNo(listing.vehicleNo) ?? normalizeVehicleNo(previous?.vehicleNo),
     lastSeenAt: now,
     lastObservedPriceKrw: observedPriceKrw,
     lastDetailFetchFailedAt: now,
@@ -347,12 +495,18 @@ export function recordListObservation(previous, listing, now) {
     priceKrw: listing.priceKrw,
     region: listing.region,
     contracted: listing.contracted,
+    vehicleNo: normalizeVehicleNo(listing.vehicleNo) ?? normalizeVehicleNo(previous?.vehicleNo),
     firstSeenAt: previous?.firstSeenAt ?? now,
     lastSeenAt: now
   };
 }
 
 export function recordDetailSuccess(previous, listing, evaluated, now) {
+  const previousId = previous?.id ? String(previous.id) : null;
+  const previousListingId =
+    previousId && previousId !== String(listing.id)
+      ? previousId
+      : previous?.previousListingId;
   const record = {
     ...(previous ?? {}),
     id: listing.id,
@@ -363,6 +517,9 @@ export function recordDetailSuccess(previous, listing, evaluated, now) {
     priceKrw: listing.priceKrw,
     region: listing.region,
     contracted: listing.contracted,
+    vehicleNo:
+      normalizeVehicleNo(evaluated.vehicleNo) ?? normalizeVehicleNo(previous?.vehicleNo),
+    ...(previousListingId ? { previousListingId } : {}),
     firstSeenAt: previous?.firstSeenAt ?? now,
     lastSeenAt: now,
     option: evaluated.option,
@@ -435,6 +592,7 @@ export function formatTelegramMessage(eventType, listing) {
   const lines = [
     `[${eventType}]`,
     `${listing.yearMonth.replace("-", "/")} ${listing.title}`,
+    `차량번호: ${normalizeVehicleNo(listing.vehicleNo) ?? "미확인"}`,
     ...(listing.conditionStatus
       ? [
           `판정: ${listing.conditionStatus}`,
