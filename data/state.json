@@ -1,7 +1,7 @@
 {
   "version": 1,
   "initializedAt": "2026-07-18T23:56:00.718Z",
-  "updatedAt": "2026-07-19T01:11:52.898Z",
+  "updatedAt": "2026-07-19T01:36:37.178Z",
   "listings": {
     "39641817": {
       "id": "39641817",
@@ -67,6 +67,22 @@
       "eligible": true,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "40395766": {
+      "id": "40395766",
+      "title": "모델 3 RWD",
+      "url": "https://fem.encar.com/cars/detail/40395766?advClickPosition=mweb_normal_g21_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-11",
+      "mileageKm": 40000,
+      "priceKrw": 36500000,
+      "region": "부산",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "40444647": {
       "id": "40444647",
       "title": "모델 3 롱 레인지 AWD",
@@ -102,34 +118,34 @@
     "40490326": {
       "id": "40490326",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/40490326?advClickPosition=mweb_mhightlight_g141_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/40490326?advClickPosition=mweb_mhightlight_g17_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-06",
       "mileageKm": 38030,
       "priceKrw": 42990000,
       "region": "부산",
       "contracted": true,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "40502228": {
       "id": "40502228",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/40502228?advClickPosition=mweb_mhightlight_g140_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/40502228?advClickPosition=mweb_mhightlight_g16_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-06",
       "mileageKm": 38030,
       "priceKrw": 42990000,
       "region": "부산",
       "contracted": true,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "40795072": {
       "id": "40795072",
@@ -371,6 +387,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "41888192": {
+      "id": "41888192",
+      "title": "모델 3 퍼포먼스 AWD",
+      "url": "https://fem.encar.com/cars/detail/41888192?advClickPosition=mweb_mhightlight_g20_t32&listAdvType=mhighlight&type=detail&view_type=normal",
+      "yearMonth": "2022-09",
+      "mileageKm": 46696,
+      "priceKrw": 99990000,
+      "region": "서울",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "41932751": {
       "id": "41932751",
       "title": "모델 3 롱 레인지 AWD",
@@ -486,34 +518,34 @@
     "41991947": {
       "id": "41991947",
       "title": "모델 3 RWD",
-      "url": "https://fem.encar.com/cars/detail/41991947?advClickPosition=mweb_mhightlight_g34_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/41991947?advClickPosition=mweb_mhightlight_g6_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-08",
       "mileageKm": 95545,
       "priceKrw": 44500000,
       "region": "부산",
       "contracted": false,
       "firstSeenAt": "2026-07-19T00:35:16.791Z",
-      "lastSeenAt": "2026-07-19T00:35:16.791Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "41996083": {
       "id": "41996083",
       "title": "모델 3 RWD",
-      "url": "https://fem.encar.com/cars/detail/41996083?advClickPosition=mweb_mhightlight_g28_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/41996083?advClickPosition=mweb_mhightlight_g5_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-08",
       "mileageKm": 95545,
       "priceKrw": 44500000,
       "region": "부산",
       "contracted": false,
       "firstSeenAt": "2026-07-19T00:35:16.791Z",
-      "lastSeenAt": "2026-07-19T00:35:16.791Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42000377": {
       "id": "42000377",
@@ -646,34 +678,34 @@
     "42023180": {
       "id": "42023180",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42023180?advClickPosition=mweb_mhightlight_g64_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/42023180?advClickPosition=mweb_mhightlight_g4_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-09",
       "mileageKm": 67235,
       "priceKrw": 32700000,
       "region": "경기",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42033809": {
       "id": "42033809",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42033809?advClickPosition=mweb_mhightlight_g57_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/42033809?advClickPosition=mweb_mhightlight_g3_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-09",
       "mileageKm": 67235,
       "priceKrw": 32700000,
       "region": "경기",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42043021": {
       "id": "42043021",
@@ -1299,6 +1331,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42218041": {
+      "id": "42218041",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42218041?advClickPosition=mweb_normal_g25_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-06",
+      "mileageKm": 80263,
+      "priceKrw": 99990000,
+      "region": "경기",
+      "contracted": true,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42220184": {
       "id": "42220184",
       "title": "모델 3 롱 레인지 AWD",
@@ -1542,18 +1590,18 @@
     "42287101": {
       "id": "42287101",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42287101?advClickPosition=mweb_mhightlight_g41_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/42287101?advClickPosition=mweb_mhightlight_g13_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-06",
       "mileageKm": 35654,
       "priceKrw": 99990000,
       "region": "경기",
       "contracted": true,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42290668": {
       "id": "42290668",
@@ -1638,18 +1686,18 @@
     "42298226": {
       "id": "42298226",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42298226?advClickPosition=mweb_mhightlight_g39_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/42298226?advClickPosition=mweb_mhightlight_g11_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-06",
       "mileageKm": 35654,
       "priceKrw": 99990000,
       "region": "경기",
       "contracted": true,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42300359": {
       "id": "42300359",
@@ -1830,18 +1878,18 @@
     "42315123": {
       "id": "42315123",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42315123?advClickPosition=mweb_mhightlight_g36_t302&listAdvType=mhighlight&type=detail&view_type=normal",
+      "url": "https://fem.encar.com/cars/detail/42315123?advClickPosition=mweb_mhightlight_g9_t32&listAdvType=mhighlight&type=detail&view_type=normal",
       "yearMonth": "2022-08",
       "mileageKm": 52196,
       "priceKrw": 28800000,
       "region": "경기",
       "contracted": true,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42315644": {
       "id": "42315644",
@@ -2099,6 +2147,38 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42333303": {
+      "id": "42333303",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42333303?advClickPosition=mweb_mhightlight_g19_t32&listAdvType=mhighlight&type=detail&view_type=checked",
+      "yearMonth": "2022-08",
+      "mileageKm": 70203,
+      "priceKrw": 39990000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
+    "42334170": {
+      "id": "42334170",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42334170?advClickPosition=mweb_mhightlight_g18_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "yearMonth": "2022-08",
+      "mileageKm": 70203,
+      "priceKrw": 39990000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42335070": {
       "id": "42335070",
       "title": "모델 3 RWD",
@@ -2294,18 +2374,50 @@
     "42353242": {
       "id": "42353242",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42353242?advClickPosition=mweb_mhightlight_g108_t302&listAdvType=mhighlight&type=detail&view_type=normal",
+      "url": "https://fem.encar.com/cars/detail/42353242?advClickPosition=mweb_mhightlight_g14_t32&listAdvType=mhighlight&type=detail&view_type=normal",
       "yearMonth": "2022-09",
       "mileageKm": 76000,
       "priceKrw": 41000000,
       "region": "대구",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
+    "42353308": {
+      "id": "42353308",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42353308?advClickPosition=mweb_normal_g24_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-08",
+      "mileageKm": 11319,
+      "priceKrw": 52000000,
+      "region": "제주",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
+    "42354882": {
+      "id": "42354882",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42354882?advClickPosition=mweb_normal_g32_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-06",
+      "mileageKm": 23925,
+      "priceKrw": 49900000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42354889": {
       "id": "42354889",
@@ -2419,6 +2531,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42358899": {
+      "id": "42358899",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42358899?advClickPosition=mweb_normal_g26_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-06",
+      "mileageKm": 22000,
+      "priceKrw": 51990000,
+      "region": "서울",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42359660": {
       "id": "42359660",
       "title": "모델 3 RWD",
@@ -2515,6 +2643,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42362138": {
+      "id": "42362138",
+      "title": "모델 3 RWD",
+      "url": "https://fem.encar.com/cars/detail/42362138?advClickPosition=mweb_normal_g31_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-09",
+      "mileageKm": 116060,
+      "priceKrw": 38900000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42362465": {
       "id": "42362465",
       "title": "모델 3 롱 레인지 AWD",
@@ -2562,6 +2706,38 @@
       "rental": false,
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+    },
+    "42363804": {
+      "id": "42363804",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42363804?advClickPosition=mweb_normal_g30_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-12",
+      "mileageKm": 49704,
+      "priceKrw": 43000000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
+    "42365162": {
+      "id": "42365162",
+      "title": "모델 3 퍼포먼스 AWD",
+      "url": "https://fem.encar.com/cars/detail/42365162?advClickPosition=mweb_mhightlight_g7_t32&listAdvType=mhighlight&type=detail&view_type=normal",
+      "yearMonth": "2022-09",
+      "mileageKm": 40400,
+      "priceKrw": 47000000,
+      "region": "전북",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42367519": {
       "id": "42367519",
@@ -2723,6 +2899,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42371690": {
+      "id": "42371690",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42371690?advClickPosition=mweb_normal_g22_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-08",
+      "mileageKm": 66584,
+      "priceKrw": 39500000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42372057": {
       "id": "42372057",
       "title": "모델 3 RWD",
@@ -2802,6 +2994,22 @@
       "rental": false,
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+    },
+    "42376181": {
+      "id": "42376181",
+      "title": "모델 3 스탠다드 RWD",
+      "url": "https://fem.encar.com/cars/detail/42376181?advClickPosition=mweb_normal_g29_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-09",
+      "mileageKm": 38000,
+      "priceKrw": 41000000,
+      "region": "대전",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42376775": {
       "id": "42376775",
@@ -2886,18 +3094,18 @@
     "42378674": {
       "id": "42378674",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42378674?advClickPosition=mweb_mhightlight_g40_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/42378674?advClickPosition=mweb_mhightlight_g12_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-06",
       "mileageKm": 62391,
       "priceKrw": 43900000,
       "region": "부산",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42378731": {
       "id": "42378731",
@@ -2979,6 +3187,22 @@
       "eligible": false,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42381493": {
+      "id": "42381493",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42381493?advClickPosition=mweb_normal_g28_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-06",
+      "mileageKm": 55500,
+      "priceKrw": 43000000,
+      "region": "대구",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42382285": {
       "id": "42382285",
       "title": "모델 3 퍼포먼스 AWD",
@@ -3043,21 +3267,37 @@
       "eligible": true,
       "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
     },
+    "42382611": {
+      "id": "42382611",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42382611?advClickPosition=mweb_normal_g27_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-12",
+      "mileageKm": 46260,
+      "priceKrw": 42000000,
+      "region": "경기",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": false,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
     "42383037": {
       "id": "42383037",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42383037?advClickPosition=mweb_mhightlight_g2_t302&listAdvType=mhighlight&type=detail&view_type=normal",
+      "url": "https://fem.encar.com/cars/detail/42383037?advClickPosition=mweb_mhightlight_g8_t32&listAdvType=mhighlight&type=detail&view_type=normal",
       "yearMonth": "2022-12",
       "mileageKm": 28658,
       "priceKrw": 48700000,
       "region": "대구",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42383232": {
       "id": "42383232",
@@ -3078,18 +3318,18 @@
     "42384042": {
       "id": "42384042",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42384042?advClickPosition=mweb_mhightlight_g38_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/42384042?advClickPosition=mweb_mhightlight_g10_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-06",
       "mileageKm": 62391,
       "priceKrw": 43900000,
       "region": "부산",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42384982": {
       "id": "42384982",
@@ -3110,18 +3350,18 @@
     "42386376": {
       "id": "42386376",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42386376?advClickPosition=mweb_mhightlight_g113_t302&listAdvType=mhighlight&type=detail&view_type=checked",
+      "url": "https://fem.encar.com/cars/detail/42386376?advClickPosition=mweb_mhightlight_g2_t32&listAdvType=mhighlight&type=detail&view_type=checked",
       "yearMonth": "2022-06",
       "mileageKm": 73704,
       "priceKrw": 39500000,
       "region": "경기",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42386433": {
       "id": "42386433",
@@ -3142,18 +3382,18 @@
     "42386837": {
       "id": "42386837",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42386837?advClickPosition=mweb_mhightlight_g111_t302&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+      "url": "https://fem.encar.com/cars/detail/42386837?advClickPosition=mweb_mhightlight_g1_t32&listAdvType=mhighlight&type=detail&view_type=hs_ad",
       "yearMonth": "2022-06",
       "mileageKm": 73704,
       "priceKrw": 39500000,
       "region": "경기",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "미확인",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     },
     "42387044": {
       "id": "42387044",
@@ -3206,18 +3446,34 @@
     "42387993": {
       "id": "42387993",
       "title": "모델 3 롱 레인지 AWD",
-      "url": "https://fem.encar.com/cars/detail/42387993?advClickPosition=mweb_mhightlight_g109_t302&listAdvType=mhighlight&type=detail&view_type=normal",
+      "url": "https://fem.encar.com/cars/detail/42387993?advClickPosition=mweb_mhightlight_g15_t32&listAdvType=mhighlight&type=detail&view_type=normal",
       "yearMonth": "2022-08",
       "mileageKm": 29400,
       "priceKrw": 50900000,
       "region": "경기",
       "contracted": false,
       "firstSeenAt": "2026-07-18T23:56:00.718Z",
-      "lastSeenAt": "2026-07-19T01:11:52.898Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
       "option": "FSD",
       "rental": false,
       "eligible": false,
-      "lastEvaluatedAt": "2026-07-19T00:35:16.791Z"
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
+    },
+    "42389272": {
+      "id": "42389272",
+      "title": "모델 3 롱 레인지 AWD",
+      "url": "https://fem.encar.com/cars/detail/42389272?advClickPosition=mweb_normal_g23_t32&listAdvType=normal&type=detail&view_type=normal",
+      "yearMonth": "2022-06",
+      "mileageKm": 177952,
+      "priceKrw": 37500000,
+      "region": "전남광주",
+      "contracted": false,
+      "firstSeenAt": "2026-07-19T01:36:37.178Z",
+      "lastSeenAt": "2026-07-19T01:36:37.178Z",
+      "option": "미확인",
+      "rental": false,
+      "eligible": true,
+      "lastEvaluatedAt": "2026-07-19T01:36:37.178Z"
     }
   }
 }
