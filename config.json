@@ -12,7 +12,7 @@
   "rentalPenaltyKrw": 3000000,
   "excludedColorTerms": ["빨간색", "적색", "레드", "red multi-coat", "ultra red"],
   "excludeContracted": true,
-  "notifyPriceIncrease": false,
+  "notifyPriceIncrease": true,
   "maxPages": 2,
   "requestDelayMs": 1500
 }

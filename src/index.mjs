@@ -8,6 +8,7 @@ import {
   loadJson,
   matchesBasicCriteria,
   parseListHtml,
+  prepareSendCurrentListing,
   recordDetailFailure,
   recordListObservation,
   recordDetailSuccess,
@@ -99,10 +100,11 @@ if (listingsById.size === 0) {
 
 const now = new Date().toISOString();
 const wasInitialized = Boolean(state.initializedAt);
+const isSendCurrent = runMode === "send_current";
 const events = [];
 
 for (const listing of listingsById.values()) {
-  if (!matchesBasicCriteria(listing, config)) continue;
+  if (!isSendCurrent && !matchesBasicCriteria(listing, config)) continue;
 
   const previous = state.listings[listing.id];
   const inspection = getListingInspection(previous, listing, runMode);
@@ -119,14 +121,32 @@ for (const listing of listingsById.values()) {
   } catch (error) {
     console.warn(`Detail fetch failed for ${listing.id}:`, error.message);
     state.listings[listing.id] = recordDetailFailure(previous, listing, now, error.message);
+    if (isSendCurrent) {
+      const event = createListingEvent({
+        runMode,
+        wasInitialized,
+        inspection,
+        previous,
+        listing: prepareSendCurrentListing(listing, config, {
+          detailSucceeded: false,
+          errorMessage: error.message
+        }),
+        detailSucceeded: false,
+        notifyPriceIncrease: config.notifyPriceIncrease
+      });
+      if (event) events.push(event);
+    }
     continue;
   }
   const enriched = analyzeDetail(detailHtml, listing, config);
   const evaluated = evaluateListing(enriched, config);
+  const eventListing = isSendCurrent
+    ? prepareSendCurrentListing(evaluated, config, { detailSucceeded: true })
+    : evaluated;
 
   state.listings[listing.id] = recordDetailSuccess(previous, listing, evaluated, now);
 
-  if (!evaluated.eligible) {
+  if (!isSendCurrent && !evaluated.eligible) {
     console.log(`Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`);
     continue;
   }
@@ -136,14 +156,14 @@ for (const listing of listingsById.values()) {
     wasInitialized,
     inspection,
     previous,
-    listing: evaluated,
+    listing: eventListing,
     detailSucceeded: true,
     notifyPriceIncrease: config.notifyPriceIncrease
   });
   if (event) events.push(event);
 }
 
-if (!wasInitialized) {
+if (!wasInitialized && !isSendCurrent) {
   state.initializedAt = now;
   await sendTelegram(
     `Sentinel-o-car 매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 인하를 알립니다.`

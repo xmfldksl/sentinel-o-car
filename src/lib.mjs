@@ -133,6 +133,21 @@ export function matchesBasicCriteria(listing, config) {
   );
 }
 
+export function getBasicCriteriaFailureReasons(listing, config) {
+  const reasons = [];
+  const titleOk = config.requiredTitleTerms.every((term) =>
+    listing.title.toLowerCase().includes(term.toLowerCase())
+  );
+
+  if (!titleOk) reasons.push("차종/트림 불일치");
+  if (listing.yearMonth < config.yearMonthMin || listing.yearMonth > config.yearMonthMax) {
+    reasons.push("연월 범위 초과");
+  }
+  if (listing.mileageKm > config.maxMileageKm) reasons.push("주행거리 초과");
+
+  return reasons;
+}
+
 export function evaluateListing(listing, config) {
   const adjustedPriceKrw = listing.priceKrw + (listing.rental ? config.rentalPenaltyKrw : 0);
   let limitKrw = config.priceLimitsKrw.base;
@@ -152,7 +167,9 @@ export function evaluateListing(listing, config) {
   const excludedReasons = [];
   if (config.excludeContracted && listing.contracted) excludedReasons.push("계약중");
   if (listing.redColor) excludedReasons.push("빨간색 계열");
-  if (adjustedPriceKrw > limitKrw) excludedReasons.push("가격 기준 초과");
+  if (adjustedPriceKrw > limitKrw) {
+    excludedReasons.push(listing.rental ? "렌트 감가 후 가격 초과" : "가격 초과");
+  }
 
   const warnings = [];
   if (listing.option === "미확인" && adjustedPriceKrw > config.priceLimitsKrw.base) {
@@ -170,6 +187,45 @@ export function evaluateListing(listing, config) {
     eligible: excludedReasons.length === 0,
     excludedReasons,
     warnings
+  };
+}
+
+export function prepareSendCurrentListing(listing, config, { detailSucceeded, errorMessage } = {}) {
+  const reasons = [...getBasicCriteriaFailureReasons(listing, config)];
+  let result = listing;
+
+  if (detailSucceeded) {
+    reasons.push(...(listing.excludedReasons ?? []));
+  } else {
+    const listText = `${listing.title} ${listing.listText ?? ""}`.toLowerCase();
+    const listShowsRedColor = config.excludedColorTerms.some((term) =>
+      listText.includes(term.toLowerCase())
+    );
+
+    if (config.excludeContracted && listing.contracted) reasons.push("계약중");
+    if (listShowsRedColor) reasons.push("빨간색 계열");
+    if (listing.priceKrw > config.priceLimitsKrw.unknownOptionHardMax) reasons.push("가격 초과");
+    reasons.push("상세 확인 실패");
+    if (listing.priceKrw > config.priceLimitsKrw.base) reasons.push("옵션 미확인");
+    result = {
+      ...listing,
+      option: "상세 확인 실패",
+      adjustedPriceKrw: listing.priceKrw,
+      limitKrw: config.priceLimitsKrw.unknownOptionHardMax,
+      priceRule: "상세 확인 실패",
+      eligible: false,
+      excludedReasons: [],
+      warnings: errorMessage ? [`상세 확인 실패: ${errorMessage}`] : ["상세 확인 실패"],
+      detailFailed: true
+    };
+  }
+
+  const conditionReasons = [...new Set(reasons)];
+  return {
+    ...result,
+    conditionStatus: conditionReasons.length === 0 ? "조건 충족" : "조건 미충족",
+    conditionReasons,
+    detailFailed: !detailSucceeded
   };
 }
 
@@ -255,8 +311,13 @@ export function createListingEvent({
   detailSucceeded,
   notifyPriceIncrease = false
 }) {
+  if (runMode === "send_current") {
+    return {
+      type: `현재 검색 결과 · ${listing.conditionStatus ?? (listing.eligible ? "조건 충족" : "조건 미충족")}`,
+      listing
+    };
+  }
   if (!detailSucceeded || !listing.eligible) return null;
-  if (runMode === "send_current") return { type: "현재 조건 충족", listing };
   if (wasInitialized && inspection.isNew) return { type: "신규", listing };
   if (wasInitialized && inspection.priceDropped) {
     return {
@@ -285,11 +346,18 @@ export function formatTelegramMessage(eventType, listing) {
   const lines = [
     `[Sentinel-o-car ${eventType}]`,
     `${listing.yearMonth.replace("-", "/")} ${listing.title}`,
+    ...(listing.conditionStatus
+      ? [
+          `판정: ${listing.conditionStatus}`,
+          ...(listing.conditionReasons?.length ? [`사유: ${listing.conditionReasons.join(", ")}`] : [])
+        ]
+      : []),
     `${formatKm(listing.mileageKm)} | ${formatKrw(listing.priceKrw)} | ${listing.region}`,
     `옵션 판정: ${listing.option}`,
     `적용 기준: ${listing.priceRule} ${formatKrw(listing.limitKrw)}`
   ];
 
+  if (listing.detailFailed) lines.push("상세: 상세 확인 실패");
   if (listing.rental) lines.push(`렌트 감가 반영 평가가격: ${formatKrw(listing.adjustedPriceKrw)}`);
   if (listing.warnings.length) lines.push(`확인사항: ${listing.warnings.join(" / ")}`);
   lines.push(listing.url);
