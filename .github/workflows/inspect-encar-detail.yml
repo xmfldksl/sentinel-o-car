@@ -1,16 +1,6 @@
 name: Inspect Encar detail
 
 on:
-  push:
-    branches:
-      - fix/color-option-detection
-    paths:
-      - "src/lib.mjs"
-      - "test/**"
-      - "config.json"
-      - "scripts/inspect-encar-detail.mjs"
-      - ".github/workflows/inspect-encar-detail.yml"
-
   workflow_dispatch:
     inputs:
       listing_ids:

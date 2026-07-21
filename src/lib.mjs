@@ -20,18 +20,26 @@ export function createSearchUrlFingerprint(urlString) {
 
 export function summarizeSearchUrl(urlString) {
   let url;
+
   try {
     url = new URL(urlString);
   } catch {
-    throw new Error("ENCAR_SEARCH_URL이 올바른 URL이 아닙니다.");
+    throw new Error(
+      "ENCAR_SEARCH_URL이 올바른 URL이 아닙니다."
+    );
   }
 
-  const encodedSearch = url.searchParams.get("search");
+  const encodedSearch =
+    url.searchParams.get("search");
+
   if (encodedSearch === null) {
-    throw new Error("ENCAR_SEARCH_URL에 search 파라미터가 없습니다.");
+    throw new Error(
+      "ENCAR_SEARCH_URL에 search 파라미터가 없습니다."
+    );
   }
 
   let search;
+
   try {
     search = JSON.parse(encodedSearch);
   } catch {
@@ -40,54 +48,87 @@ export function summarizeSearchUrl(urlString) {
     );
   }
 
-  if (!search || typeof search !== "object" || Array.isArray(search)) {
+  if (
+    !search ||
+    typeof search !== "object" ||
+    Array.isArray(search)
+  ) {
     throw new Error(
       "ENCAR_SEARCH_URL의 search 파라미터는 JSON 객체여야 합니다."
     );
   }
 
-  const action = typeof search.action === "string" ? search.action : "";
+  const action =
+    typeof search.action === "string"
+      ? search.action
+      : "";
+
   const yearRange =
-    action.match(/Year\.range\([^)]*\)/)?.[0] ?? "없음";
+    action.match(
+      /Year\.range\([^)]*\)/
+    )?.[0] ?? "없음";
+
   const title =
-    typeof search.title === "string" && search.title.trim()
+    typeof search.title === "string" &&
+    search.title.trim()
       ? singleLine(search.title)
       : "없음";
-  const normalizedUrl = url.toString();
+
+  const normalizedUrl =
+    url.toString();
 
   return {
     url: normalizedUrl,
     host: url.host,
-    page: url.searchParams.get("page") ?? "없음",
+    page:
+      url.searchParams.get("page") ??
+      "없음",
     title,
     yearRange,
-    fingerprint: createSearchUrlFingerprint(normalizedUrl)
+    fingerprint:
+      createSearchUrlFingerprint(
+        normalizedUrl
+      )
   };
 }
 
-export function resolveSearchUrl(environment = process.env) {
-  const configuredUrl = environment.ENCAR_SEARCH_URL;
+export function resolveSearchUrl(
+  environment = process.env
+) {
+  const configuredUrl =
+    environment.ENCAR_SEARCH_URL;
+
   const hasConfiguredUrl =
     typeof configuredUrl === "string" &&
     configuredUrl.trim().length > 0;
 
-  if (environment.GITHUB_ACTIONS === "true" && !hasConfiguredUrl) {
+  if (
+    environment.GITHUB_ACTIONS ===
+      "true" &&
+    !hasConfiguredUrl
+  ) {
     throw new Error(
       "GitHub Actions에서는 ENCAR_SEARCH_URL repository variable이 필요합니다."
     );
   }
 
-  const source = hasConfiguredUrl ? "repository variable" : "default";
+  const source = hasConfiguredUrl
+    ? "repository variable"
+    : "default";
 
   return {
     source,
     ...summarizeSearchUrl(
-      hasConfiguredUrl ? configuredUrl.trim() : DEFAULT_SEARCH_URL
+      hasConfiguredUrl
+        ? configuredUrl.trim()
+        : DEFAULT_SEARCH_URL
     )
   };
 }
 
-export function formatSearchUrlSummary(searchUrl) {
+export function formatSearchUrlSummary(
+  searchUrl
+) {
   return [
     `검색 URL 출처: ${searchUrl.source}`,
     `검색 URL 호스트: ${searchUrl.host}`,
@@ -109,16 +150,24 @@ const HTML_ENTITIES = new Map([
 
 export function decodeHtml(value) {
   return value
-    .replace(/&#(\d+);/g, (_, n) =>
-      String.fromCodePoint(Number(n))
+    .replace(
+      /&#(\d+);/g,
+      (_, n) =>
+        String.fromCodePoint(Number(n))
     )
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) =>
-      String.fromCodePoint(Number.parseInt(n, 16))
+    .replace(
+      /&#x([0-9a-f]+);/gi,
+      (_, n) =>
+        String.fromCodePoint(
+          Number.parseInt(n, 16)
+        )
     )
     .replace(
       /&([a-z]+);/gi,
       (match, name) =>
-        HTML_ENTITIES.get(name.toLowerCase()) ?? match
+        HTML_ENTITIES.get(
+          name.toLowerCase()
+        ) ?? match
     );
 }
 
@@ -139,14 +188,20 @@ export function stripHtml(value) {
     .trim();
 }
 
-export function normalizeVehicleNo(value) {
-  if (typeof value !== "string") return null;
+export function normalizeVehicleNo(
+  value
+) {
+  if (typeof value !== "string") {
+    return null;
+  }
 
   const normalized = value
     .trim()
     .replace(/[\s-]+/g, "");
 
-  return /^\d{2,3}[가-힣]\d{4}$/u.test(normalized)
+  return /^\d{2,3}[가-힣]\d{4}$/u.test(
+    normalized
+  )
     ? normalized
     : null;
 }
@@ -171,13 +226,17 @@ function normalizeListingId(value) {
 }
 
 function parsePreloadedState(html) {
-  if (typeof html !== "string") return null;
+  if (typeof html !== "string") {
+    return null;
+  }
 
   const match = html.match(
     /<script\b[^>]*>\s*__PRELOADED_STATE__\s*=\s*([\s\S]*?)<\/script>/i
   );
 
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   try {
     const json = match[1]
@@ -192,36 +251,99 @@ function parsePreloadedState(html) {
 
 function extractVehicleData(base) {
   return {
-    vehicleNo: normalizeVehicleNo(base?.vehicleNo),
-    vehicleId: normalizeListingId(base?.vehicleId),
-    queryCarId: normalizeListingId(base?.queryCarId)
+    vehicleNo:
+      normalizeVehicleNo(
+        base?.vehicleNo
+      ),
+    vehicleId:
+      normalizeListingId(
+        base?.vehicleId
+      ),
+    queryCarId:
+      normalizeListingId(
+        base?.queryCarId
+      )
   };
 }
 
-export function parsePreloadedVehicleData(html) {
-  const state = parsePreloadedState(html);
-  return extractVehicleData(state?.cars?.base);
+export function parsePreloadedVehicleData(
+  html
+) {
+  const state =
+    parsePreloadedState(html);
+
+  return extractVehicleData(
+    state?.cars?.base
+  );
 }
 
 export function maskVehicleNo(value) {
-  const normalized = normalizeVehicleNo(value);
+  const normalized =
+    normalizeVehicleNo(value);
 
   return normalized
-    ? normalized.replace(/\d{4}$/, "****")
+    ? normalized.replace(
+        /\d{4}$/,
+        "****"
+      )
     : "미확인";
 }
 
-function collectStringValues(value, results = []) {
+function formatListingUrl(listing) {
+  const idFromListing =
+    normalizeListingId(
+      listing?.id
+    );
+
+  const idFromUrl =
+    typeof listing?.url === "string"
+      ? listing.url.match(
+          /\/cars\/detail\/(\d+)/
+        )?.[1] ?? null
+      : null;
+
+  const listingId =
+    idFromListing ?? idFromUrl;
+
+  if (listingId) {
+    return `https://fem.encar.com/cars/detail/${listingId}`;
+  }
+
+  const rawUrl =
+    typeof listing?.url === "string"
+      ? listing.url.trim()
+      : "";
+
+  return rawUrl.split(
+    /[?#]/,
+    1
+  )[0];
+}
+
+function collectStringValues(
+  value,
+  results = []
+) {
   if (typeof value === "string") {
-    const normalized = singleLine(stripHtml(value));
-    if (normalized) results.push(normalized);
+    const normalized = singleLine(
+      stripHtml(value)
+    );
+
+    if (normalized) {
+      results.push(normalized);
+    }
+
     return results;
   }
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectStringValues(item, results);
+      collectStringValues(
+        item,
+        results
+      );
     }
+
     return results;
   }
 
@@ -229,35 +351,57 @@ function collectStringValues(value, results = []) {
     value &&
     typeof value === "object"
   ) {
-    for (const child of Object.values(value)) {
-      collectStringValues(child, results);
+    for (
+      const child of
+      Object.values(value)
+    ) {
+      collectStringValues(
+        child,
+        results
+      );
     }
   }
 
   return results;
 }
 
-function collectSellerTextSegments(base) {
+function collectSellerTextSegments(
+  base
+) {
   const rawValues = [
     base?.advertisement?.oneLineText,
     base?.contents,
     ...(Array.isArray(base?.photos)
-      ? base.photos.map((photo) => photo?.desc)
+      ? base.photos.map(
+          (photo) => photo?.desc
+        )
       : [])
   ];
 
   const segments = [];
 
   for (const value of rawValues) {
-    if (typeof value !== "string") continue;
+    if (
+      typeof value !== "string"
+    ) {
+      continue;
+    }
 
-    const normalized = stripHtml(value);
+    const normalized =
+      stripHtml(value);
 
-    for (const segment of normalized.split(
-      /[\n\r.。!！?？★•·|]+/u
-    )) {
-      const text = singleLine(segment);
-      if (text) segments.push(text);
+    for (
+      const segment of
+      normalized.split(
+        /[\n\r.。!！?？★•·|]+/u
+      )
+    ) {
+      const text =
+        singleLine(segment);
+
+      if (text) {
+        segments.push(text);
+      }
     }
   }
 
@@ -277,12 +421,25 @@ const OPTION_NON_OWNERSHIP_PATTERN =
 const OPTION_OWNERSHIP_PATTERN =
   /보유|구매\s*(?:완료|함|됨|한|완료함)?|적용|포함|장착|설치|결제\s*(?:완료)?|옵션\s*(?:포함|적용|구매|장착)?/i;
 
-function detectStructuredOption(optionValues, type) {
-  const termPattern = OPTION_TERM_PATTERNS[type];
+function detectStructuredOption(
+  optionValues,
+  type
+) {
+  const termPattern =
+    OPTION_TERM_PATTERNS[type];
 
   for (const value of optionValues) {
-    if (!termPattern.test(value)) continue;
-    if (OPTION_NON_OWNERSHIP_PATTERN.test(value)) continue;
+    if (!termPattern.test(value)) {
+      continue;
+    }
+
+    if (
+      OPTION_NON_OWNERSHIP_PATTERN.test(
+        value
+      )
+    ) {
+      continue;
+    }
 
     return {
       confirmed: true,
@@ -298,13 +455,38 @@ function detectStructuredOption(optionValues, type) {
   };
 }
 
-function detectSellerOption(sellerSegments, type) {
-  const termPattern = OPTION_TERM_PATTERNS[type];
+function detectSellerOption(
+  sellerSegments,
+  type
+) {
+  const termPattern =
+    OPTION_TERM_PATTERNS[type];
 
-  for (const segment of sellerSegments) {
-    if (!termPattern.test(segment)) continue;
-    if (OPTION_NON_OWNERSHIP_PATTERN.test(segment)) continue;
-    if (!OPTION_OWNERSHIP_PATTERN.test(segment)) continue;
+  for (
+    const segment of
+    sellerSegments
+  ) {
+    if (
+      !termPattern.test(segment)
+    ) {
+      continue;
+    }
+
+    if (
+      OPTION_NON_OWNERSHIP_PATTERN.test(
+        segment
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      !OPTION_OWNERSHIP_PATTERN.test(
+        segment
+      )
+    ) {
+      continue;
+    }
 
     return {
       confirmed: true,
@@ -324,29 +506,38 @@ function detectSellerOption(sellerSegments, type) {
 function detectConfirmedOptions(base) {
   const structuredValues = [
     ...new Set(
-      collectStringValues(base?.options)
+      collectStringValues(
+        base?.options
+      )
     )
   ];
 
   const sellerSegments =
     collectSellerTextSegments(base);
 
-  const fsdStructured = detectStructuredOption(
-    structuredValues,
-    "FSD"
-  );
-  const fsdSeller = detectSellerOption(
-    sellerSegments,
-    "FSD"
-  );
-  const eapStructured = detectStructuredOption(
-    structuredValues,
-    "EAP"
-  );
-  const eapSeller = detectSellerOption(
-    sellerSegments,
-    "EAP"
-  );
+  const fsdStructured =
+    detectStructuredOption(
+      structuredValues,
+      "FSD"
+    );
+
+  const fsdSeller =
+    detectSellerOption(
+      sellerSegments,
+      "FSD"
+    );
+
+  const eapStructured =
+    detectStructuredOption(
+      structuredValues,
+      "EAP"
+    );
+
+  const eapSeller =
+    detectSellerOption(
+      sellerSegments,
+      "EAP"
+    );
 
   const hasFsd =
     fsdStructured.confirmed ||
@@ -362,36 +553,50 @@ function detectConfirmedOptions(base) {
       ? "EAP"
       : "미확인";
 
-  const selectedEvidence = hasFsd
-    ? fsdStructured.confirmed
-      ? fsdStructured
-      : fsdSeller
-    : hasEap
-      ? eapStructured.confirmed
-        ? eapStructured
-        : eapSeller
-      : null;
+  const selectedEvidence =
+    hasFsd
+      ? fsdStructured.confirmed
+        ? fsdStructured
+        : fsdSeller
+      : hasEap
+        ? eapStructured.confirmed
+          ? eapStructured
+          : eapSeller
+        : null;
 
   return {
     option,
     hasFsd,
     hasEap,
     optionSource:
-      selectedEvidence?.source ?? "미확인",
+      selectedEvidence?.source ??
+      "미확인",
     optionEvidence:
-      selectedEvidence?.evidence ?? null
+      selectedEvidence?.evidence ??
+      null
   };
 }
 
 function normalizeColorName(value) {
-  if (typeof value !== "string") return null;
+  if (
+    typeof value !== "string"
+  ) {
+    return null;
+  }
 
-  const normalized = singleLine(value);
+  const normalized =
+    singleLine(value);
+
   return normalized || null;
 }
 
-function isExcludedColor(colorName, config) {
-  if (!colorName) return false;
+function isExcludedColor(
+  colorName,
+  config
+) {
+  if (!colorName) {
+    return false;
+  }
 
   const normalizedColor =
     colorName.toLowerCase();
@@ -415,13 +620,19 @@ export function parseListingText({
     .trim();
 
   const dateMatch =
-    normalized.match(/(\d{2})\/(\d{2})식/);
+    normalized.match(
+      /(\d{2})\/(\d{2})식/
+    );
 
   const mileageMatch =
-    normalized.match(/([\d,]+)\s*km/i);
+    normalized.match(
+      /([\d,]+)\s*km/i
+    );
 
   const priceMatches = [
-    ...normalized.matchAll(/([\d,]+)\s*만원/g)
+    ...normalized.matchAll(
+      /([\d,]+)\s*만원/g
+    )
   ];
 
   if (
@@ -432,14 +643,18 @@ export function parseListingText({
     return null;
   }
 
-  const dateIndex = dateMatch.index ?? 0;
+  const dateIndex =
+    dateMatch.index ?? 0;
 
   let title = normalized
     .slice(0, dateIndex)
     .trim();
 
   title = title
-    .replace(/^찜하기\s*/, "")
+    .replace(
+      /^찜하기\s*/,
+      ""
+    )
     .replace(
       /^'엔카믿고'는[^]*?제공합니다\s*/,
       ""
@@ -456,15 +671,20 @@ export function parseListingText({
   const month =
     Number(dateMatch[2]);
 
-  const mileageKm = Number(
-    mileageMatch[1].replaceAll(",", "")
-  );
+  const mileageKm =
+    Number(
+      mileageMatch[1].replaceAll(
+        ",",
+        ""
+      )
+    );
 
-  const priceManwon = Number(
-    priceMatches
-      .at(-1)[1]
-      .replaceAll(",", "")
-  );
+  const priceManwon =
+    Number(
+      priceMatches
+        .at(-1)[1]
+        .replaceAll(",", "")
+    );
 
   const priceKrw =
     priceManwon * 10000;
@@ -472,10 +692,11 @@ export function parseListingText({
   const contracted =
     /계약중/.test(normalized);
 
-  const afterMileage = normalized.slice(
-    (mileageMatch.index ?? 0) +
-      mileageMatch[0].length
-  );
+  const afterMileage =
+    normalized.slice(
+      (mileageMatch.index ?? 0) +
+        mileageMatch[0].length
+    );
 
   const regionMatch =
     afterMileage.match(
@@ -497,7 +718,8 @@ export function parseListingText({
     mileageKm,
     priceKrw,
     region:
-      regionMatch?.[1] ?? "미확인",
+      regionMatch?.[1] ??
+      "미확인",
     contracted,
     listText: normalized
   };
@@ -509,22 +731,34 @@ export function parseListHtml(html) {
   const anchorPattern =
     /<a\b[^>]*href=(['"])([^'"]*\/cars\/detail\/\d+[^'"]*)\1[^>]*>([\s\S]*?)<\/a>/gi;
 
-  for (const match of html.matchAll(
-    anchorPattern
-  )) {
-    const href = decodeHtml(match[2]);
+  for (
+    const match of
+    html.matchAll(anchorPattern)
+  ) {
+    const href =
+      decodeHtml(match[2]);
+
     const idMatch =
-      href.match(/\/cars\/detail\/(\d+)/);
+      href.match(
+        /\/cars\/detail\/(\d+)/
+      );
 
-    if (!idMatch) continue;
+    if (!idMatch) {
+      continue;
+    }
 
-    const parsed = parseListingText({
-      id: idMatch[1],
-      href,
-      text: stripHtml(match[3])
-    });
+    const parsed =
+      parseListingText({
+        id: idMatch[1],
+        href,
+        text: stripHtml(
+          match[3]
+        )
+      });
 
-    if (!parsed) continue;
+    if (!parsed) {
+      continue;
+    }
 
     const existing =
       results.get(parsed.id);
@@ -534,7 +768,10 @@ export function parseListHtml(html) {
       parsed.listText.length <
         existing.listText.length
     ) {
-      results.set(parsed.id, parsed);
+      results.set(
+        parsed.id,
+        parsed
+      );
     }
   }
 
@@ -546,9 +783,15 @@ export function analyzeDetail(
   listing,
   config
 ) {
-  const text = stripHtml(html);
-  const state = parsePreloadedState(html);
-  const base = state?.cars?.base;
+  const text =
+    stripHtml(html);
+
+  const state =
+    parsePreloadedState(html);
+
+  const base =
+    state?.cars?.base;
+
   const vehicleData =
     extractVehicleData(base);
 
@@ -561,7 +804,10 @@ export function analyzeDetail(
     );
 
   const redColor =
-    isExcludedColor(colorName, config);
+    isExcludedColor(
+      colorName,
+      config
+    );
 
   const rentalNegated =
     /렌트\s*(이력|용도)?\s*(없|무)|대여용도\s*(없|무)/i.test(
@@ -570,7 +816,9 @@ export function analyzeDetail(
 
   const rental =
     !rentalNegated &&
-    /렌트|렌터카|대여용도/i.test(text);
+    /렌트|렌터카|대여용도/i.test(
+      text
+    );
 
   const smokingNegated =
     /비흡연|흡연\s*(없|무)|담배\s*(없|무)/i.test(
@@ -592,7 +840,9 @@ export function analyzeDetail(
     ...optionData,
     colorName,
     colorStatus:
-      colorName ? "확인" : "미확인",
+      colorName
+        ? "확인"
+        : "미확인",
     redColor,
     rental,
     smokingWarning,
@@ -644,7 +894,9 @@ export function getBasicCriteriaFailureReasons(
     );
 
   if (!titleOk) {
-    reasons.push("차종/트림 불일치");
+    reasons.push(
+      "차종/트림 불일치"
+    );
   }
 
   if (
@@ -653,25 +905,35 @@ export function getBasicCriteriaFailureReasons(
     listing.yearMonth >
       config.yearMonthMax
   ) {
-    reasons.push("연월 범위 초과");
+    reasons.push(
+      "연월 범위 초과"
+    );
   }
 
   if (
     listing.mileageKm >
     config.maxMileageKm
   ) {
-    reasons.push("주행거리 초과");
+    reasons.push(
+      "주행거리 초과"
+    );
   }
 
   return reasons;
 }
 
-function resolveConfirmedOption(listing) {
-  if (listing.hasFsd === true) {
+function resolveConfirmedOption(
+  listing
+) {
+  if (
+    listing.hasFsd === true
+  ) {
     return "FSD";
   }
 
-  if (listing.hasEap === true) {
+  if (
+    listing.hasEap === true
+  ) {
     return "EAP";
   }
 
@@ -683,7 +945,9 @@ export function evaluateListing(
   config
 ) {
   const option =
-    resolveConfirmedOption(listing);
+    resolveConfirmedOption(
+      listing
+    );
 
   const adjustedPriceKrw =
     listing.priceKrw +
@@ -700,11 +964,17 @@ export function evaluateListing(
   if (option === "FSD") {
     limitKrw =
       config.priceLimitsKrw.fsd;
-    reason = "FSD 기준";
-  } else if (option === "EAP") {
+
+    reason =
+      "FSD 기준";
+  } else if (
+    option === "EAP"
+  ) {
     limitKrw =
       config.priceLimitsKrw.eap;
-    reason = "EAP 기준";
+
+    reason =
+      "EAP 기준";
   }
 
   const excludedReasons = [];
@@ -713,7 +983,9 @@ export function evaluateListing(
     config.excludeContracted &&
     listing.contracted
   ) {
-    excludedReasons.push("계약중");
+    excludedReasons.push(
+      "계약중"
+    );
   }
 
   if (listing.redColor) {
@@ -722,7 +994,10 @@ export function evaluateListing(
     );
   }
 
-  if (adjustedPriceKrw > limitKrw) {
+  if (
+    adjustedPriceKrw >
+    limitKrw
+  ) {
     excludedReasons.push(
       listing.rental
         ? "렌트 감가 후 가격 초과"
@@ -750,13 +1025,17 @@ export function evaluateListing(
     );
   }
 
-  if (listing.smokingWarning) {
+  if (
+    listing.smokingWarning
+  ) {
     warnings.push(
       "흡연 관련 문구 확인 필요"
     );
   }
 
-  if (listing.tuningWarning) {
+  if (
+    listing.tuningWarning
+  ) {
     warnings.push(
       "튜닝 관련 문구 확인 필요"
     );
@@ -765,8 +1044,10 @@ export function evaluateListing(
   return {
     ...listing,
     option,
-    hasFsd: option === "FSD",
-    hasEap: option === "EAP",
+    hasFsd:
+      option === "FSD",
+    hasEap:
+      option === "EAP",
     adjustedPriceKrw,
     limitKrw,
     priceRule: reason,
@@ -796,14 +1077,19 @@ export function prepareSendCurrentListing(
 
   if (detailSucceeded) {
     reasons.push(
-      ...(listing.excludedReasons ?? [])
+      ...(
+        listing.excludedReasons ??
+        []
+      )
     );
   } else {
     if (
       config.excludeContracted &&
       listing.contracted
     ) {
-      reasons.push("계약중");
+      reasons.push(
+        "계약중"
+      );
     }
 
     if (
@@ -811,21 +1097,28 @@ export function prepareSendCurrentListing(
       config.priceLimitsKrw
         .unknownOptionHardMax
     ) {
-      reasons.push("가격 초과");
+      reasons.push(
+        "가격 초과"
+      );
     }
 
-    reasons.push("상세 확인 실패");
+    reasons.push(
+      "상세 확인 실패"
+    );
 
     if (
       listing.priceKrw >
       config.priceLimitsKrw.base
     ) {
-      reasons.push("옵션 미확인");
+      reasons.push(
+        "옵션 미확인"
+      );
     }
 
     result = {
       ...listing,
-      option: "상세 확인 실패",
+      option:
+        "상세 확인 실패",
       adjustedPriceKrw:
         listing.priceKrw,
       limitKrw:
@@ -839,7 +1132,9 @@ export function prepareSendCurrentListing(
         ? [
             `상세 확인 실패: ${errorMessage}`
           ]
-        : ["상세 확인 실패"],
+        : [
+            "상세 확인 실패"
+          ],
       detailFailed: true
     };
   }
@@ -890,7 +1185,8 @@ export function getListingInspection(
       listing.priceKrw >
         previous.priceKrw,
     shouldInspect:
-      runMode === "send_current" ||
+      runMode ===
+        "send_current" ||
       isNew ||
       priceChanged
   };
@@ -908,7 +1204,8 @@ export function findPreviousListing(
       previous: exact,
       previousListingId:
         listing.id,
-      matchedBy: "listingId"
+      matchedBy:
+        "listingId"
     };
   }
 
@@ -925,24 +1222,31 @@ export function findPreviousListing(
     };
   }
 
-  const matches = Object.entries(
-    listings ?? {}
-  )
-    .filter(
-      ([, previous]) =>
-        normalizeVehicleNo(
-          previous?.vehicleNo
-        ) === vehicleNo
+  const matches =
+    Object.entries(
+      listings ?? {}
     )
-    .sort(([, left], [, right]) =>
-      String(
-        right?.lastSeenAt ?? ""
-      ).localeCompare(
-        String(
-          left?.lastSeenAt ?? ""
-        )
+      .filter(
+        ([, previous]) =>
+          normalizeVehicleNo(
+            previous?.vehicleNo
+          ) === vehicleNo
       )
-    );
+      .sort(
+        (
+          [, left],
+          [, right]
+        ) =>
+          String(
+            right?.lastSeenAt ??
+              ""
+          ).localeCompare(
+            String(
+              left?.lastSeenAt ??
+                ""
+            )
+          )
+      );
 
   const [match] = matches;
 
@@ -956,8 +1260,10 @@ export function findPreviousListing(
 
   return {
     previous: match[1],
-    previousListingId: match[0],
-    matchedBy: "vehicleNo"
+    previousListingId:
+      match[0],
+    matchedBy:
+      "vehicleNo"
   };
 }
 
@@ -980,10 +1286,12 @@ function isBetterRepresentative(
 
   if (
     Boolean(
-      candidate.listing?.contracted
+      candidate.listing
+        ?.contracted
     ) !==
     Boolean(
-      current.listing?.contracted
+      current.listing
+        ?.contracted
     )
   ) {
     return !candidate.listing
@@ -1001,16 +1309,19 @@ export function selectRepresentativeCandidates(
 ) {
   const groups = new Map();
 
-  for (const [
-    index,
-    candidate
-  ] of candidates.entries()) {
+  for (
+    const [
+      index,
+      candidate
+    ] of candidates.entries()
+  ) {
     const order =
       candidate.order ?? index;
 
     const vehicleNo =
       normalizeVehicleNo(
-        candidate.listing?.vehicleNo
+        candidate.listing
+          ?.vehicleNo
       );
 
     const key = vehicleNo
@@ -1025,17 +1336,29 @@ export function selectRepresentativeCandidates(
     const group =
       groups.get(key) ?? [];
 
-    group.push(normalizedCandidate);
-    groups.set(key, group);
+    group.push(
+      normalizedCandidate
+    );
+
+    groups.set(
+      key,
+      group
+    );
   }
 
   const representatives = [];
   const duplicates = [];
 
-  for (const group of groups.values()) {
+  for (
+    const group of
+    groups.values()
+  ) {
     const representative =
       group.reduce(
-        (current, candidate) =>
+        (
+          current,
+          candidate
+        ) =>
           isBetterRepresentative(
             candidate,
             current
@@ -1048,9 +1371,13 @@ export function selectRepresentativeCandidates(
       representative
     );
 
-    for (const candidate of group) {
+    for (
+      const candidate of
+      group
+    ) {
       if (
-        candidate !== representative
+        candidate !==
+        representative
       ) {
         duplicates.push({
           representative,
@@ -1062,7 +1389,8 @@ export function selectRepresentativeCandidates(
 
   representatives.sort(
     (left, right) =>
-      left.order - right.order
+      left.order -
+      right.order
   );
 
   duplicates.sort(
@@ -1081,13 +1409,15 @@ export function applyRepresentativeState(
   listings,
   candidate
 ) {
-  const currentListingId = String(
-    candidate.listing.id
-  );
+  const currentListingId =
+    String(
+      candidate.listing.id
+    );
 
   const vehicleNo =
     normalizeVehicleNo(
-      candidate.listing.vehicleNo
+      candidate.listing
+        .vehicleNo
     );
 
   const stateRecord = {
@@ -1097,8 +1427,9 @@ export function applyRepresentativeState(
   };
 
   if (!vehicleNo) {
-    listings[currentListingId] =
-      stateRecord;
+    listings[
+      currentListingId
+    ] = stateRecord;
 
     return {
       stateRecord,
@@ -1109,29 +1440,44 @@ export function applyRepresentativeState(
   const matchingPreviousEntries =
     Object.entries(listings)
       .filter(
-        ([listingId, previous]) =>
+        (
+          [
+            listingId,
+            previous
+          ]
+        ) =>
           listingId !==
             currentListingId &&
           normalizeVehicleNo(
             previous?.vehicleNo
           ) === vehicleNo
       )
-      .sort(([, left], [, right]) =>
-        String(
-          right?.lastSeenAt ?? ""
-        ).localeCompare(
+      .sort(
+        (
+          [, left],
+          [, right]
+        ) =>
           String(
-            left?.lastSeenAt ?? ""
+            right?.lastSeenAt ??
+              ""
+          ).localeCompare(
+            String(
+              left?.lastSeenAt ??
+                ""
+            )
           )
-        )
       );
 
   const removedListingIds =
     matchingPreviousEntries.map(
-      ([listingId]) => listingId
+      ([listingId]) =>
+        listingId
     );
 
-  for (const listingId of removedListingIds) {
+  for (
+    const listingId of
+    removedListingIds
+  ) {
     delete listings[listingId];
   }
 
@@ -1149,8 +1495,10 @@ export function applyRepresentativeState(
       recordedPreviousListingId
     )
       ? recordedPreviousListingId
-      : (removedListingIds[0] ??
-        recordedPreviousListingId);
+      : (
+          removedListingIds[0] ??
+          recordedPreviousListingId
+        );
 
   if (
     previousListingId &&
@@ -1161,8 +1509,9 @@ export function applyRepresentativeState(
       previousListingId;
   }
 
-  listings[currentListingId] =
-    stateRecord;
+  listings[
+    currentListingId
+  ] = stateRecord;
 
   return {
     stateRecord,
@@ -1175,7 +1524,8 @@ export function formatDuplicateListingLog(
   duplicate
 ) {
   return `Duplicate listing suppressed: vehicle=${maskVehicleNo(
-    representative.listing.vehicleNo
+    representative.listing
+      .vehicleNo
   )}, representative=${
     representative.listing.id
   }, duplicate=${
@@ -1190,13 +1540,16 @@ export function recordDetailFailure(
   errorMessage
 ) {
   const {
-    priceKrw: observedPriceKrw,
+    priceKrw:
+      observedPriceKrw,
     listText: _listText,
     ...observation
   } = listing;
 
   const record = previous
-    ? { ...previous }
+    ? {
+        ...previous
+      }
     : {
         ...observation,
         firstSeenAt: now
@@ -1214,7 +1567,8 @@ export function recordDetailFailure(
     lastSeenAt: now,
     lastObservedPriceKrw:
       observedPriceKrw,
-    lastDetailFetchFailedAt: now,
+    lastDetailFetchFailedAt:
+      now,
     lastDetailFetchError:
       errorMessage
   };
@@ -1230,10 +1584,14 @@ export function recordListObservation(
     id: listing.id,
     title: listing.title,
     url: listing.url,
-    yearMonth: listing.yearMonth,
-    mileageKm: listing.mileageKm,
-    priceKrw: listing.priceKrw,
-    region: listing.region,
+    yearMonth:
+      listing.yearMonth,
+    mileageKm:
+      listing.mileageKm,
+    priceKrw:
+      listing.priceKrw,
+    region:
+      listing.region,
     contracted:
       listing.contracted,
     vehicleNo:
@@ -1244,7 +1602,8 @@ export function recordListObservation(
         previous?.vehicleNo
       ),
     firstSeenAt:
-      previous?.firstSeenAt ?? now,
+      previous?.firstSeenAt ??
+      now,
     lastSeenAt: now
   };
 }
@@ -1262,19 +1621,25 @@ export function recordDetailSuccess(
 
   const previousListingId =
     previousId &&
-    previousId !== String(listing.id)
+    previousId !==
+      String(listing.id)
       ? previousId
-      : previous?.previousListingId;
+      : previous
+          ?.previousListingId;
 
   const record = {
     ...(previous ?? {}),
     id: listing.id,
     title: listing.title,
     url: listing.url,
-    yearMonth: listing.yearMonth,
-    mileageKm: listing.mileageKm,
-    priceKrw: listing.priceKrw,
-    region: listing.region,
+    yearMonth:
+      listing.yearMonth,
+    mileageKm:
+      listing.mileageKm,
+    priceKrw:
+      listing.priceKrw,
+    region:
+      listing.region,
     contracted:
       listing.contracted,
     vehicleNo:
@@ -1285,14 +1650,20 @@ export function recordDetailSuccess(
         previous?.vehicleNo
       ),
     ...(previousListingId
-      ? { previousListingId }
+      ? {
+          previousListingId
+        }
       : {}),
     firstSeenAt:
-      previous?.firstSeenAt ?? now,
+      previous?.firstSeenAt ??
+      now,
     lastSeenAt: now,
-    option: evaluated.option,
-    hasFsd: evaluated.hasFsd,
-    hasEap: evaluated.hasEap,
+    option:
+      evaluated.option,
+    hasFsd:
+      evaluated.hasFsd,
+    hasEap:
+      evaluated.hasEap,
     optionSource:
       evaluated.optionSource,
     optionEvidence:
@@ -1303,14 +1674,16 @@ export function recordDetailSuccess(
       evaluated.colorStatus,
     redColor:
       evaluated.redColor,
-    rental: evaluated.rental,
+    rental:
+      evaluated.rental,
     adjustedPriceKrw:
       evaluated.adjustedPriceKrw,
     limitKrw:
       evaluated.limitKrw,
     priceRule:
       evaluated.priceRule,
-    eligible: evaluated.eligible,
+    eligible:
+      evaluated.eligible,
     lastEvaluatedAt: now
   };
 
@@ -1330,9 +1703,12 @@ export function createListingEvent({
   detailSucceeded,
   notifyPriceIncrease = false
 }) {
-  if (runMode === "send_current") {
+  if (
+    runMode === "send_current"
+  ) {
     return {
-      type: "현재 검색 결과",
+      type:
+        "현재 검색 결과",
       listing
     };
   }
@@ -1389,13 +1765,17 @@ export function createListingEvent({
 export function formatKrw(value) {
   return `${Math.round(
     value
-  ).toLocaleString("ko-KR")}원`;
+  ).toLocaleString(
+    "ko-KR"
+  )}원`;
 }
 
 export function formatKm(value) {
   return `${Math.round(
     value
-  ).toLocaleString("ko-KR")}㎞`;
+  ).toLocaleString(
+    "ko-KR"
+  )}㎞`;
 }
 
 export function createTelegramMessageRequest(
@@ -1411,7 +1791,9 @@ export function createTelegramMessageRequest(
   };
 }
 
-function formatTelegramOption(option) {
+function formatTelegramOption(
+  option
+) {
   if (option === "FSD") {
     return "옵션: FSD 확인";
   }
@@ -1461,7 +1843,9 @@ export function formatTelegramMessage(
     )
   ];
 
-  if (listing.detailFailed) {
+  if (
+    listing.detailFailed
+  ) {
     lines.push(
       "상세: 상세 확인 실패"
     );
@@ -1475,7 +1859,9 @@ export function formatTelegramMessage(
     );
   }
 
-  lines.push(listing.url);
+  lines.push(
+    formatListingUrl(listing)
+  );
 
   return lines.join("\n");
 }
@@ -1484,17 +1870,25 @@ export function setPage(
   urlString,
   page
 ) {
-  const url = new URL(urlString);
+  const url =
+    new URL(urlString);
+
   url.searchParams.set(
     "page",
     String(page)
   );
+
   return url.toString();
 }
 
-export async function loadJson(path) {
+export async function loadJson(
+  path
+) {
   return JSON.parse(
-    await fs.readFile(path, "utf8")
+    await fs.readFile(
+      path,
+      "utf8"
+    )
   );
 }
 

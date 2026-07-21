@@ -9,7 +9,7 @@ import {
 const baseListing = {
   id: "42023180",
   title: "모델 3 롱 레인지 AWD",
-  url: "https://fem.encar.com/cars/detail/42023180",
+  url: "https://fem.encar.com/cars/detail/42023180?advClickPosition=mweb_normal&type=detail#photos",
   yearMonth: "2022-09",
   mileageKm: 92000,
   priceKrw: 38500000,
@@ -117,6 +117,11 @@ test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을
     message,
     /https:\/\/fem\.encar\.com\/cars\/detail\/42023180$/
   );
+
+  assert.doesNotMatch(
+    message,
+    /advClickPosition|view_type|type=detail|#photos/
+  );
 });
 
 test("FSD, EAP, 미확인 옵션은 정해진 세 가지 문구로만 출력한다", () => {
@@ -223,6 +228,27 @@ test("구조화 EAP와 명시적 FSD 구매가 함께 확인되면 FSD 표시를
   );
 });
 
+test("매물 URL은 쿼리 문자열과 해시를 제거하고 매물번호까지만 출력한다", () => {
+  const message = formatTelegramMessage(
+    "신규",
+    baseListing
+  );
+
+  const lastLine = message
+    .split("\n")
+    .at(-1);
+
+  assert.equal(
+    lastLine,
+    "https://fem.encar.com/cars/detail/42023180"
+  );
+
+  assert.doesNotMatch(
+    lastLine,
+    /[?#]/
+  );
+});
+
 test("normal과 send_current 알림은 같은 출력 규칙을 사용한다", () => {
   const messages = [
     formatTelegramMessage(
@@ -277,6 +303,11 @@ test("normal과 send_current 알림은 같은 출력 규칙을 사용한다", ()
     assert.match(
       message,
       /https:\/\/fem\.encar\.com\/cars\/detail\/42023180$/
+    );
+
+    assert.doesNotMatch(
+      message,
+      /[?&]advClickPosition|view_type|type=detail|#photos/
     );
 
     assert.doesNotMatch(
