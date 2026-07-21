@@ -1791,6 +1791,41 @@ export function createTelegramMessageRequest(
   };
 }
 
+export function recordTelegramDelivery(
+  record,
+  message,
+  sentAt
+) {
+  const messageId =
+    Number(message?.message_id);
+
+  if (
+    !Number.isSafeInteger(messageId) ||
+    messageId <= 0
+  ) {
+    throw new Error(
+      "텔레그램 응답에 유효한 message_id가 없습니다."
+    );
+  }
+
+  if (
+    typeof sentAt !== "string" ||
+    !sentAt.trim()
+  ) {
+    throw new Error(
+      "텔레그램 발송 시각이 필요합니다."
+    );
+  }
+
+  return {
+    ...record,
+    telegramMessageId:
+      messageId,
+    telegramSentAt:
+      sentAt
+  };
+}
+
 function formatTelegramOption(
   option
 ) {

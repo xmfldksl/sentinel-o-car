@@ -16,6 +16,7 @@ import {
   recordDetailFailure,
   recordListObservation,
   recordDetailSuccess,
+  recordTelegramDelivery,
   resolveSearchUrl,
   saveJson,
   selectRepresentativeCandidates,
@@ -77,6 +78,8 @@ async function sendTelegram(text) {
   if (!response.ok || !result.ok) {
     throw new Error(`텔레그램 전송 실패: ${JSON.stringify(result)}`);
   }
+
+  return result.result;
 }
 
 if (runMode === "telegram_test") {
@@ -207,7 +210,32 @@ if (!wasInitialized && !isSendCurrent) {
   );
 } else {
   for (const event of events) {
-    await sendTelegram(formatTelegramMessage(event.type, event.listing));
+    const text =
+      formatTelegramMessage(
+        event.type,
+        event.listing
+      );
+
+    const message =
+      await sendTelegram(text);
+
+    if (!isSendCurrent) {
+      const listingId =
+        String(event.listing.id);
+
+      const stateRecord =
+        state.listings[listingId];
+
+      if (stateRecord) {
+        state.listings[listingId] =
+          recordTelegramDelivery(
+            stateRecord,
+            message,
+            new Date().toISOString()
+          );
+      }
+    }
+
     await sleep(500);
   }
 }

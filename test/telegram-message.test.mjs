@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   analyzeDetail,
   createTelegramMessageRequest,
-  formatTelegramMessage
+  formatTelegramMessage,
+  recordTelegramDelivery
 } from "../src/lib.mjs";
 
 const baseListing = {
@@ -60,6 +61,40 @@ test("텔레그램 요청은 메시지 복사와 전달을 제한하지 않는�
 
   assert.equal(
     Object.hasOwn(request, "protectContent"),
+    false
+  );
+});
+
+test("텔레그램 전송 결과의 메시지 ID와 발송 시각을 상태에 기록한다", () => {
+  const previous = {
+    id: "42023180",
+    title: "모델 3 롱 레인지 AWD"
+  };
+
+  const recorded =
+    recordTelegramDelivery(
+      previous,
+      {
+        message_id: 12345
+      },
+      "2026-07-21T13:45:00.000Z"
+    );
+
+  assert.deepEqual(
+    recorded,
+    {
+      ...previous,
+      telegramMessageId: 12345,
+      telegramSentAt:
+        "2026-07-21T13:45:00.000Z"
+    }
+  );
+
+  assert.equal(
+    Object.hasOwn(
+      previous,
+      "telegramMessageId"
+    ),
     false
   );
 });
