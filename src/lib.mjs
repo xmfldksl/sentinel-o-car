@@ -266,6 +266,106 @@ function extractVehicleData(base) {
   };
 }
 
+function convertManwonToKrw(value) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value <= 0
+  ) {
+    return null;
+  }
+
+  return Math.round(value * 10000);
+}
+
+function normalizeSaleTypeValue(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  return normalized || null;
+}
+
+function resolveStructuredSaleType(
+  leaseRentType,
+  advertisementType
+) {
+  const values = [
+    leaseRentType,
+    advertisementType
+  ]
+    .map(normalizeSaleTypeValue)
+    .filter(Boolean);
+
+  if (
+    values.some((value) =>
+      /(?:^|_)LEASE(?:_|$)/.test(
+        value
+      )
+    )
+  ) {
+    return "LEASE";
+  }
+
+  if (
+    values.some((value) =>
+      /(?:^|_)RENT(?:_|$)/.test(
+        value
+      )
+    )
+  ) {
+    return "RENT";
+  }
+
+  return "NORMAL";
+}
+
+function extractStructuredSaleData(
+  cars,
+  fallbackPriceKrw
+) {
+  const base = cars?.base;
+  const advertisement =
+    base?.advertisement;
+  const leaseRentInfo =
+    base?.leaseRentInfo;
+
+  const saleType =
+    resolveStructuredSaleType(
+      cars?.detailFlags
+        ?.leaseRentType,
+      base?.advertisementType
+    );
+
+  const structuredPriceKrw =
+    convertManwonToKrw(
+      advertisement?.price
+    );
+
+  const monthlyFeeKrw =
+    convertManwonToKrw(
+      leaseRentInfo?.monthlyFee
+    );
+
+  return {
+    saleType,
+    monthlyFeeKrw:
+      saleType === "NORMAL"
+        ? null
+        : monthlyFeeKrw,
+    priceKrw:
+      structuredPriceKrw ??
+      fallbackPriceKrw,
+    rentalUsageHistory: null,
+    totalLossHistory: null
+  };
+}
+
 export function parsePreloadedVehicleData(
   html
 ) {
@@ -789,11 +889,19 @@ export function analyzeDetail(
   const state =
     parsePreloadedState(html);
 
+  const cars = state?.cars;
+
   const base =
-    state?.cars?.base;
+    cars?.base;
 
   const vehicleData =
     extractVehicleData(base);
+
+  const saleData =
+    extractStructuredSaleData(
+      cars,
+      listing.priceKrw
+    );
 
   const optionData =
     detectConfirmedOptions(base);
@@ -807,17 +915,6 @@ export function analyzeDetail(
     isExcludedColor(
       colorName,
       config
-    );
-
-  const rentalNegated =
-    /렌트\s*(이력|용도)?\s*(없|무)|대여용도\s*(없|무)/i.test(
-      text
-    );
-
-  const rental =
-    !rentalNegated &&
-    /렌트|렌터카|대여용도/i.test(
-      text
     );
 
   const smokingNegated =
@@ -836,7 +933,10 @@ export function analyzeDetail(
 
   return {
     ...listing,
+    listPriceKrw:
+      listing.priceKrw,
     ...vehicleData,
+    ...saleData,
     ...optionData,
     colorName,
     colorStatus:
@@ -844,7 +944,6 @@ export function analyzeDetail(
         ? "확인"
         : "미확인",
     redColor,
-    rental,
     smokingWarning,
     tuningWarning,
     detailTextSample:
@@ -949,9 +1048,13 @@ export function evaluateListing(
       listing
     );
 
+  const hasRentalUsageHistory =
+    listing.rentalUsageHistory ===
+    true;
+
   const adjustedPriceKrw =
     listing.priceKrw +
-    (listing.rental
+    (hasRentalUsageHistory
       ? config.rentalPenaltyKrw
       : 0);
 
@@ -999,7 +1102,7 @@ export function evaluateListing(
     limitKrw
   ) {
     excludedReasons.push(
-      listing.rental
+      hasRentalUsageHistory
         ? "렌트 감가 후 가격 초과"
         : "가격 초과"
     );
@@ -1017,7 +1120,7 @@ export function evaluateListing(
     );
   }
 
-  if (listing.rental) {
+  if (hasRentalUsageHistory) {
     warnings.push(
       `렌트 이력 감가 ${formatKrw(
         config.rentalPenaltyKrw
@@ -1168,27 +1271,61 @@ export function getListingInspection(
   const isNew =
     !hasConfirmedState;
 
+  const previousListPriceKrw =
+    Number.isFinite(
+      previous?.listPriceKrw
+    )
+      ? previous.listPriceKrw
+      : previous?.priceKrw;
+
+  const currentListPriceKrw =
+    Number.isFinite(
+      listing?.listPriceKrw
+    )
+      ? listing.listPriceKrw
+      : listing.priceKrw;
+
+  const listPriceChanged =
+    hasConfirmedState &&
+    previousListPriceKrw !==
+      currentListPriceKrw;
+
+  const hasDetailPrice =
+    Number.isFinite(
+      listing?.listPriceKrw
+    );
+
+  const previousComparisonPriceKrw =
+    hasDetailPrice
+      ? previous?.priceKrw
+      : previousListPriceKrw;
+
+  const currentComparisonPriceKrw =
+    hasDetailPrice
+      ? listing.priceKrw
+      : currentListPriceKrw;
+
   const priceChanged =
     hasConfirmedState &&
-    previous.priceKrw !==
-      listing.priceKrw;
+    previousComparisonPriceKrw !==
+      currentComparisonPriceKrw;
 
   return {
     isNew,
     priceChanged,
     priceDropped:
       priceChanged &&
-      listing.priceKrw <
-        previous.priceKrw,
+      currentComparisonPriceKrw <
+        previousComparisonPriceKrw,
     priceIncreased:
       priceChanged &&
-      listing.priceKrw >
-        previous.priceKrw,
+      currentComparisonPriceKrw >
+        previousComparisonPriceKrw,
     shouldInspect:
       runMode ===
-        "send_current" ||
+      "send_current" ||
       isNew ||
-      priceChanged
+      listPriceChanged
   };
 }
 
@@ -1589,6 +1726,12 @@ export function recordListObservation(
     mileageKm:
       listing.mileageKm,
     priceKrw:
+      Number.isFinite(
+        previous?.priceKrw
+      )
+        ? previous.priceKrw
+        : listing.priceKrw,
+    listPriceKrw:
       listing.priceKrw,
     region:
       listing.region,
@@ -1605,6 +1748,68 @@ export function recordListObservation(
       previous?.firstSeenAt ??
       now,
     lastSeenAt: now
+  };
+}
+
+export function migrateLegacyState(
+  state
+) {
+  if (
+    !state ||
+    typeof state !== "object" ||
+    Array.isArray(state) ||
+    !state.listings ||
+    typeof state.listings !==
+      "object" ||
+    Array.isArray(state.listings)
+  ) {
+    return state;
+  }
+
+  const listings = {};
+
+  for (
+    const [listingId, record] of
+    Object.entries(state.listings)
+  ) {
+    if (
+      !record ||
+      typeof record !== "object" ||
+      Array.isArray(record)
+    ) {
+      listings[listingId] = record;
+      continue;
+    }
+
+    const {
+      rental: _legacyRental,
+      ...migratedRecord
+    } = record;
+
+    migratedRecord.rentalUsageHistory =
+      migratedRecord
+        .rentalUsageHistory ?? null;
+
+    migratedRecord.totalLossHistory =
+      migratedRecord
+        .totalLossHistory ?? null;
+
+    if (
+      Number.isFinite(
+        migratedRecord.priceKrw
+      )
+    ) {
+      migratedRecord.adjustedPriceKrw =
+        migratedRecord.priceKrw;
+    }
+
+    listings[listingId] =
+      migratedRecord;
+  }
+
+  return {
+    ...state,
+    listings
   };
 }
 
@@ -1627,6 +1832,12 @@ export function recordDetailSuccess(
       : previous
           ?.previousListingId;
 
+  const saleType =
+    evaluated.saleType === "LEASE" ||
+    evaluated.saleType === "RENT"
+      ? evaluated.saleType
+      : "NORMAL";
+
   const record = {
     ...(previous ?? {}),
     id: listing.id,
@@ -1638,6 +1849,12 @@ export function recordDetailSuccess(
       listing.mileageKm,
     priceKrw:
       listing.priceKrw,
+    listPriceKrw:
+      Number.isFinite(
+        listing.listPriceKrw
+      )
+        ? listing.listPriceKrw
+        : listing.priceKrw,
     region:
       listing.region,
     contracted:
@@ -1674,8 +1891,21 @@ export function recordDetailSuccess(
       evaluated.colorStatus,
     redColor:
       evaluated.redColor,
-    rental:
-      evaluated.rental,
+    saleType,
+    monthlyFeeKrw:
+      saleType === "NORMAL"
+        ? null
+        : Number.isFinite(
+              evaluated.monthlyFeeKrw
+            )
+          ? evaluated.monthlyFeeKrw
+          : null,
+    rentalUsageHistory:
+      evaluated
+        .rentalUsageHistory ?? null,
+    totalLossHistory:
+      evaluated.totalLossHistory ??
+      null,
     adjustedPriceKrw:
       evaluated.adjustedPriceKrw,
     limitKrw:
@@ -1690,6 +1920,7 @@ export function recordDetailSuccess(
   delete record.lastObservedPriceKrw;
   delete record.lastDetailFetchFailedAt;
   delete record.lastDetailFetchError;
+  delete record.rental;
 
   return record;
 }
@@ -1878,6 +2109,22 @@ export function formatTelegramMessage(
     )
   ];
 
+  if (listing.saleType === "LEASE") {
+    lines.push(
+      Number.isFinite(
+        listing.monthlyFeeKrw
+      )
+        ? `판매방식: 리스 | 월 납입금: ${formatKrw(
+            listing.monthlyFeeKrw
+          )}`
+        : "판매방식: 리스"
+    );
+  } else if (
+    listing.saleType === "RENT"
+  ) {
+    lines.push("판매방식: 렌트");
+  }
+
   if (
     listing.detailFailed
   ) {
@@ -1886,7 +2133,10 @@ export function formatTelegramMessage(
     );
   }
 
-  if (listing.rental) {
+  if (
+    listing.rentalUsageHistory ===
+    true
+  ) {
     lines.push(
       `렌트 감가 반영 평가가격: ${formatKrw(
         listing.adjustedPriceKrw

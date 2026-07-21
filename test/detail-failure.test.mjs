@@ -25,7 +25,10 @@ const listing = {
 const evaluated = {
   ...listing,
   option: "FSD",
-  rental: false,
+  saleType: "NORMAL",
+  monthlyFeeKrw: null,
+  rentalUsageHistory: null,
+  totalLossHistory: null,
   eligible: true
 };
 
@@ -63,7 +66,19 @@ test("상세 조회 실패는 기존 정상 가격과 판정 결과를 덮어쓰
   assert.equal(failed.priceKrw, 34000000);
   assert.equal(failed.option, "FSD");
   assert.equal(failed.vehicleNo, "12가3456");
-  assert.equal(failed.rental, false);
+  assert.equal(failed.saleType, "NORMAL");
+  assert.equal(
+    failed.rentalUsageHistory,
+    null
+  );
+  assert.equal(
+    failed.totalLossHistory,
+    null
+  );
+  assert.equal(
+    Object.hasOwn(failed, "rental"),
+    false
+  );
   assert.equal(failed.eligible, true);
   assert.equal(failed.lastEvaluatedAt, firstSeenAt);
   assert.equal(failed.lastSeenAt, failedAt);

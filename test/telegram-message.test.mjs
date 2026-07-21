@@ -1,11 +1,29 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import test from "node:test";
 import {
   analyzeDetail,
   createTelegramMessageRequest,
+  evaluateListing,
   formatTelegramMessage,
   recordTelegramDelivery
 } from "../src/lib.mjs";
+
+const config = JSON.parse(
+  await fs.readFile(
+    new URL("../config.json", import.meta.url),
+    "utf8"
+  )
+);
+
+const leaseDetailHtml =
+  await fs.readFile(
+    new URL(
+      "./fixtures/detail-lease-preloaded.html",
+      import.meta.url
+    ),
+    "utf8"
+  );
 
 const baseListing = {
   id: "42023180",
@@ -17,7 +35,10 @@ const baseListing = {
   region: "서울",
   option: "미확인",
   vehicleNo: "12가3456",
-  rental: false,
+  saleType: "NORMAL",
+  monthlyFeeKrw: null,
+  rentalUsageHistory: null,
+  totalLossHistory: null,
   warnings: [
     "옵션 확인 필요",
     "흡연 여부 확인",
@@ -126,6 +147,11 @@ test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을
   assert.doesNotMatch(
     message,
     /옵션 확인 필요|흡연 여부 확인|튜닝 여부 확인/
+  );
+
+  assert.doesNotMatch(
+    message,
+    /판매방식:|렌트 이력: 미확인|전손 이력: 미확인/
   );
 
   assert.match(
@@ -350,4 +376,116 @@ test("normal과 send_current 알림은 같은 출력 규칙을 사용한다", ()
       /Sentinel-o-car|적용 기준|확인사항/
     );
   }
+});
+
+test("리스 메시지는 매매가격과 월 납입금을 분리하고 렌트 감가 평가가격을 출력하지 않는다", () => {
+  const analyzed = analyzeDetail(
+    leaseDetailHtml,
+    {
+      ...baseListing,
+      priceKrw: 31000000
+    },
+    config
+  );
+
+  const evaluated = evaluateListing(
+    analyzed,
+    config
+  );
+
+  const message = formatTelegramMessage(
+    "신규",
+    evaluated
+  );
+
+  assert.equal(evaluated.saleType, "LEASE");
+  assert.ok(
+    message
+      .split("\n")
+      .includes(
+        "92,000㎞ | 29,000,000원 | 서울"
+      )
+  );
+  assert.ok(
+    message
+      .split("\n")
+      .includes(
+        "판매방식: 리스 | 월 납입금: 620,000원"
+      )
+  );
+  assert.doesNotMatch(
+    message,
+    /92,000㎞ \| 620,000원/
+  );
+  assert.doesNotMatch(
+    message,
+    /렌트 감가 반영 평가가격/
+  );
+});
+
+test("현재 판매방식이 RENT이면 월 납입금 없이 렌트로 표시한다", () => {
+  const message = formatTelegramMessage(
+    "신규",
+    {
+      ...baseListing,
+      saleType: "RENT",
+      monthlyFeeKrw: 620000,
+      rentalUsageHistory: null
+    }
+  );
+
+  assert.ok(
+    message
+      .split("\n")
+      .includes("판매방식: 렌트")
+  );
+  assert.doesNotMatch(
+    message,
+    /월 납입금|렌트 감가 반영 평가가격/
+  );
+});
+
+test("판매자 자유 문구의 렌트X는 텔레그램에 렌트 감가 평가가격을 추가하지 않는다", () => {
+  const analyzed = analyzeDetail(
+    detailHtml({
+      vehicleNo: "12가3456",
+      spec: {
+        colorName: "검정색"
+      },
+      options: {
+        etc: []
+      },
+      advertisement: {
+        oneLineText: "렌트X"
+      },
+      photos: [],
+      contents: null
+    }),
+    {
+      ...baseListing,
+      priceKrw: 32000000,
+      listText: "렌트X"
+    },
+    config
+  );
+
+  const evaluated = evaluateListing(
+    analyzed,
+    config
+  );
+
+  const message = formatTelegramMessage(
+    "신규",
+    evaluated
+  );
+
+  assert.equal(evaluated.saleType, "NORMAL");
+  assert.equal(
+    evaluated.rentalUsageHistory,
+    null
+  );
+  assert.doesNotMatch(
+    message,
+    /판매방식:|렌트 감가 반영 평가가격/
+  );
 });

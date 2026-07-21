@@ -11,6 +11,7 @@ import {
   getListingInspection,
   loadJson,
   matchesBasicCriteria,
+  migrateLegacyState,
   parseListHtml,
   prepareSendCurrentListing,
   recordDetailFailure,
@@ -33,7 +34,9 @@ console.log(formatSearchUrlSummary(searchUrlConfig));
 
 const config = await loadJson(new URL("../config.json", import.meta.url));
 const statePath = process.env.STATE_PATH || "data/state.json";
-const state = await loadJson(statePath);
+const state = migrateLegacyState(
+  await loadJson(statePath)
+);
 const runMode = process.env.RUN_MODE || "normal";
 const maxPages = Number(process.env.MAX_PAGES || config.maxPages);
 const token = process.env.TELEGRAM_BOT_TOKEN;

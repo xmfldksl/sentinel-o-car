@@ -47,7 +47,10 @@ function listing(overrides = {}) {
     contracted: false,
     vehicleNo: "12가3456",
     option: "FSD",
-    rental: false,
+    saleType: "NORMAL",
+    monthlyFeeKrw: null,
+    rentalUsageHistory: null,
+    totalLossHistory: null,
     eligible: true,
     ...overrides
   };

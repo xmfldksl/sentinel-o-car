@@ -96,7 +96,7 @@ test("사용자 기본 조건을 적용한다", () => {
   );
 });
 
-test("판매자 설명의 FSD 구매완료 문구와 렌트 감가를 판정한다", () => {
+test("판매자 설명의 FSD 구매완료 문구는 유지하고 렌터카 자유 문구는 이력으로 판정하지 않는다", () => {
   const html = detailHtml(
     {
       vehicleNo: "12가3456",
@@ -133,10 +133,18 @@ test("판매자 설명의 FSD 구매완료 문구와 렌트 감가를 판정한�
     result.optionSource,
     "판매자 설명"
   );
-  assert.equal(result.rental, true);
+  assert.equal(result.saleType, "NORMAL");
+  assert.equal(
+    result.rentalUsageHistory,
+    null
+  );
+  assert.equal(
+    result.totalLossHistory,
+    null
+  );
   assert.equal(
     result.adjustedPriceKrw,
-    39000000
+    36000000
   );
   assert.equal(result.limitKrw, 40000000);
   assert.equal(result.priceRule, "FSD 기준");
