@@ -5,6 +5,9 @@ on:
     branches:
       - fix/color-option-detection
     paths:
+      - "src/lib.mjs"
+      - "test/**"
+      - "config.json"
       - "scripts/inspect-encar-detail.mjs"
       - ".github/workflows/inspect-encar-detail.yml"
 
@@ -35,6 +38,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Run tests
+        run: npm test
 
       - name: Check inspection script
         run: node --check scripts/inspect-encar-detail.mjs
