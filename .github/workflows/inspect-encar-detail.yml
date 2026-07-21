@@ -1,0 +1,47 @@
+name: Inspect Encar detail
+
+on:
+  workflow_dispatch:
+    inputs:
+      listing_ids:
+        description: "조사할 엔카 매물 ID를 쉼표로 구분"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inspect-encar-detail-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check inspection script
+        run: node --check scripts/inspect-encar-detail.mjs
+
+      - name: Inspect Encar detail data
+        env:
+          LISTING_IDS: ${{ github.event.inputs.listing_ids || vars.INSPECT_LISTING_IDS }}
+        run: |
+          if [ -z "$LISTING_IDS" ]; then
+            echo "::error::Repository variable INSPECT_LISTING_IDS가 비어 있습니다."
+            exit 1
+          fi
+
+          node scripts/inspect-encar-detail.mjs

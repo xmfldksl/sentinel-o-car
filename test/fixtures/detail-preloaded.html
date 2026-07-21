@@ -4,9 +4,42 @@
     <title>테스트 매물</title>
   </head>
   <body>
-    <main>FSD 포함 테스트 차량</main>
+    <main>
+      페이지 공통 안내문에는 FSD, EAP, 빨간색 같은 단어가 들어갈 수 있지만
+      실제 판정에는 사용하지 않는다.
+    </main>
+
     <script>
-      __PRELOADED_STATE__ = {"cars":{"base":{"vehicleNo":"12가 3456","vehicleId":42023180,"queryCarId":42023180}}};
+      __PRELOADED_STATE__ = {
+        "cars": {
+          "base": {
+            "vehicleNo": "12가 3456",
+            "vehicleId": 42023180,
+            "queryCarId": 42023180,
+            "spec": {
+              "colorName": "검정색",
+              "customColor": null
+            },
+            "options": {
+              "etc": [
+                "향상된 오토파일럿 (EAP)"
+              ]
+            },
+            "advertisement": {
+              "oneLineText": "완전무사고. FSD 구매완료. 라이젠."
+            },
+            "photos": [
+              {
+                "desc": "FSD Lite 가능"
+              },
+              {
+                "desc": null
+              }
+            ],
+            "contents": null
+          }
+        }
+      };
     </script>
   </body>
 </html>
