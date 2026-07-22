@@ -12,11 +12,15 @@ import {
   loadJson,
   matchesBasicCriteria,
   migrateLegacyState,
+  needsVehicleIdentityResolution,
+  normalizeVehicleNo,
   parseListHtml,
+  parsePreloadedVehicleData,
   prepareSendCurrentListing,
   recordDetailFailure,
   recordListObservation,
   recordDetailSuccess,
+  reconcileListingDeletions,
   recordTelegramDelivery,
   resolveSearchUrl,
   saveJson,
@@ -545,21 +549,271 @@ for (
   );
 }
 
+let deletionRepresentatives =
+  representatives;
+let identityStateRepresentatives =
+  [];
+let identityResolutionComplete =
+  true;
+
+const needsIdentityResolution =
+  runMode === "normal" &&
+  wasInitialized &&
+  needsVehicleIdentityResolution({
+    previousListings,
+    currentListings:
+      listingsById,
+    representatives
+  });
+
+if (needsIdentityResolution) {
+  const candidateByListingId =
+    new Map(
+      candidates.map((candidate) => [
+        String(candidate.listing.id),
+        candidate
+      ])
+    );
+
+  const identityCandidates = [];
+  let identityOrder = 0;
+
+  for (
+    const listing of
+    listingsById.values()
+  ) {
+    const order = identityOrder;
+    identityOrder += 1;
+
+    const listingId =
+      String(listing.id);
+
+    const candidate =
+      candidateByListingId.get(
+        listingId
+      );
+
+    if (candidate) {
+      if (
+        !normalizeVehicleNo(
+          candidate.listing
+            .vehicleNo
+        )
+      ) {
+        identityResolutionComplete =
+          false;
+      }
+
+      continue;
+    }
+
+    const previous =
+      previousListings[listingId];
+
+    const previousVehicleNo =
+      normalizeVehicleNo(
+        previous?.vehicleNo
+      );
+
+    if (previousVehicleNo) {
+      const identityListing = {
+        ...listing,
+        vehicleNo:
+          previousVehicleNo
+      };
+
+      identityCandidates.push({
+        order,
+        listing:
+          identityListing,
+        detailSucceeded: false,
+        stateRecord: null
+      });
+
+      continue;
+    }
+
+    await sleep(
+      config.requestDelayMs
+    );
+
+    let detailHtml;
+    try {
+      detailHtml = await fetchText(
+        listing.url
+      );
+    } catch (error) {
+      identityResolutionComplete =
+        false;
+      console.warn(
+        `Identity detail fetch failed for ${listing.id}:`,
+        error.message
+      );
+      continue;
+    }
+
+    const { vehicleNo } =
+      parsePreloadedVehicleData(
+        detailHtml
+      );
+
+    if (!vehicleNo) {
+      identityResolutionComplete =
+        false;
+      console.warn(
+        `Vehicle identity unavailable for ${listing.id}; deletion notification deferred.`
+      );
+      continue;
+    }
+
+    const identityListing = {
+      ...listing,
+      vehicleNo
+    };
+
+    const {
+      previous: matchedPrevious,
+      matchedBy
+    } =
+      findPreviousListing(
+        previousListings,
+        identityListing
+      );
+
+    const hasCurrentPreviousVehicleListing =
+      Object.entries(
+        previousListings
+      ).some(
+        ([previousListingId, record]) =>
+          normalizeVehicleNo(
+            record?.vehicleNo
+          ) === vehicleNo &&
+          listingsById.has(
+            previousListingId
+          )
+      );
+
+    const shouldApplyIdentityState =
+      Boolean(
+        matchedPrevious &&
+          (
+            matchedBy ===
+              "listingId" ||
+            !hasCurrentPreviousVehicleListing
+          )
+      );
+
+    identityCandidates.push({
+      order,
+      listing: identityListing,
+      detailSucceeded: true,
+      stateRecord:
+        shouldApplyIdentityState
+        ? recordListObservation(
+            matchedPrevious,
+            identityListing,
+            now
+          )
+        : null
+    });
+  }
+
+  deletionRepresentatives =
+    selectRepresentativeCandidates([
+      ...representatives,
+      ...identityCandidates
+    ]).representatives;
+
+  const standardVehicleNos =
+    new Set(
+      representatives
+        .map((candidate) =>
+          normalizeVehicleNo(
+            candidate.listing
+              .vehicleNo
+          )
+        )
+        .filter(Boolean)
+    );
+
+  identityStateRepresentatives =
+    selectRepresentativeCandidates(
+      identityCandidates.filter(
+        (candidate) =>
+          candidate.stateRecord
+      )
+    ).representatives.filter(
+      (candidate) =>
+        !standardVehicleNos.has(
+          normalizeVehicleNo(
+            candidate.listing
+              .vehicleNo
+          )
+        )
+    );
+}
+
+for (const candidate of representatives) {
+  const previousMatch =
+    findPreviousListing(
+      previousListings,
+      candidate.listing
+    ).previous;
+
+  const deletionTracked =
+    isSendCurrent
+      ? Boolean(previousMatch) &&
+        previousMatch
+          .deletionTracked !== false
+      : true;
+
+  applyRepresentativeState(
+    state.listings,
+    {
+      ...candidate,
+      stateRecord: {
+        ...candidate.stateRecord,
+        deletionTracked
+      }
+    }
+  );
+  if (candidate.event) events.push(candidate.event);
+}
 for (
   const candidate of
-  representatives
+  identityStateRepresentatives
 ) {
   applyRepresentativeState(
     state.listings,
-    candidate
+    {
+      ...candidate,
+      stateRecord: {
+        ...candidate.stateRecord,
+        deletionTracked:
+          candidate.stateRecord
+            .deletionTracked !== false
+      }
+    }
   );
-
-  if (candidate.event) {
-    events.push(
-      candidate.event
-    );
-  }
 }
+
+const deletionResult =
+  reconcileListingDeletions({
+    stateListings: state.listings,
+    previousListings,
+    currentListings:
+      listingsById,
+    representatives:
+      deletionRepresentatives,
+    identityResolutionComplete,
+    now,
+    runMode,
+    wasInitialized
+  });
+
+events.push(
+  ...deletionResult.events
+);
 
 if (
   !wasInitialized &&
@@ -568,7 +822,7 @@ if (
   state.initializedAt = now;
 
   await sendTelegram(
-    `매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 인하를 알립니다.`
+    `매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 변경, 매물삭제를 알립니다.`
   );
 } else {
   for (
@@ -588,7 +842,8 @@ if (
     if (!isSendCurrent) {
       const listingId =
         String(
-          event.listing.id
+          event.stateListingId ??
+            event.listing.id
         );
 
       const stateRecord =

@@ -10,6 +10,7 @@ import {
   getListingInspection,
   normalizeVehicleNo,
   parsePreloadedVehicleData,
+  recordDetailFailure,
   recordDetailSuccess,
   selectRepresentativeCandidates
 } from "../src/lib.mjs";
@@ -309,6 +310,74 @@ test("다른 매물 ID라도 차량번호가 같으면 기존 상태로 연결�
   assert.equal(
     inspection.isNew,
     false
+  );
+});
+
+test("새 ID의 미확정 상세 실패 기록보다 같은 차량번호의 확정 상태를 우선한다", () => {
+  const previous = previousState();
+  const current = listing({
+    id: "43000000",
+    url: "https://fem.encar.com/cars/detail/43000000"
+  });
+  const failed =
+    recordDetailFailure(
+      undefined,
+      {
+        ...current,
+        vehicleNo: null
+      },
+      "2026-07-19T00:00:00.000Z",
+      "timeout"
+    );
+
+  const match = findPreviousListing(
+    {
+      [previous.id]: previous,
+      [current.id]: failed
+    },
+    current
+  );
+
+  const inspection =
+    getListingInspection(
+      match.previous,
+      current,
+      "normal"
+    );
+
+  const record = recordDetailSuccess(
+    match.previous,
+    current,
+    current,
+    now
+  );
+
+  assert.equal(
+    match.matchedBy,
+    "vehicleNo"
+  );
+  assert.equal(
+    match.previousListingId,
+    previous.id
+  );
+  assert.equal(
+    inspection.isNew,
+    false
+  );
+  assert.equal(
+    eventFor(
+      match.previous,
+      current
+    ),
+    null
+  );
+  assert.equal(
+    record.firstSeenAt,
+    firstSeenAt
+  );
+  assert.equal(
+    record.previousListingId,
+    previous.id
   );
 });
 

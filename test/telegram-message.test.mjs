@@ -120,6 +120,38 @@ test("텔레그램 전송 결과의 메시지 ID와 발송 시각을 상태에 �
   );
 });
 
+test("매물삭제 전송 결과는 삭제 상태와 기존 매물 정보를 보존한다", () => {
+  const deletedRecord = {
+    id: "42023180",
+    title: "모델 3 롱 레인지 AWD",
+    priceKrw: 38500000,
+    url: "https://fem.encar.com/cars/detail/42023180",
+    firstSeenAt: "2026-07-20T02:00:00.000Z",
+    deletedAt: "2026-07-22T02:00:00.000Z",
+    telegramMessageId: 12345,
+    telegramSentAt: "2026-07-20T02:01:00.000Z"
+  };
+
+  const recorded =
+    recordTelegramDelivery(
+      deletedRecord,
+      {
+        message_id: 67890
+      },
+      "2026-07-22T02:01:00.000Z"
+    );
+
+  assert.deepEqual(
+    recorded,
+    {
+      ...deletedRecord,
+      telegramMessageId: 67890,
+      telegramSentAt:
+        "2026-07-22T02:01:00.000Z"
+    }
+  );
+});
+
 test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을 출력하지 않는다", () => {
   const message = formatTelegramMessage(
     "신규",
@@ -182,6 +214,54 @@ test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을
   assert.doesNotMatch(
     message,
     /advClickPosition|view_type|type=detail|#photos/
+  );
+});
+
+test("매물삭제 메시지는 보존된 매물 정보 중 확인 가능한 필드만 출력한다", () => {
+  const message = formatTelegramMessage(
+    "deleted",
+    {
+      ...baseListing,
+      conditionStatus: "조건 충족",
+      conditionReasons: [
+        "가격 조건 충족"
+      ],
+      detailFailed: true
+    }
+  );
+
+  assert.deepEqual(
+    message.split("\n"),
+    [
+      "[매물삭제]",
+      "2022/09 모델 3 롱 레인지 AWD",
+      "차량번호: 12가3456",
+      "92,000㎞ | 38,500,000원",
+      "https://fem.encar.com/cars/detail/42023180"
+    ]
+  );
+});
+
+test("정보가 적은 매물삭제 레코드도 없는 값을 표시하지 않는다", () => {
+  let message;
+
+  assert.doesNotThrow(() => {
+    message = formatTelegramMessage(
+      "deleted",
+      {
+        deletedAt: "2026-07-22T02:00:00.000Z"
+      }
+    );
+  });
+
+  assert.equal(
+    message,
+    "[매물삭제]"
+  );
+
+  assert.doesNotMatch(
+    message,
+    /미확인|undefined|NaN/
   );
 });
 

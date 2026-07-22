@@ -1336,33 +1336,15 @@ export function findPreviousListing(
   const exact =
     listings?.[listing.id];
 
-  if (exact) {
-    return {
-      previous: exact,
-      previousListingId:
-        listing.id,
-      matchedBy:
-        "listingId"
-    };
-  }
-
   const vehicleNo =
     normalizeVehicleNo(
       listing.vehicleNo
     );
 
-  if (!vehicleNo) {
-    return {
-      previous: undefined,
-      previousListingId: null,
-      matchedBy: null
-    };
-  }
-
-  const matches =
-    Object.entries(
-      listings ?? {}
-    )
+  const matches = vehicleNo
+    ? Object.entries(
+        listings ?? {}
+      )
       .filter(
         ([, previous]) =>
           normalizeVehicleNo(
@@ -1383,7 +1365,44 @@ export function findPreviousListing(
                 ""
             )
           )
-      );
+      )
+    : [];
+
+  const confirmedVehicleMatch =
+    matches.find(
+      ([listingId, previous]) =>
+        listingId !==
+          String(listing.id) &&
+        Number.isFinite(
+          previous?.priceKrw
+        )
+    );
+
+  if (
+    exact &&
+    !Number.isFinite(
+      exact.priceKrw
+    ) &&
+    confirmedVehicleMatch
+  ) {
+    return {
+      previous:
+        confirmedVehicleMatch[1],
+      previousListingId:
+        confirmedVehicleMatch[0],
+      matchedBy: "vehicleNo"
+    };
+  }
+
+  if (exact) {
+    return {
+      previous: exact,
+      previousListingId:
+        listing.id,
+      matchedBy:
+        "listingId"
+    };
+  }
 
   const [match] = matches;
 
@@ -1540,6 +1559,484 @@ export function selectRepresentativeCandidates(
     representatives,
     duplicates
   };
+}
+
+function hasDeletedAt(record) {
+  return (
+    typeof record?.deletedAt ===
+      "string" &&
+    record.deletedAt.trim().length >
+      0
+  );
+}
+
+function collectCurrentListingIds(
+  currentListings
+) {
+  if (currentListings instanceof Map) {
+    return new Set(
+      [...currentListings.keys()].map(
+        String
+      )
+    );
+  }
+
+  if (Array.isArray(currentListings)) {
+    return new Set(
+      currentListings
+        .map((listing) =>
+          normalizeListingId(
+            listing?.id
+          )
+        )
+        .filter(Boolean)
+    );
+  }
+
+  if (
+    currentListings &&
+    typeof currentListings ===
+      "object"
+  ) {
+    return new Set(
+      Object.keys(currentListings)
+    );
+  }
+
+  return new Set();
+}
+
+export function needsVehicleIdentityResolution({
+  previousListings,
+  currentListings,
+  representatives = []
+}) {
+  const currentListingIds =
+    collectCurrentListingIds(
+      currentListings
+    );
+
+  const currentVehicleNos =
+    new Set(
+      representatives
+        .map((candidate) =>
+          normalizeVehicleNo(
+            candidate.listing
+              ?.vehicleNo
+          )
+        )
+        .filter(Boolean)
+    );
+
+  const groups = new Map();
+
+  for (
+    const [listingId, record] of
+    Object.entries(
+      previousListings ?? {}
+    )
+  ) {
+    if (
+      !record ||
+      typeof record !== "object" ||
+      Array.isArray(record) ||
+      hasDeletedAt(record) ||
+      record.deletionTracked ===
+        false
+    ) {
+      continue;
+    }
+
+    const vehicleNo =
+      normalizeVehicleNo(
+        record.vehicleNo
+      );
+
+    const groupKey = vehicleNo
+      ? `vehicle:${vehicleNo}`
+      : `listing:${listingId}`;
+
+    const group =
+      groups.get(groupKey) ?? {
+        vehicleNo,
+        listingIds: []
+      };
+
+    group.listingIds.push(
+      String(listingId)
+    );
+
+    groups.set(groupKey, group);
+  }
+
+  return [...groups.values()].some(
+    (group) =>
+      Boolean(group.vehicleNo) &&
+      !group.listingIds.some(
+        (listingId) =>
+          currentListingIds.has(
+            listingId
+          )
+      ) &&
+      !(
+        group.vehicleNo &&
+        currentVehicleNos.has(
+          group.vehicleNo
+        )
+      )
+  );
+}
+
+function selectLatestStateEntry(
+  entries
+) {
+  return entries.reduce(
+    (latest, entry) =>
+      String(
+        entry.record?.lastSeenAt ??
+          ""
+      ).localeCompare(
+        String(
+          latest.record
+            ?.lastSeenAt ?? ""
+        )
+      ) > 0
+        ? entry
+        : latest
+  );
+}
+
+export function createDeletedListingEvent(
+  listing,
+  stateListingId
+) {
+  const listingId = String(
+    stateListingId ?? listing?.id
+  );
+
+  return {
+    type: "deleted",
+    listing: {
+      ...listing,
+      id: listingId
+    },
+    stateListingId: listingId
+  };
+}
+
+export function reconcileListingDeletions({
+  stateListings,
+  previousListings,
+  currentListings,
+  representatives,
+  identityResolutionComplete = true,
+  now,
+  runMode,
+  wasInitialized
+}) {
+  const result = {
+    events: [],
+    deletedListingIds: [],
+    restoredListingIds: []
+  };
+
+  if (
+    runMode !== "normal" ||
+    !wasInitialized
+  ) {
+    return result;
+  }
+
+  const currentListingIds =
+    collectCurrentListingIds(
+      currentListings
+    );
+
+  if (
+    currentListingIds.size === 0
+  ) {
+    return result;
+  }
+
+  const currentRepresentativesByVehicleNo =
+    new Map();
+
+  for (
+    const candidate of
+    representatives ?? []
+  ) {
+    const vehicleNo =
+      normalizeVehicleNo(
+        candidate.listing
+          ?.vehicleNo
+      );
+
+    if (
+      vehicleNo &&
+      !currentRepresentativesByVehicleNo.has(
+        vehicleNo
+      )
+    ) {
+      currentRepresentativesByVehicleNo.set(
+        vehicleNo,
+        candidate
+      );
+    }
+  }
+
+  const currentVehicleNos =
+    new Set(
+      currentRepresentativesByVehicleNo.keys()
+    );
+
+  for (
+    const [listingId, record] of
+    Object.entries(
+      stateListings ?? {}
+    )
+  ) {
+    if (!hasDeletedAt(record)) {
+      continue;
+    }
+
+    const normalizedListingId =
+      String(listingId);
+
+    const isPresentByListingId =
+      currentListingIds.has(
+        normalizedListingId
+      );
+
+    const vehicleNo =
+      normalizeVehicleNo(
+        record.vehicleNo
+      );
+
+    const currentRepresentative =
+      vehicleNo
+        ? currentRepresentativesByVehicleNo.get(
+            vehicleNo
+          )
+        : null;
+
+    const representativeListingId =
+      normalizeListingId(
+        currentRepresentative
+          ?.listing?.id
+      );
+
+    const isPresentByVehicleNo =
+      Boolean(
+        representativeListingId &&
+          currentListingIds.has(
+            representativeListingId
+          )
+      );
+
+    if (
+      !isPresentByListingId &&
+      !isPresentByVehicleNo
+    ) {
+      continue;
+    }
+
+    let restoredListingId =
+      normalizedListingId;
+
+    if (
+      !isPresentByListingId &&
+      currentRepresentative
+    ) {
+      restoredListingId =
+        representativeListingId;
+
+      const stateRecord =
+        stateListings[
+          restoredListingId
+        ] ??
+        currentRepresentative
+          .stateRecord ??
+        recordListObservation(
+          record,
+          currentRepresentative.listing,
+          now
+        );
+
+      applyRepresentativeState(
+        stateListings,
+        {
+          ...currentRepresentative,
+          stateRecord
+        }
+      );
+    }
+
+    const restored = {
+      ...stateListings[
+        restoredListingId
+      ],
+      lastSeenAt: now
+    };
+
+    delete restored.deletedAt;
+
+    stateListings[
+      restoredListingId
+    ] =
+      restored;
+
+    result.restoredListingIds.push(
+      restoredListingId
+    );
+  }
+
+  const previousGroups =
+    new Map();
+
+  for (
+    const [listingId, record] of
+    Object.entries(
+      previousListings ?? {}
+    )
+  ) {
+    if (
+      !record ||
+      typeof record !== "object" ||
+      Array.isArray(record) ||
+      hasDeletedAt(record) ||
+      record.deletionTracked ===
+        false
+    ) {
+      continue;
+    }
+
+    const vehicleNo =
+      normalizeVehicleNo(
+        record.vehicleNo
+      );
+
+    const groupKey = vehicleNo
+      ? `vehicle:${vehicleNo}`
+      : `listing:${listingId}`;
+
+    const group =
+      previousGroups.get(
+        groupKey
+      ) ?? {
+        vehicleNo,
+        entries: []
+      };
+
+    group.entries.push({
+      listingId:
+        String(listingId),
+      record
+    });
+
+    previousGroups.set(
+      groupKey,
+      group
+    );
+  }
+
+  for (
+    const group of
+    previousGroups.values()
+  ) {
+    const isPresentByListingId =
+      group.entries.some(
+        ({ listingId }) =>
+          currentListingIds.has(
+            listingId
+          )
+      );
+
+    const isPresentByVehicleNo =
+      Boolean(
+        group.vehicleNo &&
+          currentVehicleNos.has(
+            group.vehicleNo
+          )
+      );
+
+    if (
+      isPresentByListingId ||
+      isPresentByVehicleNo
+    ) {
+      continue;
+    }
+
+    if (
+      group.vehicleNo &&
+      !identityResolutionComplete
+    ) {
+      continue;
+    }
+
+    const markedEntries = [];
+
+    for (
+      const entry of group.entries
+    ) {
+      const currentRecord =
+        stateListings?.[
+          entry.listingId
+        ];
+
+      if (
+        !currentRecord ||
+        typeof currentRecord !==
+          "object" ||
+        Array.isArray(
+          currentRecord
+        ) ||
+        hasDeletedAt(
+          currentRecord
+        )
+      ) {
+        continue;
+      }
+
+      const deletedRecord = {
+        ...currentRecord,
+        deletedAt: now
+      };
+
+      stateListings[
+        entry.listingId
+      ] = deletedRecord;
+
+      result.deletedListingIds.push(
+        entry.listingId
+      );
+
+      markedEntries.push({
+        listingId:
+          entry.listingId,
+        record: deletedRecord
+      });
+    }
+
+    if (
+      markedEntries.length === 0
+    ) {
+      continue;
+    }
+
+    const eventEntry =
+      selectLatestStateEntry(
+        markedEntries
+      );
+
+    result.events.push(
+      createDeletedListingEvent(
+        eventEntry.record,
+        eventEntry.listingId
+      )
+    );
+  }
+
+  return result;
 }
 
 export function applyRepresentativeState(
@@ -2071,10 +2568,108 @@ function formatTelegramOption(
   return "옵션: 미확인";
 }
 
+function formatDeletedTelegramMessage(
+  listing
+) {
+  const lines = [
+    "[매물삭제]"
+  ];
+
+  const title =
+    typeof listing?.title ===
+      "string"
+      ? singleLine(listing.title)
+      : "";
+
+  if (title) {
+    const yearMonth =
+      typeof listing?.yearMonth ===
+        "string" &&
+      /^\d{4}-\d{2}$/.test(
+        listing.yearMonth
+      )
+        ? listing.yearMonth.replace(
+            "-",
+            "/"
+          )
+        : null;
+
+    lines.push(
+      yearMonth
+        ? `${yearMonth} ${title}`
+        : title
+    );
+  }
+
+  const vehicleNo =
+    normalizeVehicleNo(
+      listing?.vehicleNo
+    );
+
+  if (vehicleNo) {
+    lines.push(
+      `차량번호: ${vehicleNo}`
+    );
+  }
+
+  const listingFacts = [];
+
+  if (
+    Number.isFinite(
+      listing?.mileageKm
+    )
+  ) {
+    listingFacts.push(
+      formatKm(listing.mileageKm)
+    );
+  }
+
+  if (
+    Number.isFinite(
+      listing?.priceKrw
+    )
+  ) {
+    listingFacts.push(
+      formatKrw(listing.priceKrw)
+    );
+  }
+
+  if (listingFacts.length > 0) {
+    lines.push(
+      listingFacts.join(" | ")
+    );
+  }
+
+  const hasStoredUrl =
+    typeof listing?.url ===
+      "string" &&
+    listing.url.trim().length > 0;
+
+  if (hasStoredUrl) {
+    const url =
+      formatListingUrl(listing);
+
+    if (url) {
+      lines.push(url);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 export function formatTelegramMessage(
   eventType,
   listing
 ) {
+  if (
+    eventType === "deleted" ||
+    eventType === "매물삭제"
+  ) {
+    return formatDeletedTelegramMessage(
+      listing
+    );
+  }
+
   const lines = [
     `[${eventType}]`,
     `${listing.yearMonth.replace(
