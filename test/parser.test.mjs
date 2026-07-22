@@ -6,6 +6,7 @@ import {
   evaluateListing,
   matchesBasicCriteria,
   parseListHtml,
+  parseListingText,
   setPage
 } from "../src/lib.mjs";
 
@@ -65,6 +66,56 @@ test("목록 HTML에서 매물을 파싱하고 중복 ID를 제거한다", async
   assert.equal(target.yearMonth, "2022-09");
   assert.equal(target.mileageKm, 67235);
   assert.equal(target.priceKrw, 32700000);
+});
+
+test("목록 지역은 특정 연료명 없이 주행거리와 가격 사이에서만 판정한다", () => {
+  const cases = [
+    ["전기 경기", "경기"],
+    ["가솔린 서울", "서울"],
+    ["디젤 부산", "부산"],
+    ["하이브리드 제주", "제주"],
+    ["서울", "서울"]
+  ];
+
+  for (const [metadata, expected] of cases) {
+    const parsed = parseListingText({
+      id: "anonymous-listing",
+      href:
+        "https://example.invalid/listing/anonymous",
+      text:
+        `익명 차량 24/01식 1,000 km ${metadata} 3,000 만원`
+    });
+
+    assert.equal(
+      parsed.region,
+      expected,
+      metadata
+    );
+  }
+
+  for (const { title, metadata } of [
+    {
+      title: "서울 익명 차량",
+      metadata: "가솔린"
+    },
+    {
+      title: "경기 익명 차량",
+      metadata: ""
+    }
+  ]) {
+    const parsed = parseListingText({
+      id: "anonymous-listing",
+      href:
+        "https://example.invalid/listing/anonymous",
+      text:
+        `${title} 24/01식 1,000 km ${metadata} 3,000 만원`
+    });
+
+    assert.equal(
+      parsed.region,
+      "미확인"
+    );
+  }
 });
 
 test("사용자 기본 조건을 적용한다", () => {

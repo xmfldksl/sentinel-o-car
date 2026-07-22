@@ -1,18 +1,41 @@
 {
-  "requiredTitleTerms": ["모델 3", "롱 레인지", "AWD"],
-  "yearMonthMin": "2022-05",
-  "yearMonthMax": "2022-12",
-  "maxMileageKm": 150000,
-  "priceLimitsKrw": {
-    "base": 35000000,
-    "eap": 37000000,
-    "fsd": 40000000,
-    "unknownOptionHardMax": 40000000
-  },
-  "rentalPenaltyKrw": 3000000,
-  "excludedColorTerms": ["빨간색", "적색", "레드", "red multi-coat", "ultra red"],
-  "excludeContracted": true,
+  "configVersion": 2,
+  "legacyStateProfileId": "tesla-model3-long-range",
   "notifyPriceIncrease": true,
   "maxPages": 2,
-  "requestDelayMs": 1500
+  "requestDelayMs": 1500,
+  "profiles": [
+    {
+      "id": "tesla-model3-long-range",
+      "name": "Model 3 롱레인지",
+      "enabled": true,
+      "searchUrlEnv": "ENCAR_SEARCH_URL",
+      "optionMode": "tesla",
+      "titleFilter": {
+        "requiredAll": ["모델 3", "롱 레인지", "AWD"],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "yearMonthMin": "2022-05",
+      "yearMonthMax": "2022-12",
+      "maxMileageKm": 150000,
+      "excludedColors": [
+        "빨간색",
+        "적색",
+        "레드",
+        "red multi-coat",
+        "ultra red"
+      ],
+      "excludeContractPending": true,
+      "price": {
+        "maxPriceKrw": 35000000,
+        "teslaOptionLimitsKrw": {
+          "eap": 37000000,
+          "fsd": 40000000,
+          "unknownOptionHardMax": 40000000
+        }
+      },
+      "rentalHistoryDiscountKrw": 3000000
+    }
+  ]
 }

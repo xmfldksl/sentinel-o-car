@@ -11,6 +11,146 @@ function singleLine(value) {
     .trim();
 }
 
+function resolveVehicleConfig(config) {
+  if (Array.isArray(config?.profiles)) {
+    return (
+      config.profiles.find(
+        (profile) =>
+          profile?.enabled !== false
+      ) ??
+      config.profiles[0] ??
+      config
+    );
+  }
+
+  return config;
+}
+
+function getOptionMode(config) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  return vehicleConfig?.optionMode ===
+    "generic"
+    ? "generic"
+    : "tesla";
+}
+
+function normalizeFilterText(value) {
+  return singleLine(value).toLowerCase();
+}
+
+function normalizeFilterTerms(
+  values
+) {
+  return Array.isArray(values)
+    ? values.map(normalizeFilterText)
+    : [];
+}
+
+function resolveTitleFilter(config) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  if (
+    vehicleConfig?.titleFilter &&
+    typeof vehicleConfig.titleFilter ===
+      "object" &&
+    !Array.isArray(
+      vehicleConfig.titleFilter
+    )
+  ) {
+    return {
+      requiredAll:
+        normalizeFilterTerms(
+          vehicleConfig.titleFilter
+            .requiredAll
+        ),
+      requiredAny:
+        normalizeFilterTerms(
+          vehicleConfig.titleFilter
+            .requiredAny
+        ),
+      excludedAny:
+        normalizeFilterTerms(
+          vehicleConfig.titleFilter
+            .excludedAny
+        )
+    };
+  }
+
+  return {
+    requiredAll:
+      normalizeFilterTerms(
+        vehicleConfig
+          ?.requiredTitleTerms
+      ),
+    requiredAny: [],
+    excludedAny: []
+  };
+}
+
+export function matchesTitleFilter(
+  title,
+  config
+) {
+  const normalizedTitle =
+    normalizeFilterText(title);
+
+  const {
+    requiredAll,
+    requiredAny,
+    excludedAny
+  } = resolveTitleFilter(config);
+
+  return (
+    requiredAll.every((term) =>
+      normalizedTitle.includes(term)
+    ) &&
+    (
+      requiredAny.length === 0 ||
+      requiredAny.some((term) =>
+        normalizedTitle.includes(term)
+      )
+    ) &&
+    !excludedAny.some((term) =>
+      normalizedTitle.includes(term)
+    )
+  );
+}
+
+function resolveYearMonthBounds(
+  config
+) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  const yearMonthMin =
+    vehicleConfig?.yearMonthMin ??
+    (
+      Number.isInteger(
+        vehicleConfig?.minYear
+      )
+        ? `${vehicleConfig.minYear}-01`
+        : null
+    );
+
+  const yearMonthMax =
+    vehicleConfig?.yearMonthMax ??
+    (
+      Number.isInteger(
+        vehicleConfig?.maxYear
+      )
+        ? `${vehicleConfig.maxYear}-12`
+        : null
+    );
+
+  return {
+    yearMonthMin,
+    yearMonthMax
+  };
+}
+
 export function createSearchUrlFingerprint(urlString) {
   return createHash("sha256")
     .update(urlString, "utf8")
@@ -701,14 +841,40 @@ function isExcludedColor(
   const normalizedColor =
     colorName.toLowerCase();
 
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
   return (
-    config.excludedColorTerms ?? []
+    vehicleConfig
+      .excludedColorTerms ??
+    vehicleConfig.excludedColors ??
+    []
   ).some((term) =>
     normalizedColor.includes(
       String(term).toLowerCase()
     )
   );
 }
+
+const LISTING_REGION_LABELS = new Set([
+  "서울",
+  "부산",
+  "대구",
+  "인천",
+  "광주",
+  "대전",
+  "울산",
+  "세종",
+  "경기",
+  "강원",
+  "충북",
+  "충남",
+  "전북",
+  "전남",
+  "경북",
+  "경남",
+  "제주"
+]);
 
 export function parseListingText({
   id,
@@ -792,15 +958,23 @@ export function parseListingText({
   const contracted =
     /계약중/.test(normalized);
 
-  const afterMileage =
+  const priceStart =
+    priceMatches.at(-1).index ??
+    normalized.length;
+
+  const listingMetadata =
     normalized.slice(
       (mileageMatch.index ?? 0) +
-        mileageMatch[0].length
+        mileageMatch[0].length,
+      priceStart
     );
 
-  const regionMatch =
-    afterMileage.match(
-      /전기\s+([가-힣]{2,4})/
+  const region = listingMetadata
+    .split(/\s+/)
+    .findLast((token) =>
+      LISTING_REGION_LABELS.has(
+        token
+      )
     );
 
   return {
@@ -818,7 +992,7 @@ export function parseListingText({
     mileageKm,
     priceKrw,
     region:
-      regionMatch?.[1] ??
+      region ??
       "미확인",
     contracted,
     listText: normalized
@@ -903,8 +1077,13 @@ export function analyzeDetail(
       listing.priceKrw
     );
 
+  const optionMode =
+    getOptionMode(config);
+
   const optionData =
-    detectConfirmedOptions(base);
+    optionMode === "tesla"
+      ? detectConfirmedOptions(base)
+      : {};
 
   const colorName =
     normalizeColorName(
@@ -938,6 +1117,7 @@ export function analyzeDetail(
     ...vehicleData,
     ...saleData,
     ...optionData,
+    optionMode,
     colorName,
     colorStatus:
       colorName
@@ -955,24 +1135,30 @@ export function matchesBasicCriteria(
   listing,
   config
 ) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
   const titleOk =
-    config.requiredTitleTerms.every(
-      (term) =>
-        listing.title
-          .toLowerCase()
-          .includes(
-            term.toLowerCase()
-          )
+    matchesTitleFilter(
+      listing.title,
+      config
     );
+
+  const {
+    yearMonthMin,
+    yearMonthMax
+  } = resolveYearMonthBounds(
+    config
+  );
 
   return (
     titleOk &&
     listing.yearMonth >=
-      config.yearMonthMin &&
+      yearMonthMin &&
     listing.yearMonth <=
-      config.yearMonthMax &&
+      yearMonthMax &&
     listing.mileageKm <=
-      config.maxMileageKm
+      vehicleConfig.maxMileageKm
   );
 }
 
@@ -980,17 +1166,23 @@ export function getBasicCriteriaFailureReasons(
   listing,
   config
 ) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
   const reasons = [];
 
   const titleOk =
-    config.requiredTitleTerms.every(
-      (term) =>
-        listing.title
-          .toLowerCase()
-          .includes(
-            term.toLowerCase()
-          )
+    matchesTitleFilter(
+      listing.title,
+      config
     );
+
+  const {
+    yearMonthMin,
+    yearMonthMax
+  } = resolveYearMonthBounds(
+    config
+  );
 
   if (!titleOk) {
     reasons.push(
@@ -1000,9 +1192,9 @@ export function getBasicCriteriaFailureReasons(
 
   if (
     listing.yearMonth <
-      config.yearMonthMin ||
+      yearMonthMin ||
     listing.yearMonth >
-      config.yearMonthMax
+      yearMonthMax
   ) {
     reasons.push(
       "연월 범위 초과"
@@ -1011,7 +1203,7 @@ export function getBasicCriteriaFailureReasons(
 
   if (
     listing.mileageKm >
-    config.maxMileageKm
+    vehicleConfig.maxMileageKm
   ) {
     reasons.push(
       "주행거리 초과"
@@ -1039,13 +1231,122 @@ function resolveConfirmedOption(
   return "미확인";
 }
 
+function resolvePricePolicy(
+  config,
+  optionMode = getOptionMode(config)
+) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  if (
+    vehicleConfig?.price &&
+    typeof vehicleConfig.price ===
+      "object" &&
+    !Array.isArray(vehicleConfig.price)
+  ) {
+    const maxPriceKrw =
+      vehicleConfig.price
+        .maxPriceKrw;
+
+    if (optionMode !== "tesla") {
+      return { maxPriceKrw };
+    }
+
+    const optionLimits =
+      vehicleConfig.price
+        .teslaOptionLimitsKrw ?? {};
+
+    return {
+      maxPriceKrw,
+      eap:
+        optionLimits.eap ??
+        maxPriceKrw,
+      fsd:
+        optionLimits.fsd ??
+        maxPriceKrw,
+      unknownOptionHardMax:
+        optionLimits
+          .unknownOptionHardMax ??
+        maxPriceKrw
+    };
+  }
+
+  const maxPriceKrw =
+    vehicleConfig
+      ?.priceLimitsKrw?.base;
+
+  if (optionMode !== "tesla") {
+    return { maxPriceKrw };
+  }
+
+  return {
+    maxPriceKrw,
+    eap:
+      vehicleConfig
+        ?.priceLimitsKrw?.eap,
+    fsd:
+      vehicleConfig
+        ?.priceLimitsKrw?.fsd,
+    unknownOptionHardMax:
+      vehicleConfig
+        ?.priceLimitsKrw
+        ?.unknownOptionHardMax ??
+      vehicleConfig
+        ?.priceLimitsKrw?.base
+  };
+}
+
+function resolveRentalPenaltyKrw(
+  config
+) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  return (
+    vehicleConfig
+      ?.rentalHistoryDiscountKrw ??
+    vehicleConfig?.rentalPenaltyKrw ??
+    0
+  );
+}
+
+function shouldExcludeContracted(
+  config
+) {
+  const vehicleConfig =
+    resolveVehicleConfig(config);
+
+  return (
+    vehicleConfig
+      ?.excludeContractPending ??
+    vehicleConfig?.excludeContracted ??
+    false
+  );
+}
+
 export function evaluateListing(
   listing,
   config
 ) {
+  const optionMode =
+    getOptionMode(config);
+
   const option =
-    resolveConfirmedOption(
-      listing
+    optionMode === "tesla"
+      ? resolveConfirmedOption(
+          listing
+        )
+      : null;
+
+  const pricePolicy =
+    resolvePricePolicy(
+      config,
+      optionMode
+    );
+
+  const rentalPenaltyKrw =
+    resolveRentalPenaltyKrw(
+      config
     );
 
   const hasRentalUsageHistory =
@@ -1055,26 +1356,32 @@ export function evaluateListing(
   const adjustedPriceKrw =
     listing.priceKrw +
     (hasRentalUsageHistory
-      ? config.rentalPenaltyKrw
+      ? rentalPenaltyKrw
       : 0);
 
   let limitKrw =
-    config.priceLimitsKrw.base;
+    pricePolicy.maxPriceKrw;
 
   let reason =
-    "일반 차량 기준";
+    optionMode === "generic"
+      ? "단일 최대가격 기준"
+      : "일반 차량 기준";
 
-  if (option === "FSD") {
+  if (
+    optionMode === "tesla" &&
+    option === "FSD"
+  ) {
     limitKrw =
-      config.priceLimitsKrw.fsd;
+      pricePolicy.fsd;
 
     reason =
       "FSD 기준";
   } else if (
+    optionMode === "tesla" &&
     option === "EAP"
   ) {
     limitKrw =
-      config.priceLimitsKrw.eap;
+      pricePolicy.eap;
 
     reason =
       "EAP 기준";
@@ -1083,7 +1390,9 @@ export function evaluateListing(
   const excludedReasons = [];
 
   if (
-    config.excludeContracted &&
+    shouldExcludeContracted(
+      config
+    ) &&
     listing.contracted
   ) {
     excludedReasons.push(
@@ -1111,9 +1420,10 @@ export function evaluateListing(
   const warnings = [];
 
   if (
+    optionMode === "tesla" &&
     option === "미확인" &&
     adjustedPriceKrw >
-      config.priceLimitsKrw.base
+      pricePolicy.maxPriceKrw
   ) {
     warnings.push(
       "EAP 또는 FSD 포함 여부 확인 필요"
@@ -1123,7 +1433,7 @@ export function evaluateListing(
   if (hasRentalUsageHistory) {
     warnings.push(
       `렌트 이력 감가 ${formatKrw(
-        config.rentalPenaltyKrw
+        rentalPenaltyKrw
       )} 반영`
     );
   }
@@ -1144,13 +1454,18 @@ export function evaluateListing(
     );
   }
 
-  return {
+  const evaluated = {
     ...listing,
-    option,
-    hasFsd:
-      option === "FSD",
-    hasEap:
-      option === "EAP",
+    optionMode,
+    ...(optionMode === "tesla"
+      ? {
+          option,
+          hasFsd:
+            option === "FSD",
+          hasEap:
+            option === "EAP"
+        }
+      : {}),
     adjustedPriceKrw,
     limitKrw,
     priceRule: reason,
@@ -1159,6 +1474,16 @@ export function evaluateListing(
     excludedReasons,
     warnings
   };
+
+  if (optionMode === "generic") {
+    delete evaluated.option;
+    delete evaluated.hasFsd;
+    delete evaluated.hasEap;
+    delete evaluated.optionSource;
+    delete evaluated.optionEvidence;
+  }
+
+  return evaluated;
 }
 
 export function prepareSendCurrentListing(
@@ -1169,6 +1494,21 @@ export function prepareSendCurrentListing(
     errorMessage
   } = {}
 ) {
+  const optionMode =
+    getOptionMode(config);
+
+  const pricePolicy =
+    resolvePricePolicy(
+      config,
+      optionMode
+    );
+
+  const failureLimitKrw =
+    optionMode === "tesla"
+      ? pricePolicy
+          .unknownOptionHardMax
+      : pricePolicy.maxPriceKrw;
+
   const reasons = [
     ...getBasicCriteriaFailureReasons(
       listing,
@@ -1187,7 +1527,9 @@ export function prepareSendCurrentListing(
     );
   } else {
     if (
-      config.excludeContracted &&
+      shouldExcludeContracted(
+        config
+      ) &&
       listing.contracted
     ) {
       reasons.push(
@@ -1197,8 +1539,7 @@ export function prepareSendCurrentListing(
 
     if (
       listing.priceKrw >
-      config.priceLimitsKrw
-        .unknownOptionHardMax
+      failureLimitKrw
     ) {
       reasons.push(
         "가격 초과"
@@ -1210,8 +1551,9 @@ export function prepareSendCurrentListing(
     );
 
     if (
+      optionMode === "tesla" &&
       listing.priceKrw >
-      config.priceLimitsKrw.base
+      pricePolicy.maxPriceKrw
     ) {
       reasons.push(
         "옵션 미확인"
@@ -1220,13 +1562,17 @@ export function prepareSendCurrentListing(
 
     result = {
       ...listing,
-      option:
-        "상세 확인 실패",
+      optionMode,
+      ...(optionMode === "tesla"
+        ? {
+            option:
+              "상세 확인 실패"
+          }
+        : {}),
       adjustedPriceKrw:
         listing.priceKrw,
       limitKrw:
-        config.priceLimitsKrw
-          .unknownOptionHardMax,
+        failureLimitKrw,
       priceRule:
         "상세 확인 실패",
       eligible: false,
@@ -1240,6 +1586,14 @@ export function prepareSendCurrentListing(
           ],
       detailFailed: true
     };
+
+    if (optionMode === "generic") {
+      delete result.option;
+      delete result.hasFsd;
+      delete result.hasEap;
+      delete result.optionSource;
+      delete result.optionEvidence;
+    }
   }
 
   const conditionReasons = [
@@ -1715,6 +2069,7 @@ export function createDeletedListingEvent(
   );
 
   return {
+    kind: "deleted",
     type: "deleted",
     listing: {
       ...listing,
@@ -2167,11 +2522,58 @@ export function formatDuplicateListingLog(
   }`;
 }
 
+const TESLA_OPTION_STATE_FIELDS = [
+  "option",
+  "hasFsd",
+  "hasEap",
+  "optionSource",
+  "optionEvidence"
+];
+
+export function sanitizeListingStateForOptionMode(
+  record,
+  optionMode
+) {
+  if (
+    optionMode !== "generic" &&
+    optionMode !== "tesla"
+  ) {
+    throw new Error(
+      "optionMode must be generic or tesla"
+    );
+  }
+
+  if (
+    !record ||
+    typeof record !== "object" ||
+    Array.isArray(record)
+  ) {
+    return record;
+  }
+
+  const sanitized = {
+    ...record,
+    optionMode
+  };
+
+  if (optionMode === "generic") {
+    for (
+      const field of
+      TESLA_OPTION_STATE_FIELDS
+    ) {
+      delete sanitized[field];
+    }
+  }
+
+  return sanitized;
+}
+
 export function recordDetailFailure(
   previous,
   listing,
   now,
-  errorMessage
+  errorMessage,
+  optionMode
 ) {
   const {
     priceKrw:
@@ -2189,7 +2591,7 @@ export function recordDetailFailure(
         firstSeenAt: now
       };
 
-  return {
+  const failedRecord = {
     ...record,
     vehicleNo:
       normalizeVehicleNo(
@@ -2206,14 +2608,22 @@ export function recordDetailFailure(
     lastDetailFetchError:
       errorMessage
   };
+
+  return optionMode === undefined
+    ? failedRecord
+    : sanitizeListingStateForOptionMode(
+        failedRecord,
+        optionMode
+      );
 }
 
 export function recordListObservation(
   previous,
   listing,
-  now
+  now,
+  optionMode
 ) {
-  return {
+  const observedRecord = {
     ...previous,
     id: listing.id,
     title: listing.title,
@@ -2246,6 +2656,13 @@ export function recordListObservation(
       now,
     lastSeenAt: now
   };
+
+  return optionMode === undefined
+    ? observedRecord
+    : sanitizeListingStateForOptionMode(
+        observedRecord,
+        optionMode
+      );
 }
 
 export function migrateLegacyState(
@@ -2316,6 +2733,12 @@ export function recordDetailSuccess(
   evaluated,
   now
 ) {
+  const optionMode =
+    evaluated?.optionMode ===
+      "generic"
+      ? "generic"
+      : "tesla";
+
   const previousId =
     previous?.id
       ? String(previous.id)
@@ -2372,16 +2795,21 @@ export function recordDetailSuccess(
       previous?.firstSeenAt ??
       now,
     lastSeenAt: now,
-    option:
-      evaluated.option,
-    hasFsd:
-      evaluated.hasFsd,
-    hasEap:
-      evaluated.hasEap,
-    optionSource:
-      evaluated.optionSource,
-    optionEvidence:
-      evaluated.optionEvidence,
+    optionMode,
+    ...(optionMode === "tesla"
+      ? {
+          option:
+            evaluated.option,
+          hasFsd:
+            evaluated.hasFsd,
+          hasEap:
+            evaluated.hasEap,
+          optionSource:
+            evaluated.optionSource,
+          optionEvidence:
+            evaluated.optionEvidence
+        }
+      : {}),
     colorName:
       evaluated.colorName,
     colorStatus:
@@ -2419,7 +2847,10 @@ export function recordDetailSuccess(
   delete record.lastDetailFetchError;
   delete record.rental;
 
-  return record;
+  return sanitizeListingStateForOptionMode(
+    record,
+    optionMode
+  );
 }
 
 export function createListingEvent({
@@ -2435,9 +2866,11 @@ export function createListingEvent({
     runMode === "send_current"
   ) {
     return {
+      kind: "current",
       type:
         "현재 검색 결과",
-      listing
+      listing,
+      detailSucceeded
     };
   }
 
@@ -2453,8 +2886,10 @@ export function createListingEvent({
     inspection.isNew
   ) {
     return {
+      kind: "new",
       type: "신규",
-      listing
+      listing,
+      detailSucceeded
     };
   }
 
@@ -2463,12 +2898,18 @@ export function createListingEvent({
     inspection.priceDropped
   ) {
     return {
+      kind: "price_decrease",
       type: `가격 인하 ${previous.priceKrw.toLocaleString(
         "ko-KR"
       )}원 → ${listing.priceKrw.toLocaleString(
         "ko-KR"
       )}원`,
-      listing
+      listing,
+      previousPriceKrw:
+        previous.priceKrw,
+      newPriceKrw:
+        listing.priceKrw,
+      detailSucceeded
     };
   }
 
@@ -2478,12 +2919,18 @@ export function createListingEvent({
     notifyPriceIncrease
   ) {
     return {
+      kind: "price_increase",
       type: `가격 인상 ${previous.priceKrw.toLocaleString(
         "ko-KR"
       )}원 → ${listing.priceKrw.toLocaleString(
         "ko-KR"
       )}원`,
-      listing
+      listing,
+      previousPriceKrw:
+        previous.priceKrw,
+      newPriceKrw:
+        listing.priceKrw,
+      detailSucceeded
     };
   }
 
@@ -2568,12 +3015,57 @@ function formatTelegramOption(
   return "옵션: 미확인";
 }
 
+function normalizeProfileNames(
+  profileNames
+) {
+  if (!Array.isArray(profileNames)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      profileNames
+        .map((name) =>
+          typeof name === "string"
+            ? singleLine(name)
+            : ""
+        )
+        .filter(Boolean)
+    )
+  ];
+}
+
+function appendProfileLine(
+  lines,
+  profileNames
+) {
+  const names =
+    normalizeProfileNames(
+      profileNames
+    );
+
+  if (names.length > 0) {
+    lines.push(
+      `검색 조건: ${names.join(", ")}`
+    );
+  }
+}
+
 function formatDeletedTelegramMessage(
-  listing
+  listing,
+  {
+    profileNames = [],
+    showTeslaOption = true
+  } = {}
 ) {
   const lines = [
     "[매물삭제]"
   ];
+
+  appendProfileLine(
+    lines,
+    profileNames
+  );
 
   const title =
     typeof listing?.title ===
@@ -2640,6 +3132,25 @@ function formatDeletedTelegramMessage(
     );
   }
 
+  if (!showTeslaOption) {
+    if (
+      listing?.saleType ===
+      "LEASE"
+    ) {
+      lines.push("판매방식: 리스");
+    } else if (
+      listing?.saleType ===
+      "RENT"
+    ) {
+      lines.push("판매방식: 렌트");
+    } else if (
+      listing?.saleType ===
+      "NORMAL"
+    ) {
+      lines.push("판매방식: 일반");
+    }
+  }
+
   const hasStoredUrl =
     typeof listing?.url ===
       "string" &&
@@ -2659,19 +3170,38 @@ function formatDeletedTelegramMessage(
 
 export function formatTelegramMessage(
   eventType,
-  listing
+  listing,
+  {
+    profileNames =
+      listing?.profileNames ?? [],
+    showTeslaOption =
+      listing?.optionMode !==
+        "generic"
+  } = {}
 ) {
   if (
     eventType === "deleted" ||
     eventType === "매물삭제"
   ) {
     return formatDeletedTelegramMessage(
-      listing
+      listing,
+      {
+        profileNames,
+        showTeslaOption
+      }
     );
   }
 
   const lines = [
-    `[${eventType}]`,
+    `[${eventType}]`
+  ];
+
+  appendProfileLine(
+    lines,
+    profileNames
+  );
+
+  lines.push(
     `${listing.yearMonth.replace(
       "-",
       "/"
@@ -2698,11 +3228,16 @@ export function formatTelegramMessage(
       listing.mileageKm
     )} | ${formatKrw(
       listing.priceKrw
-    )} | ${listing.region}`,
-    formatTelegramOption(
-      listing.option
-    )
-  ];
+    )} | ${listing.region}`
+  );
+
+  if (showTeslaOption) {
+    lines.push(
+      formatTelegramOption(
+        listing.option
+      )
+    );
+  }
 
   if (listing.saleType === "LEASE") {
     lines.push(
@@ -2718,6 +3253,11 @@ export function formatTelegramMessage(
     listing.saleType === "RENT"
   ) {
     lines.push("판매방식: 렌트");
+  } else if (
+    !showTeslaOption &&
+    listing.saleType === "NORMAL"
+  ) {
+    lines.push("판매방식: 일반");
   }
 
   if (

@@ -1,110 +1,76 @@
 import {
   analyzeDetail,
   applyRepresentativeState,
-  createTelegramMessageRequest,
   createListingEvent,
+  createSearchUrlFingerprint,
   evaluateListing,
   findPreviousListing,
   formatDuplicateListingLog,
-  formatSearchUrlSummary,
   formatTelegramMessage,
   getListingInspection,
   loadJson,
   matchesBasicCriteria,
-  migrateLegacyState,
   needsVehicleIdentityResolution,
   normalizeVehicleNo,
   parseListHtml,
   parsePreloadedVehicleData,
   prepareSendCurrentListing,
   recordDetailFailure,
-  recordListObservation,
   recordDetailSuccess,
+  recordListObservation,
   reconcileListingDeletions,
   recordTelegramDelivery,
-  resolveSearchUrl,
+  sanitizeListingStateForOptionMode,
   saveJson,
   selectRepresentativeCandidates,
   setPage,
   sleep
 } from "./lib.mjs";
+import {
+  createTelegramSender,
+  mergeProfileEvents,
+  normalizeWatcherConfig,
+  normalizeWatcherState,
+  runProfilesSequentially
+} from "./runtime.mjs";
+import {
+  createEncarRequestPacer
+} from "./request-pacer.mjs";
+import { pathToFileURL } from "node:url";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36 PersonalListingMonitor/1.0";
 
-const TELEGRAM_MIN_INTERVAL_MS = 1100;
-const TELEGRAM_MAX_ATTEMPTS = 5;
+const SUPPORTED_RUN_MODES = new Set([
+  "normal",
+  "send_current",
+  "telegram_test"
+]);
 
-const searchUrlConfig = resolveSearchUrl();
-const searchUrl = searchUrlConfig.url;
-console.log(formatSearchUrlSummary(searchUrlConfig));
-
-const config = await loadJson(
-  new URL("../config.json", import.meta.url)
-);
-
-const statePath =
-  process.env.STATE_PATH ||
-  "data/state.json";
-
-const state = migrateLegacyState(
-  await loadJson(statePath)
-);
-
-const runMode =
-  process.env.RUN_MODE ||
-  "normal";
-
-const maxPages = Number(
-  process.env.MAX_PAGES ||
-  config.maxPages
-);
-
-const token =
-  process.env.TELEGRAM_BOT_TOKEN;
-
-const chatId =
-  process.env.TELEGRAM_CHAT_ID;
-
-let lastTelegramSentAt = 0;
-
-function requireTelegramSecrets() {
-  if (!token || !chatId) {
-    throw new Error(
-      "TELEGRAM_BOT_TOKEN과 TELEGRAM_CHAT_ID가 필요합니다."
-    );
-  }
+function profileLabel(profile) {
+  return `[${profile.id} | ${profile.name}]`;
 }
 
 async function fetchText(url) {
-  const controller =
-    new AbortController();
-
+  const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
     30000
   );
 
   try {
-    const response = await fetch(
-      url,
-      {
-        headers: {
-          "user-agent": USER_AGENT,
-          accept:
-            "text/html,application/xhtml+xml",
-          "accept-language":
-            "ko-KR,ko;q=0.9"
-        },
-        signal: controller.signal,
-        redirect: "follow"
-      }
-    );
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "ko-KR,ko;q=0.9"
+      },
+      signal: controller.signal,
+      redirect: "follow"
+    });
 
     if (!response.ok) {
-      throw new Error(
-        `HTTP ${response.status}`
-      );
+      throw new Error(`HTTP ${response.status}`);
     }
 
     return await response.text();
@@ -113,768 +79,846 @@ async function fetchText(url) {
   }
 }
 
-async function waitForTelegramPacing() {
-  const elapsed =
-    Date.now() -
-    lastTelegramSentAt;
-
-  const delay = Math.max(
-    0,
-    TELEGRAM_MIN_INTERVAL_MS -
-      elapsed
-  );
-
-  if (delay > 0) {
-    await sleep(delay);
-  }
-}
-
-async function sendTelegram(text) {
-  requireTelegramSecrets();
-
-  if (text.length > 4096) {
-    throw new Error(
-      "텔레그램 메시지가 4096자를 초과했습니다."
-    );
-  }
-
-  for (
-    let attempt = 1;
-    attempt <=
-    TELEGRAM_MAX_ATTEMPTS;
-    attempt += 1
-  ) {
-    await waitForTelegramPacing();
-
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/sendMessage`,
-      {
-        method: "POST",
-        headers: {
-          "content-type":
-            "application/json"
-        },
-        body: JSON.stringify(
-          createTelegramMessageRequest(
-            chatId,
-            text
-          )
-        )
-      }
-    );
-
-    let result;
-
-    try {
-      result =
-        await response.json();
-    } catch {
-      throw new Error(
-        `텔레그램 응답 해석 실패: HTTP ${response.status}`
-      );
-    }
-
-    if (
-      response.ok &&
-      result.ok
-    ) {
-      lastTelegramSentAt =
-        Date.now();
-
-      return result.result;
-    }
-
-    const rateLimited =
-      response.status === 429 ||
-      result?.error_code === 429;
-
-    const retryAfterValue =
-      Number(
-        result?.parameters
-          ?.retry_after
-      );
-
-    const retryAfterSeconds =
-      Number.isFinite(
-        retryAfterValue
-      ) &&
-      retryAfterValue > 0
-        ? retryAfterValue
-        : 5;
-
-    if (
-      rateLimited &&
-      attempt <
-        TELEGRAM_MAX_ATTEMPTS
-    ) {
-      console.warn(
-        "Telegram rate limited. " +
-          `${retryAfterSeconds}초 후 재시도합니다. ` +
-          `시도 ${attempt}/${TELEGRAM_MAX_ATTEMPTS}`
-      );
-
-      await sleep(
-        (retryAfterSeconds + 1) *
-          1000
-      );
-
-      continue;
-    }
-
-    throw new Error(
-      `텔레그램 전송 실패: ${JSON.stringify(
-        result
-      )}`
-    );
-  }
-
-  throw new Error(
-    "텔레그램 전송 재시도 횟수를 초과했습니다."
-  );
-}
-
-if (
-  runMode ===
-  "telegram_test"
-) {
-  await sendTelegram(
-    "텔레그램 연결 테스트가 성공했습니다."
-  );
+function logProfileSearch(profile) {
+  const url = new URL(profile.searchUrl);
 
   console.log(
-    "Telegram test sent."
+    [
+      `${profileLabel(profile)} 검색 URL 출처: ${profile.searchUrlSource}`,
+      `${profileLabel(profile)} 검색 URL 호스트: ${url.host}`,
+      `${profileLabel(profile)} 검색 URL page: ${url.searchParams.get("page") ?? "없음"}`,
+      `${profileLabel(profile)} 검색 URL 지문: ${createSearchUrlFingerprint(profile.searchUrl)}`
+    ].join("\n")
   );
-
-  process.exit(0);
 }
 
-const listingsById =
-  new Map();
-
-for (
-  let page = 1;
-  page <= maxPages;
-  page += 1
+async function collectProfileListings(
+  profile,
+  {
+    fetchTextImpl = fetchText,
+    requestPacer: providedRequestPacer,
+    sleepImpl = sleep,
+    nowMs = Date.now
+  } = {}
 ) {
-  const pageUrl =
-    setPage(
-      searchUrl,
+  const listingsById = new Map();
+  const requestPacer =
+    providedRequestPacer ??
+    createEncarRequestPacer({
+      sleepImpl,
+      nowMs
+    });
+
+  logProfileSearch(profile);
+
+  for (
+    let page = 1;
+    page <= profile.maxPages;
+    page += 1
+  ) {
+    const pageUrl = setPage(
+      profile.searchUrl,
       page
     );
 
-  console.log(
-    `Fetching list page ${page}.`
-  );
+    console.log(
+      `${profileLabel(profile)} Fetching list page ${page}.`
+    );
 
-  const html =
-    await fetchText(pageUrl);
+    await requestPacer.wait(
+      profile.requestDelayMs
+    );
+    const html = await fetchTextImpl(
+      pageUrl
+    );
+    const parsed = parseListHtml(html);
 
-  const parsed =
-    parseListHtml(html);
+    console.log(
+      `${profileLabel(profile)} Parsed ${parsed.length} unique listings from page ${page}.`
+    );
 
-  console.log(
-    `Parsed ${parsed.length} unique listings from page ${page}.`
-  );
+    for (const listing of parsed) {
+      listingsById.set(listing.id, listing);
+    }
+  }
 
-  for (
-    const listing of parsed
-  ) {
-    listingsById.set(
-      listing.id,
-      listing
+  if (listingsById.size === 0) {
+    throw new Error(
+      "엔카 목록에서 매물을 하나도 추출하지 못했습니다. 페이지 구조 변경 또는 접근 제한 가능성이 있습니다."
     );
   }
 
-  if (page < maxPages) {
-    await sleep(
-      config.requestDelayMs
-    );
-  }
+  return listingsById;
 }
 
-if (
-  listingsById.size === 0
+function createProfileEventEnvelope(
+  event,
+  profile,
+  observedAt
 ) {
-  throw new Error(
-    "엔카 목록에서 매물을 하나도 추출하지 못했습니다. 페이지 구조 변경 또는 접근 제한 가능성이 있습니다."
+  const stateListingId = String(
+    event.stateListingId ??
+      event.listing.id
   );
+
+  return {
+    ...event,
+    profile: {
+      id: profile.id,
+      name: profile.name,
+      optionMode: profile.optionMode
+    },
+    profileId: profile.id,
+    profileName: profile.name,
+    profileNames: [profile.name],
+    optionMode: profile.optionMode,
+    showTeslaOption:
+      profile.optionMode === "tesla",
+    observedAt,
+    stateTargets: [
+      {
+        profileId: profile.id,
+        stateListingId
+      }
+    ]
+  };
 }
 
-const now =
-  new Date().toISOString();
-
-const wasInitialized =
-  Boolean(
-    state.initializedAt
+async function processProfile({
+  profile,
+  profileState,
+  runMode,
+  fetchTextImpl = fetchText,
+  sleepImpl = sleep,
+  requestPacer: providedRequestPacer,
+  nowMs = Date.now,
+  nowIso = () =>
+    new Date().toISOString()
+}) {
+  const requestPacer =
+    providedRequestPacer ??
+    createEncarRequestPacer({
+      sleepImpl,
+      nowMs
+    });
+  const clonedState = structuredClone(
+    profileState ?? { listings: {} }
   );
-
-const isSendCurrent =
-  runMode ===
-  "send_current";
-
-const events = [];
-
-const previousListings = {
-  ...state.listings
-};
-
-const candidates = [];
-
-let listingOrder = 0;
-
-for (
-  const listing of
-  listingsById.values()
-) {
-  const order =
-    listingOrder;
-
-  listingOrder += 1;
+  const state =
+    clonedState &&
+    typeof clonedState === "object" &&
+    !Array.isArray(clonedState)
+      ? clonedState
+      : { listings: {} };
 
   if (
-    !isSendCurrent &&
-    !matchesBasicCriteria(
-      listing,
-      config
-    )
+    !state.listings ||
+    typeof state.listings !== "object" ||
+    Array.isArray(state.listings)
   ) {
-    continue;
+    state.listings = {};
   }
 
-  let { previous } =
-    findPreviousListing(
+  if (profile.optionMode === "generic") {
+    state.listings = Object.fromEntries(
+      Object.entries(state.listings).map(
+        ([listingId, record]) => [
+          listingId,
+          sanitizeListingStateForOptionMode(
+            record,
+            profile.optionMode
+          )
+        ]
+      )
+    );
+  }
+
+  const listingsById =
+    await collectProfileListings(
+      profile,
+      {
+        fetchTextImpl,
+        requestPacer
+      }
+    );
+  const now = nowIso();
+  const wasInitialized = Boolean(
+    state.initializedAt
+  );
+  const isSendCurrent =
+    runMode === "send_current";
+  const events = [];
+  const previousListings = {
+    ...state.listings
+  };
+  const candidates = [];
+  let listingOrder = 0;
+
+  for (const listing of listingsById.values()) {
+    const order = listingOrder;
+    listingOrder += 1;
+
+    if (
+      !isSendCurrent &&
+      !matchesBasicCriteria(listing, profile)
+    ) {
+      continue;
+    }
+
+    let { previous } = findPreviousListing(
       previousListings,
       listing
     );
-
-  let inspection =
-    getListingInspection(
+    let inspection = getListingInspection(
       previous,
       listing,
       runMode
     );
 
-  if (
-    !inspection.shouldInspect
-  ) {
-    const observedListing = {
-      ...listing,
-      vehicleNo:
-        previous?.vehicleNo ??
-        null
-    };
+    if (!inspection.shouldInspect) {
+      const observedListing = {
+        ...listing,
+        vehicleNo:
+          previous?.vehicleNo ?? null
+      };
 
-    candidates.push({
-      order,
-      listing:
-        observedListing,
-      detailSucceeded: false,
-      stateRecord:
-        recordListObservation(
+      candidates.push({
+        order,
+        listing: observedListing,
+        detailSucceeded: false,
+        stateRecord: recordListObservation(
           previous,
           observedListing,
-          now
+          now,
+          profile.optionMode
         ),
-      event: null
-    });
+        event: null
+      });
+      continue;
+    }
 
-    continue;
-  }
-
-  await sleep(
-    config.requestDelayMs
-  );
-
-  let detailHtml;
-
-  try {
-    detailHtml =
-      await fetchText(
-        listing.url
-      );
-  } catch (error) {
-    console.warn(
-      `Detail fetch failed for ${listing.id}:`,
-      error.message
+    await requestPacer.wait(
+      profile.requestDelayMs
     );
 
-    const failedListing = {
-      ...listing,
-      vehicleNo:
-        previous?.vehicleNo ??
-        null
-    };
+    let detailHtml;
 
-    const eventListing =
-      isSendCurrent
+    try {
+      detailHtml = await fetchTextImpl(
+        listing.url
+      );
+    } catch (error) {
+      console.warn(
+        `${profileLabel(profile)} Detail fetch failed for ${listing.id}:`,
+        error.message
+      );
+
+      const failedListing = {
+        ...listing,
+        vehicleNo:
+          previous?.vehicleNo ?? null
+      };
+      const eventListing = isSendCurrent
         ? prepareSendCurrentListing(
             failedListing,
-            config,
+            profile,
             {
-              detailSucceeded:
-                false,
-              errorMessage:
-                error.message
+              detailSucceeded: false,
+              errorMessage: error.message
             }
           )
         : failedListing;
-
-    const event =
-      createListingEvent({
+      const event = createListingEvent({
         runMode,
         wasInitialized,
         inspection,
         previous,
-        listing:
-          eventListing,
-        detailSucceeded:
-          false,
+        listing: eventListing,
+        detailSucceeded: false,
         notifyPriceIncrease:
-          config.notifyPriceIncrease
+          profile.notifyPriceIncrease
       });
 
-    candidates.push({
-      order,
-      listing:
-        eventListing,
-      detailSucceeded: false,
-      stateRecord:
-        recordDetailFailure(
+      candidates.push({
+        order,
+        listing: eventListing,
+        detailSucceeded: false,
+        stateRecord: recordDetailFailure(
           previous,
           failedListing,
           now,
-          error.message
+          error.message,
+          profile.optionMode
         ),
-      event
-    });
+        event
+      });
+      continue;
+    }
 
-    continue;
-  }
-
-  const enriched =
-    analyzeDetail(
+    const enriched = analyzeDetail(
       detailHtml,
       listing,
-      config
+      profile
     );
 
-  ({ previous } =
-    findPreviousListing(
+    ({ previous } = findPreviousListing(
       previousListings,
       enriched
     ));
-
-  inspection =
-    getListingInspection(
+    inspection = getListingInspection(
       previous,
       enriched,
       runMode
     );
 
-  const evaluated =
-    evaluateListing(
+    const evaluated = evaluateListing(
       enriched,
-      config
+      profile
     );
-
-  const eventListing =
-    isSendCurrent
+    const eventListing = isSendCurrent
       ? prepareSendCurrentListing(
           evaluated,
-          config,
-          {
-            detailSucceeded:
-              true
-          }
+          profile,
+          { detailSucceeded: true }
         )
       : evaluated;
 
-  if (
-    !isSendCurrent &&
-    !evaluated.eligible
-  ) {
-    console.log(
-      `Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`
-    );
-  }
+    if (
+      !isSendCurrent &&
+      !evaluated.eligible
+    ) {
+      console.log(
+        `${profileLabel(profile)} Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`
+      );
+    }
 
-  const event =
-    createListingEvent({
+    const event = createListingEvent({
       runMode,
       wasInitialized,
       inspection,
       previous,
-      listing:
-        eventListing,
+      listing: eventListing,
       detailSucceeded: true,
       notifyPriceIncrease:
-        config.notifyPriceIncrease
+        profile.notifyPriceIncrease
     });
 
-  candidates.push({
-    order,
-    listing:
-      eventListing,
-    detailSucceeded: true,
-    stateRecord:
-      recordDetailSuccess(
+    candidates.push({
+      order,
+      listing: eventListing,
+      detailSucceeded: true,
+      stateRecord: recordDetailSuccess(
         previous,
         enriched,
         evaluated,
         now
       ),
-    event
-  });
-}
+      event
+    });
+  }
 
-const {
-  representatives,
-  duplicates
-} =
-  selectRepresentativeCandidates(
+  const {
+    representatives,
+    duplicates
+  } = selectRepresentativeCandidates(
     candidates
   );
 
-for (
-  const {
-    representative,
-    duplicate
-  } of duplicates
-) {
-  console.log(
-    formatDuplicateListingLog(
+  for (
+    const {
       representative,
       duplicate
-    )
-  );
-}
+    } of duplicates
+  ) {
+    console.log(
+      `${profileLabel(profile)} ${formatDuplicateListingLog(
+        representative,
+        duplicate
+      )}`
+    );
+  }
 
-let deletionRepresentatives =
-  representatives;
-let identityStateRepresentatives =
-  [];
-let identityResolutionComplete =
-  true;
+  let deletionRepresentatives = representatives;
+  let identityStateRepresentatives = [];
+  let identityResolutionComplete = true;
 
-const needsIdentityResolution =
-  runMode === "normal" &&
-  wasInitialized &&
-  needsVehicleIdentityResolution({
-    previousListings,
-    currentListings:
-      listingsById,
-    representatives
-  });
+  const needsIdentityResolution =
+    runMode === "normal" &&
+    wasInitialized &&
+    needsVehicleIdentityResolution({
+      previousListings,
+      currentListings: listingsById,
+      representatives
+    });
 
-if (needsIdentityResolution) {
-  const candidateByListingId =
-    new Map(
+  if (needsIdentityResolution) {
+    const candidateByListingId = new Map(
       candidates.map((candidate) => [
         String(candidate.listing.id),
         candidate
       ])
     );
+    const identityCandidates = [];
+    let identityOrder = 0;
 
-  const identityCandidates = [];
-  let identityOrder = 0;
+    for (const listing of listingsById.values()) {
+      const order = identityOrder;
+      identityOrder += 1;
 
-  for (
-    const listing of
-    listingsById.values()
-  ) {
-    const order = identityOrder;
-    identityOrder += 1;
+      const listingId = String(listing.id);
+      const candidate =
+        candidateByListingId.get(listingId);
 
-    const listingId =
-      String(listing.id);
-
-    const candidate =
-      candidateByListingId.get(
-        listingId
-      );
-
-    if (candidate) {
-      if (
-        !normalizeVehicleNo(
-          candidate.listing
-            .vehicleNo
-        )
-      ) {
-        identityResolutionComplete =
-          false;
+      if (candidate) {
+        if (
+          !normalizeVehicleNo(
+            candidate.listing.vehicleNo
+          )
+        ) {
+          identityResolutionComplete = false;
+        }
+        continue;
       }
 
-      continue;
-    }
+      const previous =
+        previousListings[listingId];
+      const previousVehicleNo =
+        normalizeVehicleNo(
+          previous?.vehicleNo
+        );
 
-    const previous =
-      previousListings[listingId];
+      if (previousVehicleNo) {
+        identityCandidates.push({
+          order,
+          listing: {
+            ...listing,
+            vehicleNo: previousVehicleNo
+          },
+          detailSucceeded: false,
+          stateRecord: null
+        });
+        continue;
+      }
 
-    const previousVehicleNo =
-      normalizeVehicleNo(
-        previous?.vehicleNo
+      await requestPacer.wait(
+        profile.requestDelayMs
       );
 
-    if (previousVehicleNo) {
+      let detailHtml;
+      try {
+        detailHtml = await fetchTextImpl(
+          listing.url
+        );
+      } catch (error) {
+        identityResolutionComplete = false;
+        console.warn(
+          `${profileLabel(profile)} Identity detail fetch failed for ${listing.id}:`,
+          error.message
+        );
+        continue;
+      }
+
+      const { vehicleNo } =
+        parsePreloadedVehicleData(
+          detailHtml
+        );
+
+      if (!vehicleNo) {
+        identityResolutionComplete = false;
+        console.warn(
+          `${profileLabel(profile)} Vehicle identity unavailable for ${listing.id}; deletion notification deferred.`
+        );
+        continue;
+      }
+
       const identityListing = {
         ...listing,
-        vehicleNo:
-          previousVehicleNo
+        vehicleNo
       };
-
-      identityCandidates.push({
-        order,
-        listing:
-          identityListing,
-        detailSucceeded: false,
-        stateRecord: null
-      });
-
-      continue;
-    }
-
-    await sleep(
-      config.requestDelayMs
-    );
-
-    let detailHtml;
-    try {
-      detailHtml = await fetchText(
-        listing.url
-      );
-    } catch (error) {
-      identityResolutionComplete =
-        false;
-      console.warn(
-        `Identity detail fetch failed for ${listing.id}:`,
-        error.message
-      );
-      continue;
-    }
-
-    const { vehicleNo } =
-      parsePreloadedVehicleData(
-        detailHtml
-      );
-
-    if (!vehicleNo) {
-      identityResolutionComplete =
-        false;
-      console.warn(
-        `Vehicle identity unavailable for ${listing.id}; deletion notification deferred.`
-      );
-      continue;
-    }
-
-    const identityListing = {
-      ...listing,
-      vehicleNo
-    };
-
-    const {
-      previous: matchedPrevious,
-      matchedBy
-    } =
-      findPreviousListing(
+      const {
+        previous: matchedPrevious,
+        matchedBy
+      } = findPreviousListing(
         previousListings,
         identityListing
       );
-
-    const hasCurrentPreviousVehicleListing =
-      Object.entries(
-        previousListings
-      ).some(
-        ([previousListingId, record]) =>
-          normalizeVehicleNo(
-            record?.vehicleNo
-          ) === vehicleNo &&
-          listingsById.has(
-            previousListingId
-          )
-      );
-
-    const shouldApplyIdentityState =
-      Boolean(
+      const hasCurrentPreviousVehicleListing =
+        Object.entries(previousListings).some(
+          ([previousListingId, record]) =>
+            normalizeVehicleNo(
+              record?.vehicleNo
+            ) === vehicleNo &&
+            listingsById.has(
+              previousListingId
+            )
+        );
+      const shouldApplyIdentityState = Boolean(
         matchedPrevious &&
           (
-            matchedBy ===
-              "listingId" ||
+            matchedBy === "listingId" ||
             !hasCurrentPreviousVehicleListing
           )
       );
 
-    identityCandidates.push({
-      order,
-      listing: identityListing,
-      detailSucceeded: true,
-      stateRecord:
-        shouldApplyIdentityState
-        ? recordListObservation(
-            matchedPrevious,
-            identityListing,
-            now
-          )
-        : null
-    });
-  }
+      identityCandidates.push({
+        order,
+        listing: identityListing,
+        detailSucceeded: true,
+        stateRecord: shouldApplyIdentityState
+          ? recordListObservation(
+              matchedPrevious,
+              identityListing,
+              now,
+              profile.optionMode
+            )
+          : null
+      });
+    }
 
-  deletionRepresentatives =
-    selectRepresentativeCandidates([
-      ...representatives,
-      ...identityCandidates
-    ]).representatives;
+    deletionRepresentatives =
+      selectRepresentativeCandidates([
+        ...representatives,
+        ...identityCandidates
+      ]).representatives;
 
-  const standardVehicleNos =
-    new Set(
+    const standardVehicleNos = new Set(
       representatives
         .map((candidate) =>
           normalizeVehicleNo(
-            candidate.listing
-              .vehicleNo
+            candidate.listing.vehicleNo
           )
         )
         .filter(Boolean)
     );
 
-  identityStateRepresentatives =
-    selectRepresentativeCandidates(
-      identityCandidates.filter(
-        (candidate) =>
-          candidate.stateRecord
-      )
-    ).representatives.filter(
-      (candidate) =>
-        !standardVehicleNos.has(
-          normalizeVehicleNo(
-            candidate.listing
-              .vehicleNo
-          )
+    identityStateRepresentatives =
+      selectRepresentativeCandidates(
+        identityCandidates.filter(
+          (candidate) =>
+            candidate.stateRecord
         )
-    );
-}
+      ).representatives.filter(
+        (candidate) =>
+          !standardVehicleNos.has(
+            normalizeVehicleNo(
+              candidate.listing.vehicleNo
+            )
+          )
+      );
+  }
 
-for (const candidate of representatives) {
-  const previousMatch =
-    findPreviousListing(
+  for (const candidate of representatives) {
+    const previousMatch = findPreviousListing(
       previousListings,
       candidate.listing
     ).previous;
-
-  const deletionTracked =
-    isSendCurrent
+    const deletionTracked = isSendCurrent
       ? Boolean(previousMatch) &&
-        previousMatch
-          .deletionTracked !== false
+        previousMatch.deletionTracked !== false
       : true;
 
-  applyRepresentativeState(
-    state.listings,
-    {
-      ...candidate,
-      stateRecord: {
-        ...candidate.stateRecord,
-        deletionTracked
+    applyRepresentativeState(
+      state.listings,
+      {
+        ...candidate,
+        stateRecord: {
+          ...candidate.stateRecord,
+          deletionTracked
+        }
       }
+    );
+
+    if (candidate.event) {
+      events.push(candidate.event);
     }
-  );
-  if (candidate.event) events.push(candidate.event);
-}
-for (
-  const candidate of
-  identityStateRepresentatives
-) {
-  applyRepresentativeState(
-    state.listings,
-    {
-      ...candidate,
-      stateRecord: {
-        ...candidate.stateRecord,
-        deletionTracked:
-          candidate.stateRecord
-            .deletionTracked !== false
-      }
-    }
-  );
-}
+  }
 
-const deletionResult =
-  reconcileListingDeletions({
-    stateListings: state.listings,
-    previousListings,
-    currentListings:
-      listingsById,
-    representatives:
-      deletionRepresentatives,
-    identityResolutionComplete,
-    now,
-    runMode,
-    wasInitialized
-  });
-
-events.push(
-  ...deletionResult.events
-);
-
-if (
-  !wasInitialized &&
-  !isSendCurrent
-) {
-  state.initializedAt = now;
-
-  await sendTelegram(
-    `매물 감시를 시작했습니다.\n현재 조건 대상 ${Object.keys(state.listings).length}건을 기준점으로 저장했습니다.\n이후 신규 매물과 가격 변경, 매물삭제를 알립니다.`
-  );
-} else {
   for (
-    const event of events
+    const candidate of
+    identityStateRepresentatives
   ) {
-    const text =
-      formatTelegramMessage(
-        event.type,
-        event.listing
-      );
+    applyRepresentativeState(
+      state.listings,
+      {
+        ...candidate,
+        stateRecord: {
+          ...candidate.stateRecord,
+          deletionTracked:
+            candidate.stateRecord
+              .deletionTracked !== false
+        }
+      }
+    );
+  }
 
-    const message =
-      await sendTelegram(
-        text
-      );
+  const deletionResult =
+    reconcileListingDeletions({
+      stateListings: state.listings,
+      previousListings,
+      currentListings: listingsById,
+      representatives:
+        deletionRepresentatives,
+      identityResolutionComplete,
+      now,
+      runMode,
+      wasInitialized
+    });
 
-    if (!isSendCurrent) {
-      const listingId =
-        String(
-          event.stateListingId ??
-            event.listing.id
+  events.push(...deletionResult.events);
+
+  const initializedNow =
+    !wasInitialized && !isSendCurrent;
+
+  if (initializedNow) {
+    state.initializedAt = now;
+  }
+
+  state.updatedAt = now;
+
+  return {
+    profile,
+    state,
+    initializedNow,
+    listingCount:
+      Object.keys(state.listings).length,
+    events: events.map((event) =>
+      createProfileEventEnvelope(
+        event,
+        profile,
+        now
+      )
+    )
+  };
+}
+
+function createInitializationMessage(results) {
+  const initializedResults =
+    results.filter(
+      (result) => result.initializedNow
+    );
+
+  if (initializedResults.length === 0) {
+    return null;
+  }
+
+  const profileNames = initializedResults.map(
+    (result) => result.profile.name
+  );
+  const listingCount = initializedResults.reduce(
+    (sum, result) =>
+      sum + result.listingCount,
+    0
+  );
+
+  return [
+    "매물 감시를 시작했습니다.",
+    `검색 조건: ${profileNames.join(", ")}`,
+    `현재 조건 대상 ${listingCount}건을 기준점으로 저장했습니다.`,
+    "이후 신규 매물과 가격 변경, 매물삭제를 알립니다."
+  ].join("\n");
+}
+
+async function main({
+  environment = process.env,
+  rawConfig: providedConfig,
+  rawState: providedState,
+  loadJsonImpl = loadJson,
+  saveJsonImpl = saveJson,
+  createTelegramSenderImpl =
+    createTelegramSender,
+  processProfileImpl = processProfile,
+  sleepImpl = sleep,
+  requestSleepImpl = sleep,
+  requestNowMs = Date.now,
+  nowIso = () =>
+    new Date().toISOString(),
+  logger = console
+} = {}) {
+  const rawConfig =
+    providedConfig ??
+    await loadJsonImpl(
+      new URL(
+        "../config.json",
+        import.meta.url
+      )
+    );
+  const config = normalizeWatcherConfig(
+    rawConfig,
+    environment,
+    {
+      warn: (message) =>
+        logger.warn(message)
+    }
+  );
+  const runMode =
+    environment.RUN_MODE || "normal";
+
+  if (!SUPPORTED_RUN_MODES.has(runMode)) {
+    throw new Error(
+      `지원하지 않는 RUN_MODE입니다: ${runMode}`
+    );
+  }
+
+  const telegram =
+    createTelegramSenderImpl({
+      token:
+        environment
+          .TELEGRAM_BOT_TOKEN,
+      chatId:
+        environment.TELEGRAM_CHAT_ID
+    });
+
+  if (runMode === "telegram_test") {
+    await telegram.send(
+      "텔레그램 연결 테스트가 성공했습니다."
+    );
+    logger.log("Telegram test sent.");
+    return {
+      telegramTest: true,
+      notificationCount: 1
+    };
+  }
+
+  const statePath =
+    environment.STATE_PATH ||
+    "data/state.json";
+  const state = normalizeWatcherState(
+    providedState ??
+      await loadJsonImpl(statePath),
+    config
+  );
+  const requestPacer =
+    createEncarRequestPacer({
+      sleepImpl: requestSleepImpl,
+      nowMs: requestNowMs
+    });
+
+  const {
+    results,
+    profileFailures
+  } = await runProfilesSequentially(
+    config.profiles,
+    async (profile) => {
+      const result = await processProfileImpl({
+        profile,
+        profileState:
+          state.profiles[profile.id],
+        runMode,
+        requestPacer
+      });
+
+      state.profiles[profile.id] =
+        result.state;
+      return result;
+    },
+    {
+      onError: (error, profile) => {
+        logger.warn(
+          `${profileLabel(profile)} Profile processing failed: ${error.message}`
         );
+      }
+    }
+  );
 
-      const stateRecord =
-        state.listings[
-          listingId
-        ];
+  if (profileFailures.length > 0) {
+    logger.warn(
+      `${profileFailures.length} profile(s) failed; successful profile state will still be saved.`
+    );
+  }
 
-      if (stateRecord) {
-        state.listings[
-          listingId
-        ] =
-          recordTelegramDelivery(
+  const initializationMessage =
+    createInitializationMessage(results);
+
+  if (initializationMessage) {
+    await telegram.send(
+      initializationMessage
+    );
+  }
+
+  const mergedEvents = mergeProfileEvents(
+    results.flatMap(
+      (result) => result.events
+    ),
+    {
+      warn: (message) =>
+        logger.warn(message)
+    }
+  );
+
+  for (const event of mergedEvents) {
+    const text = formatTelegramMessage(
+      event.type,
+      event.listing,
+      {
+        profileNames:
+          event.profileNames,
+        showTeslaOption:
+          event.showTeslaOption
+      }
+    );
+    const message = await telegram.send(text);
+
+    if (runMode !== "send_current") {
+      for (
+        const target of
+        event.stateTargets
+      ) {
+        const profileState =
+          state.profiles[
+            target.profileId
+          ];
+        const stateRecord =
+          profileState?.listings?.[
+            target.stateListingId
+          ];
+
+        if (stateRecord) {
+          profileState.listings[
+            target.stateListingId
+          ] = recordTelegramDelivery(
             stateRecord,
             message,
-            new Date()
-              .toISOString()
+            nowIso()
           );
+        }
       }
     }
 
-    await sleep(500);
+    await sleepImpl(500);
   }
+
+  state.updatedAt = nowIso();
+  await saveJsonImpl(statePath, state);
+
+  logger.log(
+    `Done. ${mergedEvents.length} notification(s).`
+  );
+
+  return {
+    state,
+    results,
+    profileFailures,
+    events: mergedEvents,
+    notificationCount:
+      mergedEvents.length +
+      (initializationMessage ? 1 : 0)
+  };
 }
 
-state.updatedAt = now;
-
-await saveJson(
-  statePath,
-  state
+const isDirectExecution = Boolean(
+  process.argv[1] &&
+    import.meta.url ===
+      pathToFileURL(
+        process.argv[1]
+      ).href
 );
 
-console.log(
-  `Done. ${events.length} notification(s).`
-);
+if (isDirectExecution) {
+  await main();
+}
+
+export {
+  collectProfileListings,
+  main,
+  processProfile
+};
