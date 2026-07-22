@@ -47,7 +47,7 @@ jobs:
 
             if (
               !chat ||
-              !["group", "supergroup"].includes(chat.type)
+              !["group", "supergroup", "channel"].includes(chat.type)
             ) {
               continue;
             }
