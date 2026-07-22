@@ -45,7 +45,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          ENCAR_SEARCH_URL: ${{ vars.ENCAR_SEARCH_URL }}
+          ENCAR_SEARCH_URL_TESLA_MODEL3: ${{ vars.ENCAR_SEARCH_URL_TESLA_MODEL3 }}
+          ENCAR_SEARCH_URL_TOYOTA_SIENNA: ${{ vars.ENCAR_SEARCH_URL_TOYOTA_SIENNA }}
           MAX_PAGES: ${{ vars.MAX_PAGES }}
           RUN_MODE: ${{ github.event.inputs.run_mode || 'normal' }}
         run: npm run scrape

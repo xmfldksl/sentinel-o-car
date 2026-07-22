@@ -9,7 +9,7 @@
       "id": "tesla-model3-long-range",
       "name": "Model 3 롱레인지",
       "enabled": true,
-      "searchUrlEnv": "ENCAR_SEARCH_URL",
+      "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
       "optionMode": "tesla",
       "titleFilter": {
         "requiredAll": ["모델 3", "롱 레인지", "AWD"],
@@ -36,6 +36,27 @@
         }
       },
       "rentalHistoryDiscountKrw": 3000000
+    },
+    {
+      "id": "toyota-sienna",
+      "name": "도요타 시에나",
+      "enabled": true,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA",
+      "optionMode": "generic",
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "yearMonthMin": "2021-04",
+      "yearMonthMax": "9999-12",
+      "maxMileageKm": 150000,
+      "excludedColors": [],
+      "excludeContractPending": true,
+      "price": {
+        "maxPriceKrw": 46000000
+      },
+      "rentalHistoryDiscountKrw": 5000000
     }
   ]
 }
