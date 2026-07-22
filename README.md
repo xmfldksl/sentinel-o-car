@@ -1,133 +1,127 @@
 # Sentinel-o-car
 
-GitHub Actions가 엔카의 공개 검색 결과를 30분 간격으로 확인하고, 개인 텔레그램 채팅으로 다음 이벤트를 보냅니다.
+> Version 1.0
 
-- 조건에 맞는 신규 매물
-- 기존 매물의 가격 인하
-- `notifyPriceIncrease`가 `true`이면 기존 매물의 가격 인상
-- 이전 정상 실행에서 추적하던 대표 매물이 이번 정상 완료된 엔카 전체 검색 결과에서 사라진 경우 `매물삭제`
-- 수동 실행 시 현재 검색 결과 미리보기
+[English](#english) | [한국어](#한국어)
 
-첫 실행에서는 현재 매물을 기준점으로만 저장하므로 기존 매물 알림이 한꺼번에 발송되지 않습니다.
+# English
 
-## 텔레그램 메시지 형식
+## Overview
 
-매물 메시지는 복사와 전달이 가능한 일반 텍스트로 전송합니다. 첫 줄에는 신규·가격 변경·매물삭제·현재 결과 상태를 표시하고, 차량명 다음 줄에는 상세페이지에서 확인한 차량번호 또는 `미확인`을 표시합니다. 옵션은 `FSD 확인`, `EAP 확인`, `미확인` 중 하나로만 표시합니다. 리스 매물은 매매가격과 월 납입금을 분리해 표시하며, 월 납입금을 매매가격으로 사용하지 않습니다. 내부 가격 기준과 확인사항 목록은 메시지에 출력하지 않습니다.
+Sentinel-o-car is a personal tool for monitoring used-car listings on Encar. It runs through GitHub Actions and sends notifications to a configured Telegram channel or chat.
 
-## 현재 기본 검색 조건
+The current configuration targets used Tesla Model 3 listings. Sentinel-o-car is an independent personal project, not an official Encar service or official API client.
 
-- 테슬라 모델 3 롱 레인지 AWD
-- 최초등록 2022년 5월부터 2022년 12월
-- 주행거리 150,000㎞ 이하
-- 빨간색 계열 제외
-- 계약중 차량 제외
-- 일반 차량 35,000,000원 이하
-- EAP 포함 37,000,000원 이하
-- FSD 포함 40,000,000원 이하
-- 렌트 용도 이력이 확인된 차량만 평가가격에 3,000,000원을 더해 비교하며, 현재 엔카 구조화 데이터만으로 확인할 수 없는 과거 이력에는 적용하지 않음
-- 옵션이 확인되지 않은 35,000,000원 초과 차량은 40,000,000원까지 `옵션 확인 필요`로 알림
+## System Architecture
 
-조건은 `config.json`에서 변경합니다.
+> Encar search and detail pages → listing analysis and condition evaluation → comparison with previous state → Telegram notifications → `data/state.json` update
 
-## 맥북에 설치된 Codex로 개발하기
+The project is divided into a few focused components:
 
-이 프로젝트에는 Codex가 자동으로 읽는 `AGENTS.md`와 시작 프롬프트가 포함되어 있습니다.
+- `src/` collects and analyzes public listing data, compares state, and prepares notifications.
+- `config.json` defines the current vehicle and purchase conditions.
+- `data/state.json` preserves observations between runs.
+- GitHub Actions provides scheduled monitoring and manual run modes.
+- `test/` verifies parsing, evaluation, state transitions, identity handling, and Telegram output without live requests.
 
-압축을 푼 프로젝트 폴더에서 다음 명령을 실행합니다.
+## Core Features
 
-```bash
-npm run doctor
-npm run codex
-```
+- Notifications for newly detected eligible listings.
+- Price-decrease notifications and optional price-increase notifications.
+- `매물삭제` notifications when a tracked listing disappears from the successfully collected result across the configured Encar search pages.
+- Manual delivery of current search results, including condition outcomes.
+- Re-registration identification by vehicle number and suppression of duplicate advertisements for the same vehicle.
+- Preservation of previously confirmed state when a detail-page request fails.
+- Filtering by registration period, mileage, price, exterior color, and contract status.
+- FSD and EAP detection from supported structured data and public seller text.
+- Structured distinction among `NORMAL`, `LEASE`, and `RENT` sale types.
+- Separate handling of a lease sale price and monthly payment.
+- Telegram send pacing and automatic retries for HTTP 429 rate limits.
+- Scheduled and manually dispatched GitHub Actions runs.
 
-터미널 명령 대신 Finder에서 `START_CODEX.command`를 더블클릭해도 같은 검사를 거쳐 Codex가 실행됩니다. macOS가 최초 실행을 차단하면 파일을 보조 클릭한 뒤 `열기`를 선택합니다.
+`매물삭제` means that the advertisement disappeared from the monitored search result. It does not confirm that the vehicle was sold; the advertisement may also have expired or been removed.
 
-- `npm run doctor`: Git, Node.js, npm, Codex 설치 경로와 버전을 확인하고 테스트를 실행합니다.
-- `npm run codex`: 현재 프로젝트를 작업 폴더로 지정해 Codex 대화형 세션을 시작합니다.
-- `npm run codex:review`: 현재 커밋되지 않은 변경을 Codex로 검토합니다.
+## Version
 
-세부 사용법은 `docs/CODEX_USAGE.md`를 확인합니다. 실제 텔레그램 토큰과 채팅 ID는 Codex 채팅이나 저장소에 입력하지 않습니다.
+Current release: v1.0
 
-## 1. 비공개 GitHub 저장소 만들기
+Version 1.0 marks the completed implementation of:
 
-새 비공개 저장소를 만든 뒤 이 폴더의 파일 전체를 저장소에 올립니다. 상태 파일을 Actions가 커밋하므로 워크플로에는 `contents: write` 권한이 설정되어 있습니다.
+- Encar listing collection, detail analysis, and condition filtering.
+- Detection of new listings, price changes, and listing deletion.
+- Same-vehicle identification, duplicate suppression, and persistent state.
+- Telegram notifications, GitHub Actions operation, and automated tests.
 
-## 2. 텔레그램 봇 만들기
+## Notes
 
-1. 텔레그램에서 `@BotFather`를 엽니다.
-2. `/newbot`으로 봇을 생성하고 토큰을 보관합니다.
-3. 생성된 봇과 개인 채팅을 열고 `/start`를 보냅니다.
-4. 로컬 터미널에서 다음 명령으로 채팅 ID를 확인합니다.
+- Changes to Encar page markup or internal state structures may require parser updates.
+- A zero-listing parse stops the run and is not treated as deletion of every tracked listing.
+- Some option, smoking, and tuning judgments depend on public text and require manual verification.
+- Unconfirmed past rental usage and total-loss history remain `null`.
+- Before purchasing, separately verify the performance inspection record, insurance history, high-voltage battery, and actual vehicle condition.
+- This project is intended for personal, low-frequency use rather than bulk collection.
+- Store the Telegram bot token and chat ID as GitHub Secrets.
+- `data/state.json` may contain listing IDs, vehicle numbers, prices, URLs, observation timestamps, and Telegram delivery metadata. Review or reset it before making the repository public.
+- This project is licensed under the MIT License. See `LICENSE`.
 
-```bash
-TELEGRAM_BOT_TOKEN='발급받은토큰' npm run chat-id
-```
+---
 
-## 3. GitHub Actions 비밀값 등록
+# 한국어
 
-저장소의 `Settings > Secrets and variables > Actions > Secrets`에 다음 값을 등록합니다.
+## 개요
 
-- `TELEGRAM_BOT_TOKEN`: BotFather가 발급한 토큰
-- `TELEGRAM_CHAT_ID`: 위 명령으로 확인한 개인 채팅 ID
+Sentinel-o-car는 엔카 중고차 매물을 감시하는 개인용 도구입니다. GitHub Actions에서 실행되며 설정한 텔레그램 채널 또는 채팅으로 알림을 전송합니다.
 
-토큰과 채팅 ID는 코드나 `config.json`에 입력하지 않습니다.
+현재는 테슬라 모델 3 중고 매물 검색용으로 구성돼 있습니다. Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공식 서비스나 공식 API 클라이언트가 아닙니다.
 
-## 4. 엔카 검색 URL 등록
+## 시스템 구조
 
-엔카 웹에서 원하는 필터를 적용하고 주소창의 검색 URL을 복사합니다. 저장소의 `Settings > Secrets and variables > Actions > Variables`에 다음 변수를 등록합니다.
+> 엔카 검색 및 상세 페이지 → 매물 분석과 조건 판정 → 이전 상태와 비교 → 텔레그램 알림 → `data/state.json` 상태 갱신
 
-- `ENCAR_SEARCH_URL`: 복사한 엔카 검색 URL
-- `MAX_PAGES`: 확인할 페이지 수. 기본값은 `2`
+프로젝트는 다음과 같은 주요 구성요소로 나뉩니다.
 
-GitHub Actions에서는 `ENCAR_SEARCH_URL`이 필수입니다. 변수가 없거나 공백이거나, URL의 `search` 파라미터가 없거나 올바른 JSON이 아니면 네트워크 요청 전에 실행이 실패합니다. 로컬에서만 `ENCAR_SEARCH_URL`을 생략할 수 있으며, 이때 프로젝트에 포함된 테슬라 모델 3 최신순 URL을 사용하고 앱 내부 조건으로 2022년식 롱 레인지 AWD를 걸러냅니다.
+- `src/`는 공개 매물 정보를 수집·분석하고 상태를 비교해 알림을 준비합니다.
+- `config.json`은 현재 차량 조건과 구매 조건을 정의합니다.
+- `data/state.json`은 실행 사이의 관측 상태를 유지합니다.
+- GitHub Actions는 예약 감시와 수동 실행 모드를 제공합니다.
+- `test/`는 실제 요청 없이 파싱, 조건 판정, 상태 전이, 차량 식별, 텔레그램 출력을 검증합니다.
 
-실행 시작 로그에는 전체 검색 URL 대신 URL 출처, 호스트, `page`, 검색 조건 `title`, `action`의 `Year.range(...)`, URL SHA-256 지문 앞 12자리만 표시됩니다.
+## 핵심 기능
 
-## 5. 동작 확인
+- 조건을 충족하는 신규 매물 알림.
+- 가격 인하 알림과 선택적 가격 인상 알림.
+- 설정된 엔카 검색 페이지 범위에서 정상 수집한 전체 결과에서 추적 매물이 사라진 경우 `매물삭제` 알림.
+- 조건 판정 결과를 포함한 현재 검색 결과 수동 전송.
+- 차량번호 기반 동일 차량 재등록 식별과 동일 차량 중복 광고 억제.
+- 상세 페이지 요청 실패 시 기존 확정 상태 보존.
+- 최초등록 기간, 주행거리, 가격, 외장색, 계약 상태 필터링.
+- 지원되는 구조화 데이터와 공개 판매자 문구를 통한 FSD 및 EAP 판정.
+- `NORMAL`, `LEASE`, `RENT` 판매방식의 구조화 구분.
+- 리스 매매가격과 월 납입금의 분리 처리.
+- 텔레그램 전송 간격 제어와 HTTP 429 속도 제한 자동 재시도.
+- GitHub Actions 예약 실행 및 수동 실행.
 
-저장소의 `Actions > Sentinel-o-car > Run workflow`에서 다음 순서로 실행합니다.
+`매물삭제`는 감시 중인 검색 결과에서 광고가 사라졌다는 뜻입니다. 실제 판매 완료를 확정하지 않으며 광고 종료나 판매자 삭제일 수도 있습니다.
 
-1. `telegram_test`: 텔레그램 연결만 확인합니다.
-2. `normal`: 최초 기준점을 저장합니다.
-3. `send_current`: 조건 충족 여부와 관계없이 현재 검색 결과에서 발견된 매물을 조건 판정과 사유, 상세 확인 실패 표시와 함께 즉시 전송해 파싱 결과를 확인합니다.
+## 버전
 
-이후에는 매시 17분과 47분에 자동 실행됩니다. GitHub Actions 예약 실행은 시스템 부하에 따라 지연될 수 있습니다.
+Current release: v1.0
 
-## 로컬 테스트
+버전 1.0은 다음 범위의 구현이 완성된 버전입니다.
 
-```bash
-npm test
-```
+- 엔카 매물 수집, 상세 분석, 조건 필터링.
+- 신규 매물, 가격 변경, 매물삭제 감지.
+- 동일 차량 식별, 중복 억제, 상태 유지.
+- 텔레그램 알림, GitHub Actions 운영, 자동 테스트.
 
-실제 스크래핑과 전송:
+## 참고사항
 
-```bash
-TELEGRAM_BOT_TOKEN='...' \
-TELEGRAM_CHAT_ID='...' \
-ENCAR_SEARCH_URL='...' \
-npm run scrape
-```
-
-## 상태 저장 방식
-
-`data/state.json`에 매물번호, 차량번호, 가격, 현재 판매방식, 리스 월 납입금, 과거 렌트 용도·전손 이력, 최초 발견 시각과 마지막 확인 시각을 저장합니다. 엔카 구조화 데이터로 확인할 수 없는 과거 렌트 용도와 전손 이력은 `null`로 저장합니다. 매물번호를 주 식별자로 사용하고, 새 매물번호에서 같은 차량번호가 확인되면 이전 매물의 최초 발견 시각과 가격을 이어받아 재등록과 가격 변경을 판정합니다. 차량번호를 확인할 수 없으면 매물번호만 사용합니다. Actions가 실행 후 이 파일만 자동 커밋합니다. `concurrency` 설정으로 같은 브랜치에서 두 실행이 동시에 상태 파일을 수정하지 않도록 했습니다.
-
-한 번의 검색 결과에 같은 차량번호의 서로 다른 매물이 있으면 상세 조회 성공, 미계약, 검색 순서 기준으로 대표 한 건만 상태와 알림에 반영합니다. 중복 로그의 차량번호 뒤 네 자리는 `****`로 마스킹합니다.
-
-`send_current` 실행도 전송한 현재 검색 결과를 상태에 기록합니다.
-
-상세 페이지 조회에 실패하면 해당 목록 가격을 확정 가격으로 저장하지 않고 마지막 관측 가격과 실패 시각·오류만 기록합니다. 기존에 정상 확인된 가격과 판정은 유지하며 다음 실행에서 상세 조회를 다시 시도합니다.
-
-정상 실행의 전체 검색 결과에서 사라진 대표 매물은 상태에서 제거하지 않고 `deletedAt`을 기록합니다. 이미 삭제 시각이 있는 매물은 알림을 반복하지 않으며, 같은 매물이 다시 검색되면 `deletedAt`을 제거해 현재 매물로 복구합니다. 최초 기준점 생성과 `send_current`, `telegram_test` 실행에서는 매물삭제를 판정하지 않고, `send_current`에서만 추가된 상태 기록도 이후 삭제 알림 대상으로 사용하지 않습니다.
-
-## 제한과 주의
-
-- 목록 파서는 상세 URL의 `/cars/detail/매물번호`와 카드 텍스트를 사용합니다.
-- 엔카 페이지 구조가 바뀌면 매물 추출이 0건이 되고 워크플로가 실패하도록 설계했습니다. 빈 결과를 정상 상태로 저장하지 않습니다.
-- `매물삭제`는 엔카 전체 검색 결과에서 매물이 사라졌다는 뜻이며, 실제 판매 완료·광고 종료·판매자 삭제 중 어느 상태인지는 확정하지 않습니다.
-- EAP, FSD, 흡연, 튜닝과 색상 판정은 상세 페이지의 공개 문구를 기반으로 한 키워드 판정이므로 최종 확인이 필요합니다.
-- 판매자·딜러 설명이나 HTML 화면 텍스트 같은 자유 문구에서 렌트·전손 이력을 추정하지 않습니다. 엔카 구조화 데이터에서는 현재 판매방식만 `NORMAL`, `LEASE`, `RENT`로 구분합니다.
-- 외부 이력 사이트는 조회하거나 연동하지 않습니다.
-- 로그인, 캡차, 접근 제한 우회 기능은 포함하지 않았습니다.
-- 차량번호는 비공개 저장소의 상태 파일과 개인 텔레그램 알림에만 사용하며, 차대번호와 판매자 개인정보는 수집하거나 저장하지 않습니다.
-- 개인용·낮은 빈도의 사용이라도 사이트 이용약관이 자동 접근을 허용한다는 의미는 아닙니다. 운영 여부와 빈도는 사용자가 판단해야 합니다.
+- 엔카 페이지 마크업이나 내부 상태 구조가 변경되면 파서 수정이 필요할 수 있습니다.
+- 매물을 0건 파싱하면 모든 추적 매물의 삭제로 판단하지 않고 실행을 중단합니다.
+- 일부 옵션, 흡연, 튜닝 판정은 공개 문구를 기반으로 하므로 직접 확인이 필요합니다.
+- 확인할 수 없는 과거 렌트 용도와 전손 이력은 `null`로 유지합니다.
+- 구매 전 성능점검기록부, 보험이력, 고전압 배터리, 실제 차량 상태를 별도로 확인해야 합니다.
+- 개인용 저빈도 사용을 목적으로 하며 대량 수집용이 아닙니다.
+- 텔레그램 봇 토큰과 채팅 ID는 GitHub Secrets로 관리합니다.
+- `data/state.json`에는 매물번호, 차량번호, 가격, URL, 관측 시각 및 텔레그램 알림 기록이 포함될 수 있으므로 저장소를 공개하기 전에 내용을 검토하거나 초기화해야 합니다.
+- 이 프로젝트는 MIT License로 배포됩니다. 자세한 내용은 `LICENSE`를 확인하십시오.
