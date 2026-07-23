@@ -13,6 +13,29 @@ const observedAt =
 const deletionTime =
   "2026-01-03T00:00:00.000Z";
 
+function createSyntheticSearchUrl(
+  label
+) {
+  const url = new URL(
+    "https://car.encar.com/list/car"
+  );
+
+  url.searchParams.set("page", "1");
+  url.searchParams.set(
+    "search",
+    JSON.stringify({
+      type: "car",
+      action:
+        `(And.Synthetic.${label})`,
+      toggle: {},
+      layer: "",
+      sort: "MobileModifiedDate"
+    })
+  );
+
+  return url.toString();
+}
+
 function profile({
   id,
   name,
@@ -23,7 +46,7 @@ function profile({
     name,
     enabled,
     searchUrl:
-      `https://example.test/search/${id}`,
+      createSyntheticSearchUrl(id),
     optionMode: "generic",
     titleFilter: {
       requiredAll: [],
@@ -87,7 +110,7 @@ function stateListing(overrides = {}) {
 
 function legacySearchUrl() {
   const url = new URL(
-    "https://example.test/legacy-search"
+    "https://car.encar.com/list/car"
   );
 
   url.searchParams.set("page", "1");

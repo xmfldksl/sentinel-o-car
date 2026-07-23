@@ -4,13 +4,46 @@ import {
   normalizeWatcherConfig
 } from "../src/runtime.mjs";
 
+function syntheticSearchUrl(
+  label,
+  {
+    page = 1,
+    title = `Synthetic ${label}`,
+    action = `(And.Synthetic.${label})`
+  } = {}
+) {
+  const url = new URL(
+    "https://car.encar.com/list/car"
+  );
+
+  url.searchParams.set(
+    "page",
+    String(page)
+  );
+  url.searchParams.set(
+    "search",
+    JSON.stringify({
+      type: "car",
+      action,
+      title,
+      toggle: {},
+      layer: "",
+      sort: "MobileModifiedDate"
+    })
+  );
+
+  return url.toString();
+}
+
 function genericProfile(overrides = {}) {
   const result = {
     id: "condition-a",
     name: "Condition A",
     enabled: true,
     searchUrl:
-      "https://example.test/search/a",
+      syntheticSearchUrl(
+        "condition-a"
+      ),
     optionMode: "generic",
     titleFilter: {
       requiredAll: [],
@@ -47,7 +80,9 @@ function teslaProfile(overrides = {}) {
     id: "condition-t",
     name: "Condition T",
     searchUrl:
-      "https://example.test/search/t",
+      syntheticSearchUrl(
+        "condition-t"
+      ),
     optionMode: "tesla",
     price: {
       maxPriceKrw: 35000000,
@@ -72,22 +107,14 @@ function versionTwoConfig(profiles) {
 }
 
 function legacySearchUrl() {
-  const url = new URL(
-    "https://example.test/legacy-search"
-  );
-
-  url.searchParams.set("page", "1");
-  url.searchParams.set(
-    "search",
-    JSON.stringify({
-      type: "car",
+  return syntheticSearchUrl(
+    "legacy-config",
+    {
       action:
         "(And.Year.range(202201..202212))",
       title: "Anonymous condition"
-    })
+    }
   );
-
-  return url.toString();
 }
 
 function legacyConfig() {
@@ -155,7 +182,9 @@ test("두 프로필의 배열 순서와 서로 다른 직접/환경변수 URL을
       ]),
       {
         CONDITION_T_URL:
-          "https://example.test/from-environment"
+          syntheticSearchUrl(
+            "from-environment"
+          )
       }
     );
 
@@ -167,11 +196,15 @@ test("두 프로필의 배열 순서와 서로 다른 직접/환경변수 URL을
   );
   assert.equal(
     normalized.profiles[0].searchUrl,
-    "https://example.test/search/a"
+    syntheticSearchUrl(
+      "condition-a"
+    )
   );
   assert.equal(
     normalized.profiles[1].searchUrl,
-    "https://example.test/from-environment"
+    syntheticSearchUrl(
+      "from-environment"
+    )
   );
   assert.equal(
     normalized.profiles[1]
@@ -268,7 +301,7 @@ test("직접 URL과 환경변수 URL의 누락·중복·프로토콜 오류를 �
               })
             ])
           ),
-        /profiles\[0\] \(condition-a\)\.searchUrl must be a valid HTTP or HTTPS URL/
+        /엔카 검색 URL의 호스트 또는 경로를 지원하지 않습니다/
       );
     }
   );
@@ -311,7 +344,7 @@ test("직접 URL과 환경변수 URL의 누락·중복·프로토콜 오류를 �
                 "file:///tmp/search"
             }
           ),
-        /must be a valid HTTP or HTTPS URL/
+        /엔카 검색 URL의 호스트 또는 경로를 지원하지 않습니다/
       );
     }
   );
@@ -330,7 +363,9 @@ test("직접 URL과 환경변수 URL의 누락·중복·프로토콜 오류를 �
             ]),
             {
               CONDITION_URL:
-                "https://example.test/from-environment"
+                syntheticSearchUrl(
+                  "from-environment"
+                )
             }
           ),
         /must define exactly one of searchUrl or searchUrlEnv/
@@ -940,7 +975,9 @@ test("legacyStateProfileId는 구성된 disabled 프로필도 가리킬 수 있�
           name: "Disabled condition",
           enabled: false,
           searchUrl:
-            "https://example.test/search/disabled"
+            syntheticSearchUrl(
+              "disabled-condition"
+            )
         })
       ]),
       legacyStateProfileId:

@@ -4,6 +4,9 @@ import {
   resolveSearchUrl,
   sleep
 } from "./lib.mjs";
+import {
+  normalizeEncarSearchUrl
+} from "./search-url.mjs";
 
 const SUPPORTED_CONFIG_VERSION = 2;
 const STATE_SCHEMA_VERSION = 2;
@@ -309,32 +312,6 @@ function normalizeYearRange(source, path) {
   };
 }
 
-function normalizeHttpUrl(value, path) {
-  const rawUrl =
-    requireNonEmptyString(value, path);
-
-  let url;
-
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error(
-      `${path} must be a valid HTTP or HTTPS URL`
-    );
-  }
-
-  if (
-    url.protocol !== "http:" &&
-    url.protocol !== "https:"
-  ) {
-    throw new Error(
-      `${path} must be a valid HTTP or HTTPS URL`
-    );
-  }
-
-  return url.toString();
-}
-
 function normalizeProfileSearchUrl(
   source,
   environment,
@@ -357,9 +334,11 @@ function normalizeProfileSearchUrl(
 
   if (hasSearchUrl) {
     return {
-      searchUrl: normalizeHttpUrl(
-        source.searchUrl,
-        `${path}.searchUrl`
+      searchUrl: normalizeEncarSearchUrl(
+        requireNonEmptyString(
+          source.searchUrl,
+          `${path}.searchUrl`
+        )
       ),
       searchUrlSource: "config"
     };
@@ -384,9 +363,8 @@ function normalizeProfileSearchUrl(
   }
 
   return {
-    searchUrl: normalizeHttpUrl(
-      environmentValue.trim(),
-      `${path}.searchUrlEnv (${environmentName})`
+    searchUrl: normalizeEncarSearchUrl(
+      environmentValue.trim()
     ),
     searchUrlSource:
       `environment:${environmentName}`
@@ -615,7 +593,10 @@ function normalizeProfile(
           );
 
         return {
-          searchUrl: resolved.url,
+          searchUrl:
+            normalizeEncarSearchUrl(
+              resolved.url
+            ),
           searchUrlSource:
             resolved.source
         };

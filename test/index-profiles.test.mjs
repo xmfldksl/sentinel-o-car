@@ -5,17 +5,43 @@ import {
   processProfile
 } from "../src/index.mjs";
 
+function createSyntheticSearchUrl(
+  label
+) {
+  const url = new URL(
+    "https://car.encar.com/list/car"
+  );
+
+  url.searchParams.set("page", "1");
+  url.searchParams.set(
+    "search",
+    JSON.stringify({
+      type: "car",
+      action:
+        `(And.Synthetic.${label})`,
+      toggle: {},
+      layer: "",
+      sort: "MobileModifiedDate"
+    })
+  );
+
+  return url.toString();
+}
+
 function profile(
   id,
   name,
-  searchUrl,
+  searchKey,
   enabled = true
 ) {
   return {
     id,
     name,
     enabled,
-    searchUrl,
+    searchUrl:
+      createSyntheticSearchUrl(
+        searchKey
+      ),
     searchUrlSource: "config",
     optionMode: "generic",
     titleFilter: {
@@ -109,18 +135,18 @@ test("main은 enabled 프로필을 순서대로 각 searchUrl과 함께 처리�
     profile(
       "first",
       "첫 조건",
-      "https://example.test/first"
+      "first"
     ),
     profile(
       "disabled",
       "꺼진 조건",
-      "https://example.test/disabled",
+      "disabled",
       false
     ),
     profile(
       "second",
       "둘째 조건",
-      "https://example.test/second"
+      "second"
     )
   ];
   const calls = [];
@@ -159,11 +185,15 @@ test("main은 enabled 프로필을 순서대로 각 searchUrl과 함께 처리�
   assert.deepEqual(calls, [
     [
       "first",
-      "https://example.test/first"
+      createSyntheticSearchUrl(
+        "first"
+      )
     ],
     [
       "second",
-      "https://example.test/second"
+      createSyntheticSearchUrl(
+        "second"
+      )
     ]
   ]);
   assert.ok(
@@ -177,7 +207,7 @@ test("main의 공유 Encar pacer는 실패한 프로필 뒤에도 다음 프로�
       ...profile(
         "failed",
         "실패 조건",
-        "https://example.test/failed"
+        "failed"
       ),
       requestDelayMs: 100
     },
@@ -185,7 +215,7 @@ test("main의 공유 Encar pacer는 실패한 프로필 뒤에도 다음 프로�
       ...profile(
         "success",
         "성공 조건",
-        "https://example.test/success"
+        "success"
       ),
       requestDelayMs: 250
     }
@@ -268,7 +298,7 @@ test("main의 실제 profile 처리는 실패한 상세 요청 뒤 다음 profil
       ...profile(
         "first",
         "첫 조건",
-        "https://example.test/first"
+        "first"
       ),
       requestDelayMs: 100
     },
@@ -276,7 +306,7 @@ test("main의 실제 profile 처리는 실패한 상세 요청 뒤 다음 profil
       ...profile(
         "second",
         "둘째 조건",
-        "https://example.test/second"
+        "second"
       ),
       requestDelayMs: 250
     }
@@ -373,7 +403,7 @@ test("실제 프로필 목록 조회 실패는 입력 상태를 변경하거나 
     ...profile(
       "failed",
       "실패 조건",
-      "https://example.test/fail"
+      "fail"
     ),
     titleFilter: {
       requiredAll: [],
@@ -445,7 +475,7 @@ test("generic 프로필의 목록 관측은 같은 id의 기존 Tesla 옵션 상
     ...profile(
       "generic-transition",
       "일반 조건",
-      "https://example.test/search/generic-transition"
+      "generic-transition"
     ),
     yearMonthMin: "2020-01",
     yearMonthMax: "2030-12",
@@ -544,17 +574,17 @@ test("한 프로필 실패는 그 상태를 보존하고 다음 성공 상태 �
     profile(
       "failed",
       "실패 조건",
-      "https://example.test/fail"
+      "fail"
     ),
     profile(
       "success",
       "성공 조건",
-      "https://example.test/success"
+      "success"
     ),
     profile(
       "disabled",
       "비활성 조건",
-      "https://example.test/disabled",
+      "disabled",
       false
     )
   ];
@@ -642,12 +672,12 @@ test("모든 enabled 프로필 실패 시 상태를 저장하지 않는다", asy
     profile(
       "one",
       "조건 하나",
-      "https://example.test/one"
+      "one"
     ),
     profile(
       "two",
       "조건 둘",
-      "https://example.test/two"
+      "two"
     )
   ];
   let saveCalled = false;
@@ -680,12 +710,12 @@ test("동일 신규 이벤트는 한 메시지로 병합하고 양쪽 상태에 
     profile(
       "one",
       "조건 하나",
-      "https://example.test/one"
+      "one"
     ),
     profile(
       "two",
       "조건 둘",
-      "https://example.test/two"
+      "two"
     )
   ];
   const rawState = stateFor(profiles);
@@ -785,12 +815,12 @@ test("동일 삭제 이벤트는 한 메시지로 병합하고 모든 프로필 
     profile(
       "delete-one",
       "삭제 조건 하나",
-      "https://example.test/delete-one"
+      "delete-one"
     ),
     profile(
       "delete-two",
       "삭제 조건 둘",
-      "https://example.test/delete-two"
+      "delete-two"
     )
   ];
   const rawState = stateFor(profiles);
@@ -885,12 +915,12 @@ test("telegram_test는 프로필 수와 무관하게 테스트 메시지 한 건
     profile(
       "one",
       "조건 하나",
-      "https://example.test/one"
+      "one"
     ),
     profile(
       "two",
       "조건 둘",
-      "https://example.test/two"
+      "two"
     )
   ];
   const sent = [];

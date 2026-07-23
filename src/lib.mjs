@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import {
+  normalizeEncarSearchUrl
+} from "./search-url.mjs";
+
+export {
+  normalizeEncarSearchUrl
+};
 
 export const DEFAULT_SEARCH_URL =
   "https://car.encar.com/list/car?page=1&search=%7B%22type%22%3A%22car%22%2C%22action%22%3A%22%28And.Hidden.N._.MultiView2Hidden.N._.MultiViewHidden.N._.%28C.CarType.N._.%28C.Manufacturer.%ED%85%8C%EC%8A%AC%EB%9D%BC._.%28C.ModelGroup.%EB%AA%A8%EB%8D%B8+3._.Model.%EB%AA%A8%EB%8D%B8+3.%29%29%29%29%22%2C%22toggle%22%3A%7B%7D%2C%22layer%22%3A%22%22%2C%22sort%22%3A%22MobileModifiedDate%22%7D";
@@ -159,44 +166,14 @@ export function createSearchUrlFingerprint(urlString) {
 }
 
 export function summarizeSearchUrl(urlString) {
-  let url;
-
-  try {
-    url = new URL(urlString);
-  } catch {
-    throw new Error(
-      "ENCAR_SEARCH_URL이 올바른 URL이 아닙니다."
-    );
-  }
-
+  const normalizedUrl =
+    normalizeEncarSearchUrl(urlString);
+  const url = new URL(normalizedUrl);
   const encodedSearch =
     url.searchParams.get("search");
 
-  if (encodedSearch === null) {
-    throw new Error(
-      "ENCAR_SEARCH_URL에 search 파라미터가 없습니다."
-    );
-  }
-
-  let search;
-
-  try {
-    search = JSON.parse(encodedSearch);
-  } catch {
-    throw new Error(
-      "ENCAR_SEARCH_URL의 search 파라미터가 올바른 JSON이 아닙니다."
-    );
-  }
-
-  if (
-    !search ||
-    typeof search !== "object" ||
-    Array.isArray(search)
-  ) {
-    throw new Error(
-      "ENCAR_SEARCH_URL의 search 파라미터는 JSON 객체여야 합니다."
-    );
-  }
+  const search =
+    JSON.parse(encodedSearch);
 
   const action =
     typeof search.action === "string"
@@ -213,9 +190,6 @@ export function summarizeSearchUrl(urlString) {
     search.title.trim()
       ? singleLine(search.title)
       : "없음";
-
-  const normalizedUrl =
-    url.toString();
 
   return {
     url: normalizedUrl,
