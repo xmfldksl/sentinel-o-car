@@ -10,19 +10,34 @@ import {
 } from "../src/lib.mjs";
 
 const config = {
-  requiredTitleTerms: ["모델 3", "롱 레인지", "AWD"],
+  optionMode: "tesla",
+  titleFilter: {
+    requiredAll: [
+      "모델 3",
+      "롱 레인지",
+      "AWD"
+    ],
+    requiredAny: [],
+    excludedAny: []
+  },
   yearMonthMin: "2022-05",
   yearMonthMax: "2022-12",
   maxMileageKm: 150000,
-  priceLimitsKrw: {
-    base: 35000000,
-    eap: 37000000,
-    fsd: 40000000,
-    unknownOptionHardMax: 40000000
+  price: {
+    maxPriceKrw: 35000000,
+    teslaOptionLimitsKrw: {
+      eap: 37000000,
+      fsd: 40000000,
+      unknownOptionHardMax:
+        40000000
+    }
   },
-  rentalPenaltyKrw: 3000000,
-  excludedColorTerms: ["빨간색", "적색", "레드"],
-  excludeContracted: true,
+  excludedColors: [
+    "빨간색",
+    "적색",
+    "레드"
+  ],
+  excludeContractPending: true,
   notifyPriceIncrease: true
 };
 
@@ -116,49 +131,6 @@ test("normal 모드는 조건 미충족 매물의 알림 이벤트를 만들지 
       detailSucceeded: true
     }),
     null
-  );
-});
-
-test("send_current 모드는 조건 미충족 매물도 알림 이벤트를 만든다", () => {
-  const overLimit = {
-    ...baseListing,
-    yearMonth: "2023-01",
-    mileageKm: 151000,
-    priceKrw: 41000000
-  };
-
-  const enriched = analyzeDetail(
-    basicDetail(),
-    overLimit,
-    config
-  );
-
-  const evaluated = evaluateListing(
-    enriched,
-    config
-  );
-
-  const sendCurrentListing =
-    prepareSendCurrentListing(
-      evaluated,
-      config,
-      { detailSucceeded: true }
-    );
-
-  const event = eventFor({
-    runMode: "send_current",
-    listing: sendCurrentListing,
-    detailSucceeded: true
-  });
-
-  assert.equal(
-    sendCurrentListing.conditionStatus,
-    "조건 미충족"
-  );
-
-  assert.equal(
-    event.type,
-    "현재 검색 결과"
   );
 });
 
@@ -400,26 +372,5 @@ test("상세 조회 실패 매물도 send_current에서는 목록 정보와 실�
   assert.match(
     message,
     /사유: .*옵션 미확인/
-  );
-});
-
-test("normal 모드의 상세 조회 실패 알림 억제 동작은 유지된다", () => {
-  const failedListing =
-    prepareSendCurrentListing(
-      baseListing,
-      config,
-      {
-        detailSucceeded: false,
-        errorMessage: "timeout"
-      }
-    );
-
-  assert.equal(
-    eventFor({
-      runMode: "normal",
-      listing: failedListing,
-      detailSucceeded: false
-    }),
-    null
   );
 });

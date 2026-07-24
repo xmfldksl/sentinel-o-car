@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   DEFAULT_SEARCH_URL,
   createSearchUrlFingerprint,
-  formatSearchUrlSummary,
   normalizeEncarSearchUrl,
   resolveSearchUrl,
   setPage
@@ -389,7 +388,7 @@ test("변환된 URL은 페이지 순회 시 page만 변경할 수 있다", () =>
   );
 });
 
-test("resolveSearchUrl은 기존 형식도 정규화된 요약과 지문으로 반환한다", () => {
+test("resolveSearchUrl은 기존 형식도 정규화된 URL로 반환한다", () => {
   const legacyUrl =
     createLegacyUrl(
       "resolve-legacy",
@@ -400,85 +399,67 @@ test("resolveSearchUrl은 기존 형식도 정규화된 요약과 지문으로 �
       GITHUB_ACTIONS: "true",
       ENCAR_SEARCH_URL: legacyUrl
     });
-  const log =
-    formatSearchUrlSummary(result);
+  const normalizedUrl =
+    new URL(result.url);
 
   assert.equal(
     result.source,
     "repository variable"
   );
   assert.equal(
-    result.host,
+    normalizedUrl.host,
     "car.encar.com"
   );
   assert.equal(
-    result.page,
+    normalizedUrl.searchParams.get(
+      "page"
+    ),
     "2"
   );
   assert.equal(
-    result.fingerprint,
-    createSearchUrlFingerprint(
-      result.url
+    result.url,
+    normalizeEncarSearchUrl(
+      legacyUrl
     )
   );
-  assert.equal(
-    log.includes(legacyUrl),
-    false
-  );
-  assert.equal(
-    log.includes(result.url),
-    false
-  );
+  assert.notEqual(result.url, legacyUrl);
 });
 
-test("정상 현재 URL에서 디코딩된 title과 Year.range를 추출한다", () => {
+test("resolveSearchUrl은 현재 URL의 title과 Year.range를 보존한다", () => {
   const result =
     resolveSearchUrl({
       GITHUB_ACTIONS: "true",
       ENCAR_SEARCH_URL: currentUrl
     });
-  const log =
-    formatSearchUrlSummary(result);
+  const resolvedUrl =
+    new URL(result.url);
+  const resolvedSearch = JSON.parse(
+    resolvedUrl.searchParams.get(
+      "search"
+    )
+  );
 
   assert.equal(
     result.source,
     "repository variable"
   );
   assert.equal(
-    result.host,
+    resolvedUrl.host,
     "car.encar.com"
   );
   assert.equal(
-    result.page,
+    resolvedUrl.searchParams.get(
+      "page"
+    ),
     "3"
   );
   assert.equal(
-    result.title,
+    resolvedSearch.title,
     currentSearch.title
   );
-  assert.equal(
-    result.yearRange,
-    "Year.range(202205..202212)"
-  );
   assert.match(
-    log,
-    /검색 URL 출처: repository variable/
-  );
-  assert.match(
-    log,
-    /검색 조건 title: 테슬라 모델 3 롱 레인지 AWD/
-  );
-  assert.match(
-    log,
-    /검색 조건 연식 범위: Year\.range\(202205\.\.202212\)/
-  );
-  assert.equal(
-    log.includes(currentUrl),
-    false
-  );
-  assert.equal(
-    log.includes(result.url),
-    false
+    resolvedSearch.action,
+    /Year\.range\(202205\.\.202212\)/
   );
 });
 

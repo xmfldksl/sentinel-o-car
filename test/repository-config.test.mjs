@@ -25,6 +25,14 @@ const readmeText = await fs.readFile(
   new URL("../README.md", import.meta.url),
   "utf8"
 );
+const exampleConfigText =
+  await fs.readFile(
+    new URL(
+      "../examples/config.multi.example.json",
+      import.meta.url
+    ),
+    "utf8"
+  );
 const listHtml = await fs.readFile(
   new URL(
     "./fixtures/list.html",
@@ -307,14 +315,6 @@ test("활성 프로필 URL만 제공해도 비활성 슬롯을 포함해 정상 
       maxPriceKrw:
         Number.MAX_SAFE_INTEGER
     });
-    assert.equal(
-      profile.rentalPenaltyKrw,
-      undefined
-    );
-    assert.equal(
-      profile.rentalHistoryDiscountKrw,
-      undefined
-    );
   }
 });
 
@@ -485,7 +485,7 @@ test("신규 Toyota 프로필의 첫 정상 실행은 신규 이벤트 없이 �
   );
 });
 
-test("워크플로는 5개 검색 URL을 Repository Variables로 연결한다", () => {
+test("워크플로는 5개 검색 URL과 MAX_PAGES를 Repository Variables로 연결한다", () => {
   const urlEnvironmentNames = [
     TESLA_URL_ENV,
     TOYOTA_URL_ENV,
@@ -529,13 +529,17 @@ test("워크플로는 5개 검색 URL을 Repository Variables로 연결한다", 
     workflowText,
     /TELEGRAM_CHAT_ID:\s*\$\{\{\s*secrets\.TELEGRAM_CHAT_ID\s*\}\}/
   );
+  assert.match(
+    workflowText,
+    /MAX_PAGES:\s*\$\{\{\s*vars\.MAX_PAGES\s*\}\}/
+  );
   assert.doesNotMatch(
     workflowText,
     /https?:\/\/[^\s"]*encar\./i
   );
 });
 
-test("README는 URL 중심 설정, 5개 슬롯, 입력값과 렌트 감가 미사용을 설명한다", () => {
+test("README 한영 설명과 예제는 5개 슬롯 및 렌트 자동 감가 미사용 계약을 따른다", () => {
   assert.match(
     readmeText,
     /Settings → Secrets and variables → Actions → Variables/
@@ -555,6 +559,10 @@ test("README는 URL 중심 설정, 5개 슬롯, 입력값과 렌트 감가 미�
   assert.match(
     readmeText,
     /## 5개 프로필 자리/
+  );
+  assert.match(
+    readmeText,
+    /`Model 3 4WD` and `Toyota Sienna` are enabled/
   );
   assert.match(
     readmeText,
@@ -578,10 +586,34 @@ test("README는 URL 중심 설정, 5개 슬롯, 입력값과 렌트 감가 미�
   );
   assert.match(
     readmeText,
-    /과거 렌트 용도 이력에 따른 감가와 별도 표시는 사용하지 않습니다/
+    /The optional `MAX_PAGES` Repository Variable overrides `config\.json`'s `maxPages` value/
   );
   assert.match(
     readmeText,
-    /`rentalHistoryDiscountKrw`와 `rentalPenaltyKrw`는 새 설정에 추가하지 마십시오/
+    /선택 Repository Variable인 `MAX_PAGES`는 모든 프로필에서 `config\.json`의 `maxPages` 값을 재정의합니다/
+  );
+  assert.match(
+    readmeText,
+    /Rental usage history does not trigger automatic depreciation or a separate message line/
+  );
+  assert.match(
+    readmeText,
+    /과거 렌트 용도 이력에 따른 자동 감가와 별도 메시지 표시는 사용하지 않습니다/
+  );
+  assert.doesNotMatch(
+    readmeText,
+    /rentalHistoryDiscountKrw|rentalPenaltyKrw/
+  );
+  assert.doesNotMatch(
+    exampleConfigText,
+    /rentalHistoryDiscountKrw|rentalPenaltyKrw/
+  );
+  assert.match(
+    exampleConfigText,
+    /"searchUrlEnv": "ENCAR_SEARCH_URL_3"/
+  );
+  assert.match(
+    exampleConfigText,
+    /"searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3"/
   );
 });

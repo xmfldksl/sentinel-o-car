@@ -46,7 +46,7 @@ Keep each profile `id` stable. Changing it can make the watcher treat the profil
 
 ## Five Profile Slots
 
-The current configuration provides five profile slots: two enabled profiles and three disabled slots reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
+The current configuration provides five profile slots: `Model 3 4WD` and `Toyota Sienna` are enabled, and three disabled slots are reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
 
 - `tesla-model3-long-range` → `ENCAR_SEARCH_URL_TESLA_MODEL3`
 - `toyota-sienna` → `ENCAR_SEARCH_URL_TOYOTA_SIENNA`
@@ -58,7 +58,9 @@ A disabled slot may keep its `searchUrlEnv` name without creating the correspond
 
 Seller categories such as private, dealer, and brand-certified sales, and sale methods such as normal sale, lease, operating lease, financial lease, rent, and rent succession are selected as Encar search URL conditions.
 
-`rentalHistoryDiscountKrw` and `rentalPenaltyKrw` are not used. Rental usage history does not trigger automatic depreciation, so `adjustedPriceKrw` remains equal to the actual listing price.
+The optional `MAX_PAGES` Repository Variable overrides `config.json`'s `maxPages` value for every profile.
+
+Rental usage history does not trigger automatic depreciation or a separate message line, so the evaluated price remains equal to the actual listing price.
 
 ## Core Features
 
@@ -127,7 +129,7 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 
 `config.json`의 `profiles` 배열에 검색 조건을 추가합니다. 각 프로필은 독립된 엔카 검색 URL과 필터를 사용하며, 모든 메시지는 동일한 텔레그램 봇과 채널로 전송되고 일치한 프로필 이름을 표시합니다.
 
-- `generic` 프로필은 `price.maxPriceKrw` 하나를 사용합니다. 브랜드, 모델, 트림, 연료, 구동방식과 일반 옵션은 엔카 검색 URL에서 설정합니다.
+- `generic` 프로필은 `price.maxPriceKrw` 하나를 사용합니다. 브랜드, 모델, 트림, 연료, 구동방식, 일반 옵션, 판매자 구분과 판매방식은 엔카 검색 URL에서 설정합니다.
 - `tesla` 프로필은 EAP 및 FSD 가격 상한을 별도로 사용할 수 있습니다. 구매 옵션이 확인되지 않으면 기본 최대가격을, 상세 확인 자체가 실패하면 `unknownOptionHardMax`를 사용합니다.
 - `optionMode`: 선택값입니다. `generic` 또는 `tesla`만 허용됩니다.
 - `searchUrl` 또는 `searchUrlEnv` 중 하나를 설정합니다.
@@ -160,7 +162,9 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 - 판매자: 개인, 딜러, 브랜드 인증 판매
 - 판매방식: 일반, 리스, 운용리스, 금융리스, 렌트, 렌트승계
 
-과거 렌트 용도 이력에 따른 감가와 별도 표시는 사용하지 않습니다. `rentalHistoryDiscountKrw`와 `rentalPenaltyKrw`는 새 설정에 추가하지 마십시오. 렌트 용도 이력이 `true`여도 자동 감가하지 않으며 `adjustedPriceKrw`는 실제 매물가격과 동일합니다.
+선택 Repository Variable인 `MAX_PAGES`는 모든 프로필에서 `config.json`의 `maxPages` 값을 재정의합니다.
+
+과거 렌트 용도 이력에 따른 자동 감가와 별도 메시지 표시는 사용하지 않습니다. 렌트 용도 이력이 `true`여도 평가가격은 실제 매물가격과 동일합니다.
 
 ## 핵심 기능
 
@@ -181,7 +185,7 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 
 ## 버전
 
-Current release: v1.0
+현재 릴리스: v1.0
 
 버전 1.0은 다음 범위의 구현이 완성된 버전입니다.
 

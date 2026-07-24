@@ -60,8 +60,7 @@ function profile({
     excludeContractPending: true,
     price: {
       maxPriceKrw: 50000000
-    },
-    rentalHistoryDiscountKrw: 0
+    }
   };
 }
 
@@ -139,7 +138,6 @@ function normalizedLegacyConfig() {
         unknownOptionHardMax:
           35000000
       },
-      rentalPenaltyKrw: 0,
       excludedColorTerms: [],
       excludeContracted: true,
       maxPages: 1,

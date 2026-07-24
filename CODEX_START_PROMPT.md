@@ -5,7 +5,7 @@ Sentinel-o-car 저장소의 로컬 개발 담당자로 작업해라.
 1. `AGENTS.md`, `README.md`, `config.json`, `.github/workflows/sentinel-o-car.yml`, `src/`, `test/`를 읽는다.
 2. `git status --short`, `node --version`, `npm --version`을 확인한다.
 3. `npm test`를 실행한다.
-4. 현재 구현이 GitHub Actions에서 엔카 공개 목록을 확인하고 개인 텔레그램으로 신규 매물과 가격 인하를 보내는 목적에 맞는지 검토한다.
+4. 현재 구현이 GitHub Actions에서 엔카 공개 목록을 확인하고 개인 텔레그램으로 신규, 가격 변경, 현재매물, 매물삭제 알림을 보내는 목적에 맞는지 검토한다.
 5. 즉시 코드를 수정하지 말고, 발견한 문제를 심각도 순으로 보고한다.
 
 검토 시 특히 다음을 확인한다.
@@ -18,7 +18,7 @@ Sentinel-o-car 저장소의 로컬 개발 담당자로 작업해라.
 - 빈 검색 결과가 상태 파일을 훼손하지 않는지
 - GitHub Actions 상태 커밋 충돌
 - 텔레그램 토큰과 채팅 ID 노출 가능성
-- 정규식 기반 FSD, EAP, 렌트, 흡연, 튜닝 판정의 오탐
+- 구조화 데이터와 공개 문구 기반 FSD, EAP, 흡연, 튜닝 판정의 오탐과 렌트·전손 자유 문구 오판
 - 사용자 조건이 `config.json`과 코드에 중복 하드코딩됐는지
 
 로그인 우회, 캡차 우회, 비공개 API 호출, 요청 빈도 증가를 제안하거나 구현하지 마라.

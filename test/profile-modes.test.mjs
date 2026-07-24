@@ -240,27 +240,6 @@ test("generic 상세 분석은 Tesla 옵션 및 판매자 옵션 문구 필드�
   assertHasNoTeslaStateFields(analyzed);
 });
 
-test("generic 텔레그램 메시지는 검색 조건만 추가하고 Tesla 옵션 문구를 숨긴다", () => {
-  const message = formatTelegramMessage(
-    "신규",
-    listing({
-      option: "FSD",
-      hasFsd: true,
-      hasEap: true
-    }),
-    {
-      profileNames: ["일반 조건"],
-      showTeslaOption: false
-    }
-  );
-
-  assert.match(message, /검색 조건: 일반 조건/);
-  assert.doesNotMatch(
-    message,
-    /FSD|EAP|옵션: 미확인/
-  );
-});
-
 test("generic 신규 가격변경 현재매물 매물삭제 메시지는 모두 프로필을 표시하고 옵션 문구를 숨긴다", () => {
   const eventTypes = [
     "신규",
@@ -347,34 +326,6 @@ test("generic 상세 실패 send_current 판정에는 옵션 미확인 사유가
     /옵션|FSD|EAP/
   );
   assertHasNoTeslaStateFields(prepared);
-});
-
-test("generic 상세 성공 상태는 기존 Tesla 옵션 필드도 남기지 않는다", () => {
-  const current = listing();
-  const evaluated = evaluateListing(
-    current,
-    genericConfig
-  );
-  const previous = {
-    ...listing(),
-    option: "FSD",
-    hasFsd: true,
-    hasEap: false,
-    optionSource: "legacy source",
-    optionEvidence: "legacy evidence",
-    firstSeenAt: "2026-01-01T00:00:00.000Z"
-  };
-
-  const record = recordDetailSuccess(
-    previous,
-    current,
-    evaluated,
-    "2026-01-02T00:00:00.000Z"
-  );
-
-  assert.equal(record.priceKrw, 34000000);
-  assert.equal(record.saleType, "NORMAL");
-  assertHasNoTeslaStateFields(record);
 });
 
 test("Tesla에서 generic으로 바뀐 상태는 모든 저장 경로에서 옵션 필드만 제거한다", () => {

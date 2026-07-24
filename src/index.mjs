@@ -727,7 +727,6 @@ async function main({
   createTelegramSenderImpl =
     createTelegramSender,
   processProfileImpl = processProfile,
-  sleepImpl = sleep,
   requestSleepImpl = sleep,
   requestNowMs = Date.now,
   nowIso = () =>
@@ -883,8 +882,6 @@ async function main({
         }
       }
     }
-
-    await sleepImpl(500);
   }
 
   state.updatedAt = nowIso();

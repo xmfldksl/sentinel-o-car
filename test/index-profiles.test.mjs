@@ -175,7 +175,6 @@ test("main은 enabled 프로필을 순서대로 각 searchUrl과 함께 처리�
     saveJsonImpl: async (_path, value) => {
       savedState = value;
     },
-    sleepImpl: async () => {},
     nowIso: () =>
       "2026-01-02T00:00:00.000Z",
     logger: quietLogger()
@@ -256,7 +255,6 @@ test("main의 공유 Encar pacer는 실패한 프로필 뒤에도 다음 프로�
     createTelegramSenderImpl:
       telegramFactory([]),
     saveJsonImpl: async () => {},
-    sleepImpl: async () => {},
     requestSleepImpl: async (delay) => {
       requestSleeps.push(delay);
       clock += delay;
@@ -360,7 +358,6 @@ test("main의 실제 profile 처리는 실패한 상세 요청 뒤 다음 profil
     createTelegramSenderImpl:
       telegramFactory([]),
     saveJsonImpl: async () => {},
-    sleepImpl: async () => {},
     requestSleepImpl: async (delay) => {
       requestSleeps.push(delay);
       clock += delay;
@@ -446,7 +443,6 @@ test("실제 프로필 목록 조회 실패는 입력 상태를 변경하거나 
       fetchTextImpl: async () => {
         throw new Error("list failed");
       },
-      sleepImpl: async () => {},
       nowIso: () =>
         "2026-01-02T00:00:00.000Z"
     }),
@@ -528,7 +524,6 @@ test("generic 프로필의 목록 관측은 같은 id의 기존 Tesla 옵션 상
       fetchCount += 1;
       return `<a href="/cars/detail/${listingId}">일반 차량 22/06식 10,000km 서울 3,400만원</a>`;
     },
-    sleepImpl: async () => {},
     nowIso: () =>
       "2026-01-02T00:00:00.000Z"
   });
@@ -640,7 +635,6 @@ test("한 프로필 실패는 그 상태를 보존하고 다음 성공 상태 �
     saveJsonImpl: async (_path, value) => {
       savedState = value;
     },
-    sleepImpl: async () => {},
     nowIso: () =>
       "2026-01-02T00:00:00.000Z",
     logger: quietLogger()
@@ -778,7 +772,6 @@ test("동일 신규 이벤트는 한 메시지로 병합하고 양쪽 상태에 
     saveJsonImpl: async (_path, value) => {
       savedState = value;
     },
-    sleepImpl: async () => {},
     nowIso: () =>
       "2026-01-02T00:00:00.000Z",
     logger: quietLogger()
@@ -885,7 +878,6 @@ test("동일 삭제 이벤트는 한 메시지로 병합하고 모든 프로필 
     saveJsonImpl: async (_path, value) => {
       savedState = value;
     },
-    sleepImpl: async () => {},
     nowIso: () =>
       "2026-01-03T00:00:00.000Z",
     logger: quietLogger()

@@ -6,8 +6,7 @@ import {
   evaluateListing,
   matchesBasicCriteria,
   parseListHtml,
-  parseListingText,
-  setPage
+  parseListingText
 } from "../src/lib.mjs";
 
 const config = JSON.parse(
@@ -437,14 +436,4 @@ test("FSD와 EAP가 모두 확정되면 FSD 가격 기준을 우선한다", () =
   assert.equal(result.hasEap, false);
   assert.equal(result.limitKrw, 40000000);
   assert.equal(result.eligible, true);
-});
-
-test("페이지 번호를 URL에 안전하게 반영한다", () => {
-  assert.equal(
-    setPage(
-      "https://example.com/list?search=x&page=1",
-      3
-    ),
-    "https://example.com/list?search=x&page=3"
-  );
 });

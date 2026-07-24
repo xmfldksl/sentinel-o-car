@@ -97,7 +97,7 @@ function resolveTitleFilter(config) {
   };
 }
 
-export function matchesTitleFilter(
+function matchesTitleFilter(
   title,
   config
 ) {
@@ -165,47 +165,6 @@ export function createSearchUrlFingerprint(urlString) {
     .slice(0, 12);
 }
 
-export function summarizeSearchUrl(urlString) {
-  const normalizedUrl =
-    normalizeEncarSearchUrl(urlString);
-  const url = new URL(normalizedUrl);
-  const encodedSearch =
-    url.searchParams.get("search");
-
-  const search =
-    JSON.parse(encodedSearch);
-
-  const action =
-    typeof search.action === "string"
-      ? search.action
-      : "";
-
-  const yearRange =
-    action.match(
-      /Year\.range\([^)]*\)/
-    )?.[0] ?? "없음";
-
-  const title =
-    typeof search.title === "string" &&
-    search.title.trim()
-      ? singleLine(search.title)
-      : "없음";
-
-  return {
-    url: normalizedUrl,
-    host: url.host,
-    page:
-      url.searchParams.get("page") ??
-      "없음",
-    title,
-    yearRange,
-    fingerprint:
-      createSearchUrlFingerprint(
-        normalizedUrl
-      )
-  };
-}
-
 export function resolveSearchUrl(
   environment = process.env
 ) {
@@ -232,25 +191,12 @@ export function resolveSearchUrl(
 
   return {
     source,
-    ...summarizeSearchUrl(
+    url: normalizeEncarSearchUrl(
       hasConfiguredUrl
         ? configuredUrl.trim()
         : DEFAULT_SEARCH_URL
     )
   };
-}
-
-export function formatSearchUrlSummary(
-  searchUrl
-) {
-  return [
-    `검색 URL 출처: ${searchUrl.source}`,
-    `검색 URL 호스트: ${searchUrl.host}`,
-    `검색 URL page: ${searchUrl.page}`,
-    `검색 조건 title: ${searchUrl.title}`,
-    `검색 조건 연식 범위: ${searchUrl.yearRange}`,
-    `검색 URL 지문: ${searchUrl.fingerprint}`
-  ].join("\n");
 }
 
 const HTML_ENTITIES = new Map([
@@ -262,7 +208,7 @@ const HTML_ENTITIES = new Map([
   ["nbsp", " "]
 ]);
 
-export function decodeHtml(value) {
+function decodeHtml(value) {
   return value
     .replace(
       /&#(\d+);/g,
@@ -285,7 +231,7 @@ export function decodeHtml(value) {
     );
 }
 
-export function stripHtml(value) {
+function stripHtml(value) {
   return decodeHtml(
     String(value)
       .replace(
@@ -491,7 +437,7 @@ export function parsePreloadedVehicleData(
   );
 }
 
-export function maskVehicleNo(value) {
+function maskVehicleNo(value) {
   const normalized =
     normalizeVehicleNo(value);
 
@@ -1998,7 +1944,7 @@ function selectLatestStateEntry(
   );
 }
 
-export function createDeletedListingEvent(
+function createDeletedListingEvent(
   listing,
   stateListingId
 ) {
@@ -2460,7 +2406,7 @@ export function formatDuplicateListingLog(
   }`;
 }
 
-const TESLA_OPTION_STATE_FIELDS = [
+export const TESLA_OPTION_STATE_FIELDS = [
   "option",
   "hasFsd",
   "hasEap",
@@ -2875,7 +2821,7 @@ export function createListingEvent({
   return null;
 }
 
-export function formatKrw(value) {
+function formatKrw(value) {
   return `${Math.round(
     value
   ).toLocaleString(
@@ -2883,7 +2829,7 @@ export function formatKrw(value) {
   )}원`;
 }
 
-export function formatKm(value) {
+function formatKm(value) {
   return `${Math.round(
     value
   ).toLocaleString(

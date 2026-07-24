@@ -1,4 +1,5 @@
 import {
+  TESLA_OPTION_STATE_FIELDS,
   createTelegramMessageRequest,
   migrateLegacyState,
   resolveSearchUrl,
@@ -612,10 +613,7 @@ function normalizeProfile(
           );
 
         return {
-          searchUrl:
-            normalizeEncarSearchUrl(
-              resolved.url
-            ),
+          searchUrl: resolved.url,
           searchUrlSource:
             resolved.source
         };
@@ -1654,14 +1652,6 @@ function isBetterEventRepresentative(
   );
 }
 
-const TESLA_OPTION_STATE_FIELDS = [
-  "option",
-  "hasFsd",
-  "hasEap",
-  "optionSource",
-  "optionEvidence"
-];
-
 const TESLA_OPTION_CONTRIBUTOR =
   Symbol("teslaOptionContributor");
 
@@ -2162,10 +2152,6 @@ export function createTelegramSender({
         )}`
       );
     }
-
-    throw new Error(
-      "텔레그램 전송 재시도 횟수를 초과했습니다."
-    );
   }
 
   function send(text) {

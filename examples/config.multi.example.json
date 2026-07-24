@@ -8,7 +8,7 @@
       "id": "generic-vehicle-example",
       "name": "일반 차량 예시",
       "enabled": true,
-      "searchUrlEnv": "GENERIC_ENCAR_SEARCH_URL",
+      "searchUrlEnv": "ENCAR_SEARCH_URL_3",
       "optionMode": "generic",
       "titleFilter": {
         "requiredAll": [],
@@ -22,14 +22,13 @@
       "excludeContractPending": true,
       "price": {
         "maxPriceKrw": 45000000
-      },
-      "rentalHistoryDiscountKrw": 0
+      }
     },
     {
       "id": "tesla-option-example",
       "name": "Tesla 옵션 예시",
       "enabled": true,
-      "searchUrlEnv": "TESLA_ENCAR_SEARCH_URL",
+      "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
       "optionMode": "tesla",
       "titleFilter": {
         "requiredAll": [],
@@ -48,8 +47,7 @@
           "fsd": 40000000,
           "unknownOptionHardMax": 35000000
         }
-      },
-      "rentalHistoryDiscountKrw": 0
+      }
     }
   ]
 }

@@ -51,7 +51,6 @@ function normalizedProfile(
     price: {
       maxPriceKrw: 50000000
     },
-    rentalPenaltyKrw: 0,
     notifyPriceIncrease: true,
     maxPages: 1,
     requestDelayMs: 25,
