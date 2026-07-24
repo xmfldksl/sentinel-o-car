@@ -123,7 +123,7 @@ test("저장소 config는 URL 중심 활성 프로필 2개와 명시형 비활�
 
   assert.deepEqual(tesla, {
     id: TESLA_PROFILE_ID,
-    name: "Model 3 AWD",
+    name: "Model 3 4WD",
     enabled: true,
     searchUrlEnv: TESLA_URL_ENV,
     optionMode: "tesla",
@@ -309,7 +309,11 @@ test("활성 프로필 URL만 제공해도 비활성 슬롯을 포함해 정상 
     });
     assert.equal(
       profile.rentalPenaltyKrw,
-      0
+      undefined
+    );
+    assert.equal(
+      profile.rentalHistoryDiscountKrw,
+      undefined
     );
   }
 });

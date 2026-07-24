@@ -348,7 +348,12 @@ test("현재 판매방식이 RENT여도 렌트 용도 이력이 null이면 감�
   );
 });
 
-test("렌트 용도 이력이 명시적으로 true일 때만 렌트 감가를 적용한다", () => {
+test("렌트 용도 이력이 true여도 구형 렌트 감가 설정을 적용하지 않는다", () => {
+  const legacyRentalConfig = {
+    ...config.profiles[0],
+    rentalHistoryDiscountKrw: 5000000,
+    rentalPenaltyKrw: 3000000
+  };
   const result = evaluateListing(
     {
       ...listing({
@@ -364,21 +369,21 @@ test("렌트 용도 이력이 명시적으로 true일 때만 렌트 감가를 �
       smokingWarning: false,
       tuningWarning: false
     },
-    config
+    legacyRentalConfig
   );
 
   assert.equal(
     result.adjustedPriceKrw,
-    36000000
+    33000000
   );
-  assert.equal(result.eligible, false);
+  assert.equal(result.eligible, true);
   assert.deepEqual(
     result.excludedReasons,
-    ["렌트 감가 후 가격 초과"]
+    []
   );
-  assert.match(
+  assert.doesNotMatch(
     result.warnings.join(" "),
-    /렌트 이력 감가 3,000,000원 반영/
+    /렌트.*감가/
   );
 });
 

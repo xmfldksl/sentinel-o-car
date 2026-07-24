@@ -119,6 +119,20 @@ test("목록 지역은 특정 연료명 없이 주행거리와 가격 사이에�
 });
 
 test("사용자 기본 조건을 적용한다", () => {
+  const testConfig = {
+    titleFilter: {
+      requiredAll: [
+        "모델 3",
+        "롱 레인지",
+        "AWD"
+      ],
+      requiredAny: [],
+      excludedAny: []
+    },
+    yearMonthMin: "2022-05",
+    yearMonthMax: "2022-12",
+    maxMileageKm: 150000
+  };
   const target = {
     title: "모델 3 롱 레인지 AWD",
     yearMonth: "2022-09",
@@ -126,14 +140,22 @@ test("사용자 기본 조건을 적용한다", () => {
   };
 
   assert.equal(
-    matchesBasicCriteria(target, config),
+    matchesBasicCriteria(target, testConfig),
     true
   );
 
   assert.equal(
     matchesBasicCriteria(
       { ...target, mileageKm: 150001 },
-      config
+      testConfig
+    ),
+    false
+  );
+
+  assert.equal(
+    matchesBasicCriteria(
+      { ...target, yearMonth: "2023-01" },
+      testConfig
     ),
     false
   );
@@ -141,7 +163,7 @@ test("사용자 기본 조건을 적용한다", () => {
   assert.equal(
     matchesBasicCriteria(
       { ...target, title: "모델 3 RWD" },
-      config
+      testConfig
     ),
     false
   );
@@ -326,6 +348,23 @@ test("페이지 공통 본문의 색상과 옵션 단어는 판정에 사용하�
 });
 
 test("구조화 외장색이 빨간색이면 계약중과 함께 제외한다", () => {
+  const testConfig = {
+    optionMode: "tesla",
+    excludedColors: [
+      "빨간색",
+      "적색",
+      "레드"
+    ],
+    excludeContractPending: true,
+    price: {
+      maxPriceKrw: 35000000,
+      teslaOptionLimitsKrw: {
+        eap: 37000000,
+        fsd: 40000000,
+        unknownOptionHardMax: 40000000
+      }
+    }
+  };
   const html = detailHtml({
     vehicleNo: "12가3456",
     spec: {
@@ -346,12 +385,12 @@ test("구조화 외장색이 빨간색이면 계약중과 함께 제외한다", 
       contracted: true,
       priceKrw: 32000000
     }),
-    config
+    testConfig
   );
 
   const result = evaluateListing(
     enriched,
-    config
+    testConfig
   );
 
   assert.equal(result.colorName, "빨간색");

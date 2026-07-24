@@ -28,18 +28,37 @@ The project is divided into a few focused components:
 
 Add each search to the `profiles` array in `config.json`. Every profile has its own Encar search URL and filters, while all messages use the same Telegram bot and channel and include the matching profile name.
 
-- `generic` profiles use one `price.maxPriceKrw`. Configure the make, model, trim, fuel, drivetrain, and ordinary options in the Encar search URL.
+- `generic` profiles use one `price.maxPriceKrw`. Configure the make, model, trim, fuel, drivetrain, ordinary options, seller category, and sale method in the Encar search URL.
 - `tesla` profiles can use separate EAP and FSD price limits. The base maximum remains the limit when no purchased option is confirmed, while `unknownOptionHardMax` applies when detail verification fails.
+- `optionMode` is optional and accepts only `generic` or `tesla`.
 - Set either `searchUrl` or `searchUrlEnv`.
+- Register GitHub Repository Variables at `Settings → Secrets and variables → Actions → Variables`.
 - To register a Repository Variable, select the desired vehicle and filters on Encar, open the search-results page, and copy the complete URL from the browser address bar.
-- Both the current `https://car.encar.com/list/car?...` format and the legacy `https://www.encar.com/fc/fc_carsearchlist.do?...#!...` format are supported.
+- Current format: `https://car.encar.com/list/car?...`
+- Legacy format: `https://www.encar.com/fc/fc_carsearchlist.do?...#!...`
 - Legacy URLs are converted automatically in memory before any network request. The original Repository Variable is not modified.
 - Unsupported or malformed URLs fail before collection starts, and the full URL is not printed in the error message or normal logs.
-- Map each profile's `searchUrlEnv` value to a separate GitHub Actions Repository Variable in the workflow. Actual search URLs should not be stored in the repository.
+- Map each profile's `searchUrlEnv` value to a separate GitHub Actions Repository Variable in the workflow. Actual search URLs must not be written directly into the repository.
 - See `examples/config.multi.example.json` for generic and Tesla examples without personal search URLs.
 - When migrating a populated legacy state to multiple profiles, set `legacyStateProfileId` to the single profile that should inherit it; legacy state is never copied to every profile.
 
 Keep each profile `id` stable. Changing it can make the watcher treat the profile as a new state namespace.
+
+## Five Profile Slots
+
+The current configuration provides five profile slots: two enabled profiles and three disabled slots reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
+
+- `tesla-model3-long-range` → `ENCAR_SEARCH_URL_TESLA_MODEL3`
+- `toyota-sienna` → `ENCAR_SEARCH_URL_TOYOTA_SIENNA`
+- `slot-3` → `ENCAR_SEARCH_URL_3`
+- `slot-4` → `ENCAR_SEARCH_URL_4`
+- `slot-5` → `ENCAR_SEARCH_URL_5`
+
+A disabled slot may keep its `searchUrlEnv` name without creating the corresponding Repository Variable. To add a sixth or later profile, add the profile and `searchUrlEnv` to `config.json`, expose the same environment variable in `.github/workflows/sentinel-o-car.yml`, and create the matching Repository Variable.
+
+Seller categories such as private, dealer, and brand-certified sales, and sale methods such as normal sale, lease, operating lease, financial lease, rent, and rent succession are selected as Encar search URL conditions.
+
+`rentalHistoryDiscountKrw` and `rentalPenaltyKrw` are not used. Rental usage history does not trigger automatic depreciation, so `adjustedPriceKrw` remains equal to the actual listing price.
 
 ## Core Features
 
@@ -110,16 +129,38 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 
 - `generic` 프로필은 `price.maxPriceKrw` 하나를 사용합니다. 브랜드, 모델, 트림, 연료, 구동방식과 일반 옵션은 엔카 검색 URL에서 설정합니다.
 - `tesla` 프로필은 EAP 및 FSD 가격 상한을 별도로 사용할 수 있습니다. 구매 옵션이 확인되지 않으면 기본 최대가격을, 상세 확인 자체가 실패하면 `unknownOptionHardMax`를 사용합니다.
+- `optionMode`: 선택값입니다. `generic` 또는 `tesla`만 허용됩니다.
 - `searchUrl` 또는 `searchUrlEnv` 중 하나를 설정합니다.
+- GitHub Repository Variables 등록 위치는 `Settings → Secrets and variables → Actions → Variables`입니다.
 - Repository Variable을 등록할 때는 엔카에서 원하는 차량과 조건을 선택하고 검색 결과 화면을 연 뒤, 브라우저 주소창의 URL 전체를 복사합니다.
-- 현재 `https://car.encar.com/list/car?...` 형식과 기존 `https://www.encar.com/fc/fc_carsearchlist.do?...#!...` 형식을 모두 지원합니다.
+- 현재 형식: `https://car.encar.com/list/car?...`
+- 기존 형식: `https://www.encar.com/fc/fc_carsearchlist.do?...#!...`
 - 기존 형식은 네트워크 요청 전에 실행 중 메모리에서 자동 변환되며 Repository Variable 원본은 변경되지 않습니다.
 - 지원하지 않거나 손상된 URL은 수집 시작 전에 오류로 중단하며, 오류 메시지와 일반 로그에 URL 전체를 출력하지 않습니다.
-- 각 프로필의 `searchUrlEnv` 값을 워크플로에서 서로 다른 GitHub Actions Repository Variable과 연결합니다. 실제 검색 URL은 저장소에 기록하지 않는 것을 권장합니다.
+- 각 프로필의 `searchUrlEnv` 값을 워크플로에서 서로 다른 GitHub Actions Repository Variable과 연결합니다. 실제 검색 URL은 Repository Variables로만 관리하며 저장소에 직접 기록하지 않습니다.
 - 개인 검색 URL이 없는 generic 및 Tesla 예시는 `examples/config.multi.example.json`에서 확인할 수 있습니다.
 - 기존 상태가 있는 상태에서 여러 프로필로 전환할 때는 상태를 승계할 한 프로필을 `legacyStateProfileId`로 지정합니다. 구형 상태를 모든 프로필에 복제하지 않습니다.
 
 프로필 `id`는 안정적으로 유지하십시오. 값을 바꾸면 새로운 상태 영역으로 인식될 수 있습니다.
+
+## 5개 프로필 자리
+
+현재 `config.json`은 총 5개 프로필 슬롯을 지원합니다. `Model 3 4WD`와 `도요타 시에나` 2개는 활성 프로필이고, `slot-3`, `slot-4`, `slot-5` 3개는 비활성 슬롯입니다. 각 프로필의 `searchUrlEnv`는 다음과 같이 같은 이름의 Repository Variable 및 워크플로 환경변수와 연결됩니다.
+
+- `tesla-model3-long-range` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3"`
+- `toyota-sienna` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA"`
+- `slot-3` → `"searchUrlEnv": "ENCAR_SEARCH_URL_3"`
+- `slot-4` → `"searchUrlEnv": "ENCAR_SEARCH_URL_4"`
+- `slot-5` → `"searchUrlEnv": "ENCAR_SEARCH_URL_5"`
+
+비활성 프로필은 `searchUrlEnv` 이름만 유지하고 대응하는 Repository Variable을 만들지 않아도 됩니다. 6번째 이후 프로필을 추가할 때는 `config.json`의 프로필과 `searchUrlEnv`, `.github/workflows/sentinel-o-car.yml`의 환경변수, 같은 이름의 Repository Variable을 함께 추가해야 합니다.
+
+차종, 연식, 주행거리, 제외색상과 다음 구분은 엔카 검색 URL 조건으로 선택합니다.
+
+- 판매자: 개인, 딜러, 브랜드 인증 판매
+- 판매방식: 일반, 리스, 운용리스, 금융리스, 렌트, 렌트승계
+
+과거 렌트 용도 이력에 따른 감가와 별도 표시는 사용하지 않습니다. `rentalHistoryDiscountKrw`와 `rentalPenaltyKrw`는 새 설정에 추가하지 마십시오. 렌트 용도 이력이 `true`여도 자동 감가하지 않으며 `adjustedPriceKrw`는 실제 매물가격과 동일합니다.
 
 ## 핵심 기능
 
