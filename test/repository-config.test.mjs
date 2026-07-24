@@ -131,7 +131,7 @@ test("저장소 config는 URL 중심 활성 프로필 2개와 명시형 비활�
 
   assert.deepEqual(tesla, {
     id: TESLA_PROFILE_ID,
-    name: "Model 3 4WD",
+    name: "Model 3 AWD",
     enabled: true,
     searchUrlEnv: TESLA_URL_ENV,
     optionMode: "tesla",
@@ -562,7 +562,7 @@ test("README 한영 설명과 예제는 5개 슬롯 및 렌트 자동 감가 미
   );
   assert.match(
     readmeText,
-    /`Model 3 4WD` and `Toyota Sienna` are enabled/
+    /`Model 3 AWD` and `Toyota Sienna` are enabled/
   );
   assert.match(
     readmeText,

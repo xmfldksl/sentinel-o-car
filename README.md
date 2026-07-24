@@ -46,7 +46,7 @@ Keep each profile `id` stable. Changing it can make the watcher treat the profil
 
 ## Five Profile Slots
 
-The current configuration provides five profile slots: `Model 3 4WD` and `Toyota Sienna` are enabled, and three disabled slots are reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
+The current configuration provides five profile slots: `Model 3 AWD` and `Toyota Sienna` are enabled, and three disabled slots are reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
 
 - `tesla-model3-long-range` → `ENCAR_SEARCH_URL_TESLA_MODEL3`
 - `toyota-sienna` → `ENCAR_SEARCH_URL_TOYOTA_SIENNA`
@@ -147,7 +147,7 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 
 ## 5개 프로필 자리
 
-현재 `config.json`은 총 5개 프로필 슬롯을 지원합니다. `Model 3 4WD`와 `도요타 시에나` 2개는 활성 프로필이고, `slot-3`, `slot-4`, `slot-5` 3개는 비활성 슬롯입니다. 각 프로필의 `searchUrlEnv`는 다음과 같이 같은 이름의 Repository Variable 및 워크플로 환경변수와 연결됩니다.
+현재 `config.json`은 총 5개 프로필 슬롯을 지원합니다. `Model 3 AWD`와 `도요타 시에나` 2개는 활성 프로필이고, `slot-3`, `slot-4`, `slot-5` 3개는 비활성 슬롯입니다. 각 프로필의 `searchUrlEnv`는 다음과 같이 같은 이름의 Repository Variable 및 워크플로 환경변수와 연결됩니다.
 
 - `tesla-model3-long-range` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3"`
 - `toyota-sienna` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA"`

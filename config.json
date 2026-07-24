@@ -7,7 +7,7 @@
   "profiles": [
     {
       "id": "tesla-model3-long-range",
-      "name": "Model 3 4WD",
+      "name": "Model 3 AWD",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
       "optionMode": "tesla",
