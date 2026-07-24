@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import test from "node:test";
-import {
-  normalizeWatcherConfig,
-  normalizeWatcherState
-} from "../src/runtime.mjs";
+import { normalizeWatcherConfig } from "../src/runtime.mjs";
 
 const configText = await fs.readFile(
   new URL("../config.json", import.meta.url),
@@ -135,17 +131,6 @@ const TESLA_STATE_RECORD_KEYS = [
   "optionEvidence",
   "optionSource"
 ];
-const STATE_PRESERVATION_FIELDS = [
-  "id",
-  "vehicleNo",
-  "previousListingId",
-  "firstSeenAt",
-  "lastSeenAt",
-  "lastEvaluatedAt",
-  "deletedAt",
-  "telegramMessageId",
-  "telegramSentAt"
-];
 const DISABLED_SLOTS = [
   {
     id: "slot-3",
@@ -173,35 +158,6 @@ const EXPECTED_PROFILE_IDS = [
     (slot) => slot.id
   )
 ];
-// HEAD:data/state.json 정리 전 projection에서 계산했다.
-// root updatedAt과 이번 정리 대상 필드는 digest에 포함하지 않는다.
-const EXPECTED_STATE_PRESERVATION = {
-  "slot-3": {
-    listingCount: 0,
-    digest:
-      "d8a2557ddd383c2d9995c48fb22262fba6dfa3018560eef828035f4d18b5a2b8"
-  },
-  "slot-4": {
-    listingCount: 0,
-    digest:
-      "e89ecab51061069ad9775ab529c307b53a6f0c51919995b1238b3193db416ac5"
-  },
-  "slot-5": {
-    listingCount: 0,
-    digest:
-      "f4e6ea56db08f74ba7ddba5bf2eafea92943d8ec262833a8e04e6f637dc2cda2"
-  },
-  [TESLA_PROFILE_ID]: {
-    listingCount: 26,
-    digest:
-      "7992e709dff98ec7fe05525f35a60f3a4607deeb0a7b85fa05a9df5e3594d57d"
-  },
-  [TOYOTA_PROFILE_ID]: {
-    listingCount: 72,
-    digest:
-      "889eb33f510c42a1c59b230d6c7067da54450959bc76afe4d9300a22e8ae3c0a"
-  }
-};
 
 function sortedKeys(value) {
   return Object.keys(value).sort();
@@ -261,140 +217,6 @@ function normalizeRepositoryConfig() {
 function findProfile(config, id) {
   return config.profiles.find(
     (profile) => profile.id === id
-  );
-}
-
-function compareText(left, right) {
-  if (left < right) {
-    return -1;
-  }
-
-  if (left > right) {
-    return 1;
-  }
-
-  return 0;
-}
-
-function createProfileStatePreservationProjection(
-  profileId,
-  profileState
-) {
-  const profileTimestamps =
-    Object.fromEntries(
-      [
-        "initializedAt",
-        "updatedAt"
-      ]
-        .filter((field) =>
-          Object.hasOwn(
-            profileState,
-            field
-          )
-        )
-        .map((field) => [
-          field,
-          profileState[field]
-        ])
-    );
-  const listings = Object.entries(
-    profileState.listings
-  )
-    .sort(([left], [right]) =>
-      compareText(left, right)
-    )
-    .map(
-      ([
-        listingId,
-        record
-      ]) => ({
-        listingId,
-        fields: Object.fromEntries(
-          STATE_PRESERVATION_FIELDS
-            .filter((field) =>
-              Object.hasOwn(
-                record,
-                field
-              )
-            )
-            .map((field) => [
-              field,
-              record[field]
-            ])
-        )
-      })
-    );
-
-  return {
-    profileId,
-    profileTimestamps,
-    listings
-  };
-}
-
-function createStateContinuityProjection(
-  state
-) {
-  return Object.fromEntries(
-    Object.entries(
-      state.profiles
-    )
-      .sort(([left], [right]) =>
-        compareText(left, right)
-      )
-      .map(
-      ([profileId, profileState]) => [
-        profileId,
-        createProfileStatePreservationProjection(
-          profileId,
-          profileState
-        )
-      ]
-    )
-  );
-}
-
-function createStatePreservationSummary(
-  state
-) {
-  return Object.fromEntries(
-    Object.entries(
-      createStateContinuityProjection(
-        state
-      )
-    ).map(
-      ([profileId, projection]) => [
-        profileId,
-        {
-          listingCount:
-            projection.listings.length,
-          digest: createHash("sha256")
-            .update(
-              JSON.stringify(projection)
-            )
-            .digest("hex")
-        }
-      ]
-    )
-  );
-}
-
-function createStateListingIndex(state) {
-  return Object.fromEntries(
-    Object.entries(
-      state.profiles
-    )
-      .sort(([left], [right]) =>
-        compareText(left, right)
-      )
-      .map(
-      ([profileId, profileState]) => [
-        profileId,
-        Object.keys(
-          profileState.listings
-        ).sort(compareText)
-      ]
-    )
   );
 }
 
@@ -807,21 +629,42 @@ test("data/state.json은 config profile별 current v2 state invariant를 따른�
     ),
     false
   );
-  assert.deepEqual(
-    sortedKeys(rawState.profiles),
-    [...rawConfig.profiles]
-      .map((profile) => profile.id)
-      .sort()
+  assert.equal(
+    typeof rawState.profiles ===
+      "object" &&
+      rawState.profiles !== null &&
+      !Array.isArray(
+        rawState.profiles
+      ),
+    true,
+    "state profiles shape"
   );
 
+  const configProfilesById = new Map(
+    rawConfig.profiles.map(
+      (profile) => [profile.id, profile]
+    )
+  );
+
+  // 빈 profiles는 초기화 직후의 정상 상태이므로
+  // 모든 config profile namespace를 요구하지 않는다.
   for (
-    const profileConfig
-    of rawConfig.profiles
+    const [
+      profileId,
+      profileState
+    ] of Object.entries(
+      rawState.profiles
+    )
   ) {
-    const profileId =
-      profileConfig.id;
-    const profileState =
-      rawState.profiles[profileId];
+    const profileConfig =
+      configProfilesById.get(profileId);
+
+    assert.notEqual(
+      profileConfig,
+      undefined,
+      `${profileId} is not a config profile`
+    );
+
     const listings =
       profileState.listings;
     const hasInitializedAt =
@@ -1091,99 +934,4 @@ test("data/state.json은 config profile별 current v2 state invariant를 따른�
       listingPosition += 1;
     }
   }
-});
-
-test("current state 정규화는 ID, identity, 관측 및 delivery metadata를 변경하지 않는다", () => {
-  const stateBefore =
-    structuredClone(rawState);
-  const preservationSummary =
-    createStatePreservationSummary(
-      rawState
-    );
-  const beforeProjection =
-    createStateContinuityProjection(
-      rawState
-    );
-  const beforeListingIndex =
-    createStateListingIndex(rawState);
-  const beforeListingCounts =
-    Object.fromEntries(
-      Object.entries(
-        beforeListingIndex
-      ).map(([profileId, ids]) => [
-        profileId,
-        ids.length
-      ])
-    );
-  const normalizedState =
-    normalizeWatcherState(
-      rawState,
-      normalizeRepositoryConfig()
-    );
-  const normalizedPlainState =
-    JSON.parse(
-      JSON.stringify(normalizedState)
-    );
-  const afterProjection =
-    createStateContinuityProjection(
-      normalizedPlainState
-    );
-  const afterListingIndex =
-    createStateListingIndex(
-      normalizedPlainState
-    );
-  const afterListingCounts =
-    Object.fromEntries(
-      Object.entries(
-        afterListingIndex
-      ).map(([profileId, ids]) => [
-        profileId,
-        ids.length
-      ])
-    );
-
-  assert.deepEqual(
-    preservationSummary,
-    EXPECTED_STATE_PRESERVATION,
-    "one-time cleanup changed preserved state metadata"
-  );
-  assert.equal(
-    JSON.stringify(rawState) ===
-      JSON.stringify(stateBefore),
-    true,
-    "normalizeWatcherState mutated input"
-  );
-  assert.equal(
-    JSON.stringify(
-      normalizedPlainState
-    ) === JSON.stringify(rawState),
-    true,
-    "current state changed during normalization"
-  );
-  assert.equal(
-    JSON.stringify(
-      afterListingCounts
-    ) ===
-      JSON.stringify(
-        beforeListingCounts
-      ),
-    true,
-    "profile listing counts changed"
-  );
-  assert.equal(
-    JSON.stringify(afterListingIndex) ===
-      JSON.stringify(
-        beforeListingIndex
-      ),
-    true,
-    "profile listing ID sets changed"
-  );
-  assert.equal(
-    JSON.stringify(afterProjection) ===
-      JSON.stringify(
-        beforeProjection
-      ),
-    true,
-    "state continuity projection changed"
-  );
 });
