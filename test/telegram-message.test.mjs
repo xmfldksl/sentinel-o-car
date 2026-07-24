@@ -217,84 +217,150 @@ test("매물 메시지는 앱 이름과 내부 가격 기준 및 확인사항을
   );
 });
 
-test("매물삭제 메시지는 보존된 매물 정보 중 확인 가능한 필드만 출력한다", () => {
-  const message = formatTelegramMessage(
-    "deleted",
-    {
-      ...baseListing,
-      conditionStatus: "조건 충족",
-      conditionReasons: [
-        "가격 조건 충족"
-      ],
-      detailFailed: true
-    }
+test("매물삭제 메시지는 신규 알림과 제목을 제외한 상세 본문을 동일하게 출력한다", () => {
+  const listing = {
+    ...baseListing,
+    option: "FSD",
+    profileNames: [
+      "Model 3 롱레인지"
+    ],
+    conditionStatus: "조건 충족",
+    conditionReasons: [],
+    detailFailed: false
+  };
+
+  const newMessage =
+    formatTelegramMessage(
+      "신규",
+      listing
+    );
+
+  const deletedMessage =
+    formatTelegramMessage(
+      "deleted",
+      listing
+    );
+
+  const newLines =
+    newMessage.split("\n");
+  const deletedLines =
+    deletedMessage.split("\n");
+
+  assert.equal(
+    newLines[0],
+    "[신규]"
+  );
+  assert.equal(
+    deletedLines[0],
+    "[매물삭제]"
+  );
+  assert.deepEqual(
+    deletedLines.slice(1),
+    newLines.slice(1)
+  );
+  assert.match(
+    deletedMessage,
+    /검색 조건: Model 3 롱레인지/
+  );
+  assert.match(
+    deletedMessage,
+    /옵션: FSD 확인/
+  );
+  assert.match(
+    deletedMessage,
+    /92,000㎞ \| 38,500,000원 \| 서울/
+  );
+  assert.match(
+    deletedMessage,
+    /https:\/\/fem\.encar\.com\/cars\/detail\/42023180$/
+  );
+});
+
+test("정보가 적은 구형 매물삭제 레코드도 안전한 기본 문구로 출력한다", () => {
+  let teslaMessage;
+  let genericMessage;
+
+  assert.doesNotThrow(() => {
+    teslaMessage =
+      formatTelegramMessage(
+        "deleted",
+        {
+          deletedAt:
+            "2026-07-22T02:00:00.000Z"
+        }
+      );
+
+    genericMessage =
+      formatTelegramMessage(
+        "deleted",
+        {
+          optionMode: "generic",
+          deletedAt:
+            "2026-07-22T02:00:00.000Z"
+        }
+      );
+  });
+
+  assert.deepEqual(
+    teslaMessage.split("\n"),
+    [
+      "[매물삭제]",
+      "차량번호: 미확인",
+      "옵션: 미확인"
+    ]
   );
 
   assert.deepEqual(
-    message.split("\n"),
+    genericMessage.split("\n"),
     [
       "[매물삭제]",
-      "2022/09 모델 3 롱 레인지 AWD",
-      "차량번호: 12가3456",
-      "92,000㎞ | 38,500,000원",
-      "https://fem.encar.com/cars/detail/42023180"
+      "차량번호: 미확인"
     ]
   );
-});
 
-test("정보가 적은 매물삭제 레코드도 없는 값을 표시하지 않는다", () => {
-  let message;
-
-  assert.doesNotThrow(() => {
-    message = formatTelegramMessage(
-      "deleted",
-      {
-        deletedAt: "2026-07-22T02:00:00.000Z"
-      }
+  for (const message of [
+    teslaMessage,
+    genericMessage
+  ]) {
+    assert.doesNotMatch(
+      message,
+      /undefined|NaN/
     );
-  });
-
-  assert.equal(
-    message,
-    "[매물삭제]"
-  );
-
-  assert.doesNotMatch(
-    message,
-    /미확인|undefined|NaN/
-  );
+  }
 });
 
-test("FSD, EAP, 미확인 옵션은 정해진 세 가지 문구로만 출력한다", () => {
-  assert.match(
-    formatTelegramMessage(
-      "신규",
-      {
-        ...baseListing,
-        option: "FSD"
-      }
-    ),
-    /옵션: FSD 확인/
-  );
+test("신규와 삭제 알림 모두 FSD, EAP, 미확인 옵션을 같은 문구로 출력한다", () => {
+  const cases = [
+    ["FSD", /옵션: FSD 확인/],
+    ["EAP", /옵션: EAP 확인/],
+    ["미확인", /옵션: 미확인/]
+  ];
 
-  assert.match(
-    formatTelegramMessage(
-      "신규",
-      {
-        ...baseListing,
-        option: "EAP"
-      }
-    ),
-    /옵션: EAP 확인/
-  );
+  for (const [
+    option,
+    pattern
+  ] of cases) {
+    const listing = {
+      ...baseListing,
+      option
+    };
 
-  assert.match(
-    formatTelegramMessage(
-      "신규",
-      baseListing
-    ),
-    /옵션: 미확인/
-  );
+    assert.match(
+      formatTelegramMessage(
+        "신규",
+        listing
+      ),
+      pattern
+    );
+
+    assert.match(
+      formatTelegramMessage(
+        "deleted",
+        listing
+      ),
+      pattern
+    );
+  }
 });
 
 test("차량번호 미확인은 정해진 문구로 출력한다", () => {
@@ -522,6 +588,103 @@ test("현재 판매방식이 RENT이면 월 납입금 없이 렌트로 표시한
   assert.doesNotMatch(
     message,
     /월 납입금|렌트 감가 반영 평가가격/
+  );
+});
+
+test("generic 매물삭제 알림은 Tesla 옵션을 제외하고 일반 판매방식을 출력한다", () => {
+  const listing = {
+    ...baseListing,
+    optionMode: "generic",
+    saleType: "NORMAL"
+  };
+
+  const newMessage =
+    formatTelegramMessage(
+      "신규",
+      listing
+    );
+
+  const deletedMessage =
+    formatTelegramMessage(
+      "deleted",
+      listing
+    );
+
+  assert.deepEqual(
+    deletedMessage
+      .split("\n")
+      .slice(1),
+    newMessage
+      .split("\n")
+      .slice(1)
+  );
+  assert.match(
+    deletedMessage,
+    /판매방식: 일반/
+  );
+  assert.doesNotMatch(
+    deletedMessage,
+    /옵션:/
+  );
+});
+
+test("과거 렌트 이력과 구형 감가 설정은 평가가격과 텔레그램 문구에 영향을 주지 않는다", () => {
+  const evaluated =
+    evaluateListing(
+      {
+        ...baseListing,
+        optionMode: "generic",
+        priceKrw: 38000000,
+        rentalUsageHistory: true,
+        redColor: false,
+        contracted: false,
+        smokingWarning: false,
+        tuningWarning: false
+      },
+      {
+        optionMode: "generic",
+        price: {
+          maxPriceKrw: 38000000
+        },
+        rentalHistoryDiscountKrw:
+          5000000,
+        rentalPenaltyKrw:
+          5000000,
+        excludeContractPending:
+          true
+      }
+    );
+
+  const message =
+    formatTelegramMessage(
+      "신규",
+      evaluated
+    );
+
+  assert.equal(
+    evaluated.adjustedPriceKrw,
+    38000000
+  );
+  assert.equal(
+    evaluated.eligible,
+    true
+  );
+  assert.deepEqual(
+    evaluated.excludedReasons,
+    []
+  );
+  assert.equal(
+    evaluated.warnings.some(
+      (warning) =>
+        /렌트.*감가/.test(
+          warning
+        )
+    ),
+    false
+  );
+  assert.doesNotMatch(
+    message,
+    /렌트 감가|평가가격/
   );
 });
 

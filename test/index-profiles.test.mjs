@@ -56,8 +56,7 @@ function profile(
     excludeContractPending: true,
     price: {
       maxPriceKrw: 50000000
-    },
-    rentalHistoryDiscountKrw: 0
+    }
   };
 }
 
@@ -414,7 +413,6 @@ test("실제 프로필 목록 조회 실패는 입력 상태를 변경하거나 
     yearMonthMax: "2030-12",
     excludedColorTerms: [],
     excludeContracted: true,
-    rentalPenaltyKrw: 0,
     notifyPriceIncrease: true,
     maxPages: 1,
     requestDelayMs: 0
@@ -481,7 +479,6 @@ test("generic 프로필의 목록 관측은 같은 id의 기존 Tesla 옵션 상
     yearMonthMax: "2030-12",
     excludedColorTerms: [],
     excludeContracted: true,
-    rentalPenaltyKrw: 0,
     notifyPriceIncrease: true,
     maxPages: 1,
     requestDelayMs: 0

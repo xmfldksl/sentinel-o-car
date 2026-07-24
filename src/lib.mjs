@@ -1270,20 +1270,6 @@ function resolvePricePolicy(
   };
 }
 
-function resolveRentalPenaltyKrw(
-  config
-) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  return (
-    vehicleConfig
-      ?.rentalHistoryDiscountKrw ??
-    vehicleConfig?.rentalPenaltyKrw ??
-    0
-  );
-}
-
 function shouldExcludeContracted(
   config
 ) {
@@ -1318,20 +1304,8 @@ export function evaluateListing(
       optionMode
     );
 
-  const rentalPenaltyKrw =
-    resolveRentalPenaltyKrw(
-      config
-    );
-
-  const hasRentalUsageHistory =
-    listing.rentalUsageHistory ===
-    true;
-
   const adjustedPriceKrw =
-    listing.priceKrw +
-    (hasRentalUsageHistory
-      ? rentalPenaltyKrw
-      : 0);
+    listing.priceKrw;
 
   let limitKrw =
     pricePolicy.maxPriceKrw;
@@ -1385,9 +1359,7 @@ export function evaluateListing(
     limitKrw
   ) {
     excludedReasons.push(
-      hasRentalUsageHistory
-        ? "렌트 감가 후 가격 초과"
-        : "가격 초과"
+      "가격 초과"
     );
   }
 
@@ -1401,14 +1373,6 @@ export function evaluateListing(
   ) {
     warnings.push(
       "EAP 또는 FSD 포함 여부 확인 필요"
-    );
-  }
-
-  if (hasRentalUsageHistory) {
-    warnings.push(
-      `렌트 이력 감가 ${formatKrw(
-        rentalPenaltyKrw
-      )} 반영`
     );
   }
 
@@ -3025,15 +2989,25 @@ function appendProfileLine(
   }
 }
 
-function formatDeletedTelegramMessage(
+export function formatTelegramMessage(
+  eventType,
   listing,
   {
-    profileNames = [],
-    showTeslaOption = true
+    profileNames =
+      listing?.profileNames ?? [],
+    showTeslaOption =
+      listing?.optionMode !==
+        "generic"
   } = {}
 ) {
+  const displayEventType =
+    eventType === "deleted" ||
+    eventType === "매물삭제"
+      ? "매물삭제"
+      : eventType;
+
   const lines = [
-    "[매물삭제]"
+    `[${displayEventType}]`
   ];
 
   appendProfileLine(
@@ -3047,35 +3021,49 @@ function formatDeletedTelegramMessage(
       ? singleLine(listing.title)
       : "";
 
-  if (title) {
-    const yearMonth =
-      typeof listing?.yearMonth ===
-        "string" &&
-      /^\d{4}-\d{2}$/.test(
-        listing.yearMonth
-      )
-        ? listing.yearMonth.replace(
-            "-",
-            "/"
-          )
-        : null;
+  const yearMonth =
+    typeof listing?.yearMonth ===
+      "string" &&
+    /^\d{4}-\d{2}$/.test(
+      listing.yearMonth
+    )
+      ? listing.yearMonth.replace(
+          "-",
+          "/"
+        )
+      : "";
 
+  if (title || yearMonth) {
     lines.push(
-      yearMonth
-        ? `${yearMonth} ${title}`
-        : title
+      [yearMonth, title]
+        .filter(Boolean)
+        .join(" ")
     );
   }
 
-  const vehicleNo =
-    normalizeVehicleNo(
-      listing?.vehicleNo
+  lines.push(
+    `차량번호: ${
+      normalizeVehicleNo(
+        listing?.vehicleNo
+      ) ?? "미확인"
+    }`
+  );
+
+  if (listing?.conditionStatus) {
+    lines.push(
+      `판정: ${listing.conditionStatus}`
     );
 
-  if (vehicleNo) {
-    lines.push(
-      `차량번호: ${vehicleNo}`
-    );
+    if (
+      listing.conditionReasons
+        ?.length
+    ) {
+      lines.push(
+        `사유: ${listing.conditionReasons.join(
+          ", "
+        )}`
+      );
+    }
   }
 
   const listingFacts = [];
@@ -3100,120 +3088,33 @@ function formatDeletedTelegramMessage(
     );
   }
 
+  const region =
+    typeof listing?.region ===
+      "string"
+      ? singleLine(listing.region)
+      : "";
+
+  if (region) {
+    listingFacts.push(region);
+  }
+
   if (listingFacts.length > 0) {
     lines.push(
       listingFacts.join(" | ")
     );
   }
 
-  if (!showTeslaOption) {
-    if (
-      listing?.saleType ===
-      "LEASE"
-    ) {
-      lines.push("판매방식: 리스");
-    } else if (
-      listing?.saleType ===
-      "RENT"
-    ) {
-      lines.push("판매방식: 렌트");
-    } else if (
-      listing?.saleType ===
-      "NORMAL"
-    ) {
-      lines.push("판매방식: 일반");
-    }
-  }
-
-  const hasStoredUrl =
-    typeof listing?.url ===
-      "string" &&
-    listing.url.trim().length > 0;
-
-  if (hasStoredUrl) {
-    const url =
-      formatListingUrl(listing);
-
-    if (url) {
-      lines.push(url);
-    }
-  }
-
-  return lines.join("\n");
-}
-
-export function formatTelegramMessage(
-  eventType,
-  listing,
-  {
-    profileNames =
-      listing?.profileNames ?? [],
-    showTeslaOption =
-      listing?.optionMode !==
-        "generic"
-  } = {}
-) {
-  if (
-    eventType === "deleted" ||
-    eventType === "매물삭제"
-  ) {
-    return formatDeletedTelegramMessage(
-      listing,
-      {
-        profileNames,
-        showTeslaOption
-      }
-    );
-  }
-
-  const lines = [
-    `[${eventType}]`
-  ];
-
-  appendProfileLine(
-    lines,
-    profileNames
-  );
-
-  lines.push(
-    `${listing.yearMonth.replace(
-      "-",
-      "/"
-    )} ${listing.title}`,
-    `차량번호: ${
-      normalizeVehicleNo(
-        listing.vehicleNo
-      ) ?? "미확인"
-    }`,
-    ...(listing.conditionStatus
-      ? [
-          `판정: ${listing.conditionStatus}`,
-          ...(listing.conditionReasons
-            ?.length
-            ? [
-                `사유: ${listing.conditionReasons.join(
-                  ", "
-                )}`
-              ]
-            : [])
-        ]
-      : []),
-    `${formatKm(
-      listing.mileageKm
-    )} | ${formatKrw(
-      listing.priceKrw
-    )} | ${listing.region}`
-  );
-
   if (showTeslaOption) {
     lines.push(
       formatTelegramOption(
-        listing.option
+        listing?.option
       )
     );
   }
 
-  if (listing.saleType === "LEASE") {
+  if (
+    listing?.saleType === "LEASE"
+  ) {
     lines.push(
       Number.isFinite(
         listing.monthlyFeeKrw
@@ -3224,38 +3125,30 @@ export function formatTelegramMessage(
         : "판매방식: 리스"
     );
   } else if (
-    listing.saleType === "RENT"
+    listing?.saleType === "RENT"
   ) {
     lines.push("판매방식: 렌트");
   } else if (
     !showTeslaOption &&
-    listing.saleType === "NORMAL"
+    listing?.saleType === "NORMAL"
   ) {
     lines.push("판매방식: 일반");
   }
 
   if (
-    listing.detailFailed
+    listing?.detailFailed
   ) {
     lines.push(
       "상세: 상세 확인 실패"
     );
   }
 
-  if (
-    listing.rentalUsageHistory ===
-    true
-  ) {
-    lines.push(
-      `렌트 감가 반영 평가가격: ${formatKrw(
-        listing.adjustedPriceKrw
-      )}`
-    );
-  }
+  const url =
+    formatListingUrl(listing);
 
-  lines.push(
-    formatListingUrl(listing)
-  );
+  if (url) {
+    lines.push(url);
+  }
 
   return lines.join("\n");
 }

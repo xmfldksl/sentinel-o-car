@@ -58,7 +58,6 @@ function genericProfile(overrides = {}) {
     price: {
       maxPriceKrw: 45000000
     },
-    rentalHistoryDiscountKrw: 0,
     ...overrides
   };
 
@@ -133,7 +132,6 @@ function legacyConfig() {
       unknownOptionHardMax:
         35000000
     },
-    rentalPenaltyKrw: 3000000,
     excludedColorTerms: [
       "Excluded color"
     ],
@@ -213,16 +211,20 @@ test("두 프로필의 배열 순서와 서로 다른 직접/환경변수 URL을
   );
 });
 
-test("disabled 프로필은 유지하지만 enabled 프로필이 하나도 없으면 거부한다", () => {
+test("disabled 프로필은 URL 환경변수가 없어도 유지하지만 enabled 프로필이 하나도 없으면 거부한다", () => {
   const normalized =
     normalizeWatcherConfig(
       versionTwoConfig([
         genericProfile({
           id: "disabled-condition",
-          enabled: false
+          enabled: false,
+          searchUrl: undefined,
+          searchUrlEnv:
+            "MISSING_DISABLED_URL"
         }),
         teslaProfile()
-      ])
+      ]),
+      {}
     );
 
   assert.deepEqual(
@@ -242,6 +244,15 @@ test("disabled 프로필은 유지하지만 enabled 프로필이 하나도 없�
         enabled: true
       }
     ]
+  );
+  assert.equal(
+    normalized.profiles[0].searchUrl,
+    null
+  );
+  assert.equal(
+    normalized.profiles[0]
+      .searchUrlSource,
+    "environment:MISSING_DISABLED_URL"
   );
 
   assert.throws(
@@ -388,6 +399,21 @@ test("지원하지 않는 optionMode를 거부한다", () => {
   );
 });
 
+test("optionMode를 생략하면 generic을 적용한다", () => {
+  const profile = genericProfile();
+  delete profile.optionMode;
+
+  const normalized =
+    normalizeWatcherConfig(
+      versionTwoConfig([profile])
+    );
+
+  assert.equal(
+    normalized.profiles[0].optionMode,
+    "generic"
+  );
+});
+
 test("기본 가격과 구형 base 가격은 0 이상의 유한한 정수여야 한다", async (t) => {
   for (const invalidValue of [
     null,
@@ -437,6 +463,24 @@ test("기본 가격과 구형 base 가격은 0 이상의 유한한 정수여야 
           ),
         /priceLimitsKrw\.base must be a non-negative integer/
       );
+    }
+  );
+});
+
+test("generic 프로필은 price를 생략하면 프로그램 내부 가격 상한을 적용하지 않는다", () => {
+  const profile = genericProfile();
+  delete profile.price;
+
+  const normalized =
+    normalizeWatcherConfig(
+      versionTwoConfig([profile])
+    );
+
+  assert.deepEqual(
+    normalized.profiles[0].price,
+    {
+      maxPriceKrw:
+        Number.MAX_SAFE_INTEGER
     }
   );
 });
@@ -561,7 +605,7 @@ test("titleFilter 배열 형식과 비어 있지 않은 항목을 검증한다",
   );
 });
 
-test("연식, 주행거리, 제외 색상, 렌트 감가 값을 검증한다", async (t) => {
+test("연식, 주행거리, 제외 색상 값을 검증한다", async (t) => {
   await t.test(
     "minYear가 maxYear보다 큼",
     () => {
@@ -611,21 +655,6 @@ test("연식, 주행거리, 제외 색상, 렌트 감가 값을 검증한다", a
           ])
         ),
       /excludedColors must be an array of strings/
-    );
-  });
-
-  await t.test("렌트 감가", () => {
-    assert.throws(
-      () =>
-        normalizeWatcherConfig(
-          versionTwoConfig([
-            genericProfile({
-              rentalHistoryDiscountKrw:
-                -1
-            })
-          ])
-        ),
-      /rentalHistoryDiscountKrw must be a non-negative integer/
     );
   });
 });
@@ -780,15 +809,6 @@ test("명시적으로 null인 사용자 설정 필드는 누락값 기본값으�
       pattern: /excludeContractPending must be a boolean/
     },
     {
-      name: "rentalHistoryDiscountKrw",
-      config: versionTwoConfig([
-        genericProfile({
-          rentalHistoryDiscountKrw: null
-        })
-      ]),
-      pattern: /rentalHistoryDiscountKrw must be a non-negative integer/
-    },
-    {
       name: "notifyPriceIncrease",
       config: versionTwoConfig([
         genericProfile({
@@ -912,6 +932,8 @@ test("명시적 null은 환경변수 override가 있어도 거부한다", () => 
 test("생략된 선택 필드에만 안전한 기본값을 적용한다", () => {
   const profile = genericProfile();
 
+  delete profile.optionMode;
+  delete profile.price;
   delete profile.titleFilter.requiredAll;
   delete profile.titleFilter.requiredAny;
   delete profile.titleFilter.excludedAny;
@@ -920,7 +942,6 @@ test("생략된 선택 필드에만 안전한 기본값을 적용한다", () => 
   delete profile.maxMileageKm;
   delete profile.excludedColors;
   delete profile.excludeContractPending;
-  delete profile.rentalHistoryDiscountKrw;
 
   const normalized = normalizeWatcherConfig(
     {
@@ -929,6 +950,14 @@ test("생략된 선택 필드에만 안전한 기본값을 적용한다", () => 
     }
   ).profiles[0];
 
+  assert.equal(
+    normalized.optionMode,
+    "generic"
+  );
+  assert.deepEqual(normalized.price, {
+    maxPriceKrw:
+      Number.MAX_SAFE_INTEGER
+  });
   assert.deepEqual(normalized.titleFilter, {
     requiredAll: [],
     requiredAny: [],
@@ -953,10 +982,6 @@ test("생략된 선택 필드에만 안전한 기본값을 적용한다", () => 
   assert.equal(
     normalized.excludeContracted,
     true
-  );
-  assert.equal(
-    normalized.rentalPenaltyKrw,
-    0
   );
   assert.equal(normalized.maxPages, 1);
   assert.equal(

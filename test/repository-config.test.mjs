@@ -21,6 +21,10 @@ const workflowText = await fs.readFile(
   ),
   "utf8"
 );
+const readmeText = await fs.readFile(
+  new URL("../README.md", import.meta.url),
+  "utf8"
+);
 const listHtml = await fs.readFile(
   new URL(
     "./fixtures/list.html",
@@ -44,6 +48,26 @@ const TESLA_URL_ENV =
   "ENCAR_SEARCH_URL_TESLA_MODEL3";
 const TOYOTA_URL_ENV =
   "ENCAR_SEARCH_URL_TOYOTA_SIENNA";
+const DISABLED_SLOTS = [
+  {
+    id: "slot-3",
+    name: "검색 조건 3",
+    searchUrlEnv:
+      "ENCAR_SEARCH_URL_3"
+  },
+  {
+    id: "slot-4",
+    name: "검색 조건 4",
+    searchUrlEnv:
+      "ENCAR_SEARCH_URL_4"
+  },
+  {
+    id: "slot-5",
+    name: "검색 조건 5",
+    searchUrlEnv:
+      "ENCAR_SEARCH_URL_5"
+  }
+];
 
 function createSyntheticSearchUrl(
   label
@@ -68,10 +92,14 @@ function createSyntheticSearchUrl(
   return url.toString();
 }
 
-test("저장소 config는 기존 Tesla 조건을 유지하고 Toyota 프로필을 추가한다", () => {
+test("저장소 config는 URL 중심 활성 프로필 2개와 명시형 비활성 슬롯 3개를 둔다", () => {
   const enabledProfiles =
     rawConfig.profiles.filter(
       (profile) => profile.enabled
+    );
+  const disabledProfiles =
+    rawConfig.profiles.filter(
+      (profile) => !profile.enabled
     );
   const tesla = rawConfig.profiles.find(
     (profile) =>
@@ -82,37 +110,28 @@ test("저장소 config는 기존 Tesla 조건을 유지하고 Toyota 프로필�
       profile.id === TOYOTA_PROFILE_ID
   );
 
+  assert.equal(
+    rawConfig.profiles.length,
+    5
+  );
   assert.equal(enabledProfiles.length, 2);
+  assert.equal(disabledProfiles.length, 3);
   assert.equal(
     rawConfig.legacyStateProfileId,
     TESLA_PROFILE_ID
   );
+
   assert.deepEqual(tesla, {
     id: TESLA_PROFILE_ID,
-    name: "Model 3 롱레인지",
+    name: "Model 3 AWD",
     enabled: true,
     searchUrlEnv: TESLA_URL_ENV,
     optionMode: "tesla",
     titleFilter: {
-      requiredAll: [
-        "모델 3",
-        "롱 레인지",
-        "AWD"
-      ],
+      requiredAll: [],
       requiredAny: [],
       excludedAny: []
     },
-    yearMonthMin: "2022-05",
-    yearMonthMax: "2022-12",
-    maxMileageKm: 150000,
-    excludedColors: [
-      "빨간색",
-      "적색",
-      "레드",
-      "red multi-coat",
-      "ultra red"
-    ],
-    excludeContractPending: true,
     price: {
       maxPriceKrw: 35000000,
       teslaOptionLimitsKrw: {
@@ -121,10 +140,9 @@ test("저장소 config는 기존 Tesla 조건을 유지하고 Toyota 프로필�
         unknownOptionHardMax:
           40000000
       }
-    },
-    rentalHistoryDiscountKrw:
-      3000000
+    }
   });
+
   assert.deepEqual(toyota, {
     id: TOYOTA_PROFILE_ID,
     name: "도요타 시에나",
@@ -136,21 +154,33 @@ test("저장소 config는 기존 Tesla 조건을 유지하고 Toyota 프로필�
       requiredAny: [],
       excludedAny: []
     },
-    yearMonthMin: "2021-04",
-    yearMonthMax: "9999-12",
-    maxMileageKm: 150000,
-    excludedColors: [],
-    excludeContractPending: true,
     price: {
       maxPriceKrw: 46000000
-    },
-    rentalHistoryDiscountKrw:
-      5000000
+    }
   });
-  assert.doesNotMatch(
-    configText,
-    /https?:\/\//
+
+  assert.deepEqual(
+    disabledProfiles,
+    DISABLED_SLOTS.map(
+      ({
+        id,
+        name,
+        searchUrlEnv
+      }) => ({
+        id,
+        name,
+        enabled: false,
+        searchUrlEnv,
+        optionMode: "generic",
+        titleFilter: {
+          requiredAll: [],
+          requiredAny: [],
+          excludedAny: []
+        }
+      })
+    )
   );
+
   assert.equal(
     rawConfig.profiles.every(
       (profile) =>
@@ -161,9 +191,52 @@ test("저장소 config는 기존 Tesla 조건을 유지하고 Toyota 프로필�
     ),
     true
   );
+  assert.equal(
+    rawConfig.profiles.every(
+      (profile) =>
+        !Object.hasOwn(
+          profile,
+          "rentalHistoryDiscountKrw"
+        ) &&
+        !Object.hasOwn(
+          profile,
+          "rentalPenaltyKrw"
+        )
+    ),
+    true
+  );
+  assert.equal(
+    [
+      tesla,
+      toyota
+    ].every(
+      (profile) =>
+        !Object.hasOwn(
+          profile,
+          "yearMonthMin"
+        ) &&
+        !Object.hasOwn(
+          profile,
+          "yearMonthMax"
+        ) &&
+        !Object.hasOwn(
+          profile,
+          "maxMileageKm"
+        ) &&
+        !Object.hasOwn(
+          profile,
+          "excludedColors"
+        )
+    ),
+    true
+  );
+  assert.doesNotMatch(
+    configText,
+    /https?:\/\//
+  );
 });
 
-test("Tesla와 Toyota URL 환경변수는 각 프로필에 독립적으로 정규화된다", () => {
+test("활성 프로필 URL만 제공해도 비활성 슬롯을 포함해 정상 정규화한다", () => {
   const teslaUrl =
     createSyntheticSearchUrl(
       "tesla"
@@ -192,6 +265,10 @@ test("Tesla와 Toyota URL 환경변수는 각 프로필에 독립적으로 정�
     );
 
   assert.equal(
+    normalized.profiles.length,
+    5
+  );
+  assert.equal(
     profilesById[TESLA_PROFILE_ID]
       .searchUrl,
     teslaUrl
@@ -211,6 +288,30 @@ test("Tesla와 Toyota URL 환경변수는 각 프로필에 독립적으로 정�
       .searchUrlSource,
     `environment:${TOYOTA_URL_ENV}`
   );
+
+  for (const slot of DISABLED_SLOTS) {
+    const profile =
+      profilesById[slot.id];
+
+    assert.equal(profile.enabled, false);
+    assert.equal(profile.searchUrl, null);
+    assert.equal(
+      profile.searchUrlSource,
+      `environment:${slot.searchUrlEnv}`
+    );
+    assert.equal(
+      profile.optionMode,
+      "generic"
+    );
+    assert.deepEqual(profile.price, {
+      maxPriceKrw:
+        Number.MAX_SAFE_INTEGER
+    });
+    assert.equal(
+      profile.rentalPenaltyKrw,
+      0
+    );
+  }
 });
 
 test("구형 상태는 Tesla에만 승계되고 신규 Toyota 기준점은 빈 상태에서 시작한다", () => {
@@ -308,6 +409,15 @@ test("구형 상태는 Tesla에만 승계되고 신규 Toyota 기준점은 빈 �
     ],
     { listings: {} }
   );
+
+  for (const slot of DISABLED_SLOTS) {
+    assert.deepEqual(
+      normalizedState.profiles[
+        slot.id
+      ],
+      { listings: {} }
+    );
+  }
 });
 
 test("신규 Toyota 프로필의 첫 정상 실행은 신규 이벤트 없이 기준점만 만든다", async () => {
@@ -371,15 +481,30 @@ test("신규 Toyota 프로필의 첫 정상 실행은 신규 이벤트 없이 �
   );
 });
 
-test("워크플로는 두 검색 URL을 Repository Variables로 각각 연결한다", () => {
-  assert.match(
-    workflowText,
-    /ENCAR_SEARCH_URL_TESLA_MODEL3:\s*\$\{\{\s*vars\.ENCAR_SEARCH_URL_TESLA_MODEL3\s*\}\}/
-  );
-  assert.match(
-    workflowText,
-    /ENCAR_SEARCH_URL_TOYOTA_SIENNA:\s*\$\{\{\s*vars\.ENCAR_SEARCH_URL_TOYOTA_SIENNA\s*\}\}/
-  );
+test("워크플로는 5개 검색 URL을 Repository Variables로 연결한다", () => {
+  const urlEnvironmentNames = [
+    TESLA_URL_ENV,
+    TOYOTA_URL_ENV,
+    ...DISABLED_SLOTS.map(
+      (slot) => slot.searchUrlEnv
+    )
+  ];
+
+  for (
+    const environmentName
+    of urlEnvironmentNames
+  ) {
+    assert.match(
+      workflowText,
+      new RegExp(
+        `${environmentName}:\\s*` +
+        `\\$\\{\\{\\s*vars\\.` +
+        `${environmentName}` +
+        `\\s*\\}\\}`
+      )
+    );
+  }
+
   assert.doesNotMatch(
     workflowText,
     /\bvars\.ENCAR_SEARCH_URL\b/
@@ -403,5 +528,56 @@ test("워크플로는 두 검색 URL을 Repository Variables로 각각 연결한
   assert.doesNotMatch(
     workflowText,
     /https?:\/\/[^\s"]*encar\./i
+  );
+});
+
+test("README는 URL 중심 설정, 5개 슬롯, 입력값과 렌트 감가 미사용을 설명한다", () => {
+  assert.match(
+    readmeText,
+    /Settings → Secrets and variables → Actions → Variables/
+  );
+  assert.match(
+    readmeText,
+    /현재 형식: `https:\/\/car\.encar\.com\/list\/car\?\.\.\.`/
+  );
+  assert.match(
+    readmeText,
+    /기존 형식: `https:\/\/www\.encar\.com\/fc\/fc_carsearchlist\.do\?\.\.\.#!\.\.\.`/
+  );
+  assert.match(
+    readmeText,
+    /비활성 프로필은 `searchUrlEnv` 이름만 유지하고 대응하는 Repository Variable을 만들지 않아도 됩니다/
+  );
+  assert.match(
+    readmeText,
+    /## 5개 프로필 자리/
+  );
+  assert.match(
+    readmeText,
+    /6번째 이후 프로필을 추가할 때/
+  );
+  assert.match(
+    readmeText,
+    /"searchUrlEnv": "ENCAR_SEARCH_URL_3"/
+  );
+  assert.match(
+    readmeText,
+    /`optionMode`: 선택값입니다\. `generic` 또는 `tesla`만 허용/
+  );
+  assert.match(
+    readmeText,
+    /판매자: 개인, 딜러, 브랜드 인증 판매/
+  );
+  assert.match(
+    readmeText,
+    /판매방식: 일반, 리스, 운용리스, 금융리스, 렌트, 렌트승계/
+  );
+  assert.match(
+    readmeText,
+    /과거 렌트 용도 이력에 따른 감가와 별도 표시는 사용하지 않습니다/
+  );
+  assert.match(
+    readmeText,
+    /`rentalHistoryDiscountKrw`와 `rentalPenaltyKrw`는 새 설정에 추가하지 마십시오/
   );
 });

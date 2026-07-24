@@ -315,7 +315,8 @@ function normalizeYearRange(source, path) {
 function normalizeProfileSearchUrl(
   source,
   environment,
-  path
+  path,
+  enabled
 ) {
   const hasSearchUrl = hasOwn(
     source,
@@ -357,6 +358,14 @@ function normalizeProfileSearchUrl(
       "string" ||
     !environmentValue.trim()
   ) {
+    if (!enabled) {
+      return {
+        searchUrl: null,
+        searchUrlSource:
+          `environment:${environmentName}`
+      };
+    }
+
     throw new Error(
       `${path}.searchUrlEnv references missing environment variable ${environmentName}`
     );
@@ -409,6 +418,16 @@ function normalizePrice(
   const pricePath = hasNewPrice
     ? `${path}.price`
     : `${path}.priceLimitsKrw`;
+
+  if (
+    priceSource === undefined &&
+    optionMode === "generic"
+  ) {
+    return {
+      maxPriceKrw:
+        Number.MAX_SAFE_INTEGER
+    };
+  }
 
   if (!isPlainObject(priceSource)) {
     throw new Error(
@@ -604,7 +623,8 @@ function normalizeProfile(
     : normalizeProfileSearchUrl(
         source,
         environment,
-        path
+        path,
+        enabled
       );
 
   const legacyOptionMode =
@@ -616,7 +636,7 @@ function normalizeProfile(
         ? source.optionMode
         : legacyOptionMode,
       `${path}.optionMode`,
-      legacy ? "tesla" : undefined
+      legacy ? "tesla" : "generic"
     );
   const titleFilter =
     normalizeTitleFilter(
@@ -680,23 +700,6 @@ function normalizeProfile(
     path,
     warn
   );
-  const rentalPenaltyKrw =
-    requireNonNegativeInteger(
-      resolveAliasedValue(
-        source,
-        "rentalHistoryDiscountKrw",
-        "rentalPenaltyKrw",
-        0
-      ),
-      `${path}.${
-        hasOwn(
-          source,
-          "rentalHistoryDiscountKrw"
-        )
-          ? "rentalHistoryDiscountKrw"
-          : "rentalPenaltyKrw"
-      }`
-    );
   const notifyPriceIncrease =
     requireBoolean(
       hasOwn(
@@ -744,7 +747,6 @@ function normalizeProfile(
     excludedColorTerms,
     excludeContracted,
     price,
-    rentalPenaltyKrw,
     notifyPriceIncrease,
     maxPages,
     requestDelayMs

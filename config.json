@@ -7,26 +7,15 @@
   "profiles": [
     {
       "id": "tesla-model3-long-range",
-      "name": "Model 3 롱레인지",
+      "name": "Model 3 4WD",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
       "optionMode": "tesla",
       "titleFilter": {
-        "requiredAll": ["모델 3", "롱 레인지", "AWD"],
+        "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
       },
-      "yearMonthMin": "2022-05",
-      "yearMonthMax": "2022-12",
-      "maxMileageKm": 150000,
-      "excludedColors": [
-        "빨간색",
-        "적색",
-        "레드",
-        "red multi-coat",
-        "ultra red"
-      ],
-      "excludeContractPending": true,
       "price": {
         "maxPriceKrw": 35000000,
         "teslaOptionLimitsKrw": {
@@ -34,8 +23,7 @@
           "fsd": 40000000,
           "unknownOptionHardMax": 40000000
         }
-      },
-      "rentalHistoryDiscountKrw": 3000000
+      }
     },
     {
       "id": "toyota-sienna",
@@ -48,15 +36,45 @@
         "requiredAny": [],
         "excludedAny": []
       },
-      "yearMonthMin": "2021-04",
-      "yearMonthMax": "9999-12",
-      "maxMileageKm": 150000,
-      "excludedColors": [],
-      "excludeContractPending": true,
       "price": {
         "maxPriceKrw": 46000000
-      },
-      "rentalHistoryDiscountKrw": 5000000
+      }
+    },
+    {
+      "id": "slot-3",
+      "name": "검색 조건 3",
+      "enabled": false,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_3",
+      "optionMode": "generic",
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      }
+    },
+    {
+      "id": "slot-4",
+      "name": "검색 조건 4",
+      "enabled": false,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_4",
+      "optionMode": "generic",
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      }
+    },
+    {
+      "id": "slot-5",
+      "name": "검색 조건 5",
+      "enabled": false,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_5",
+      "optionMode": "generic",
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      }
     }
   ]
 }

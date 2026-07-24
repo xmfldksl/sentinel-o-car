@@ -34,7 +34,6 @@ const genericConfig = {
   maxMileageKm: 200000,
   excludedColorTerms: [],
   excludeContracted: true,
-  rentalPenaltyKrw: 0,
   price: {
     maxPriceKrw: 35000000
   }
