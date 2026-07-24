@@ -98,6 +98,148 @@ test("목록 HTML에서 필수 구조를 파싱하고 중복 ID를 제거한다"
   );
 });
 
+function listCardHtml(
+  cardBody,
+  { preloadedState } = {}
+) {
+  return `<!doctype html>
+<html><body>
+<a href="https://fem.encar.com/cars/detail/42105454">
+  ${cardBody}
+</a>
+${
+  preloadedState
+    ? `<script>__PRELOADED_STATE__ = ${JSON.stringify(
+        preloadedState
+      )};</script>`
+    : ""
+}
+</body></html>`;
+}
+
+test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포함하지 않는다", async (t) => {
+  const sellerDescription =
+    "완무/1인소유/키2/24시간출고/비대면거래가능/신차급/도색없음";
+  const vehicleTitle =
+    "시에나 4세대 2.5 하이브리드 AWD";
+  const listMetadata =
+    "24/11식 31,761 km 하이브리드 경기 5,450 만원";
+  const cases = [
+    {
+      name: "구조화 차량명",
+      html: listCardHtml(
+        `찜하기 ${sellerDescription} 광고문구 ${listMetadata}`,
+        {
+          preloadedState: {
+            cars: {
+              list: [
+                {
+                  id: 42105454,
+                  modelName: "시에나 4세대",
+                  gradeName: "2.5 하이브리드",
+                  gradeDetailName: "AWD",
+                  advertisement: {
+                    oneLineText:
+                      sellerDescription
+                  }
+                }
+              ]
+            }
+          }
+        }
+      )
+    },
+    {
+      name: "차량명 전용 DOM 요소",
+      html: listCardHtml(
+        `찜하기 <span class="hotmark">${sellerDescription}</span> <span class="car_name">${vehicleTitle}</span> ${listMetadata}`
+      )
+    },
+    {
+      name: "카드 문장 fallback",
+      html: listCardHtml(
+        `찜하기 ${sellerDescription} ${vehicleTitle} ${listMetadata}`
+      )
+    }
+  ];
+
+  for (const entry of cases) {
+    await t.test(entry.name, () => {
+      const [parsed] = parseListHtml(
+        entry.html
+      );
+
+      assert.equal(
+        parsed.title,
+        vehicleTitle
+      );
+      assert.doesNotMatch(
+        parsed.title,
+        /완무|1인소유|키2|24시간출고|비대면거래가능|신차급|도색없음|찜하기/
+      );
+      assert.equal(
+        parsed.mileageKm,
+        31761
+      );
+      assert.equal(
+        parsed.priceKrw,
+        54500000
+      );
+    });
+  }
+});
+
+test("상세 분석은 판매자 설명으로 정상 목록 제목을 덮어쓰지 않는다", () => {
+  const analyzed = analyzeDetail(
+    detailHtml(
+      detailBase({
+        category: {
+          manufacturerName: "테슬라",
+          modelName: "모델 S",
+          gradeName: "롱 레인지"
+        },
+        advertisement: {
+          oneLineText:
+            "완무/1인소유/키2/신차급 최저가 판매합니다"
+        },
+        contents:
+          "무사고 도색없음 24시간출고"
+      })
+    ),
+    listing(),
+    teslaProfile
+  );
+  const recovered = analyzeDetail(
+    detailHtml(
+      detailBase({
+        category: {
+          modelName: "시에나 4세대",
+          gradeName: "2.5 하이브리드",
+          gradeDetailName: "AWD"
+        },
+        advertisement: {
+          oneLineText:
+            "완무/1인소유/키2/신차급"
+        }
+      })
+    ),
+    listing({
+      title:
+        "완무/1인소유/키2/24시간출고/비대면거래가능/신차급/도색없음 시에나"
+    }),
+    teslaProfile
+  );
+
+  assert.equal(
+    analyzed.title,
+    "모델 3 롱 레인지 AWD"
+  );
+  assert.equal(
+    recovered.title,
+    "시에나 4세대 2.5 하이브리드 AWD"
+  );
+});
+
 test("목록 지역은 주행거리와 가격 사이의 구조에서만 판정한다", () => {
   const cases = [
     ["전기 경기", "경기"],

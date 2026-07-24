@@ -20,6 +20,7 @@ import {
   reconcileListingDeletions,
   recordTelegramDelivery,
   saveJson,
+  selectListingTitle,
   selectRepresentativeCandidates,
   setPage,
   sleep
@@ -290,8 +291,14 @@ async function processProfile({
 
       const failedListing = {
         ...listing,
+        title: selectListingTitle(
+          previous?.title,
+          listing.title
+        ),
         vehicleNo:
-          previous?.vehicleNo ?? null
+          previous?.vehicleNo ?? null,
+        colorName:
+          previous?.colorName ?? null
       };
       const eventListing = isSendCurrent
         ? prepareSendCurrentListing(
@@ -329,7 +336,7 @@ async function processProfile({
       continue;
     }
 
-    const enriched = analyzeDetail(
+    const analyzed = analyzeDetail(
       detailHtml,
       listing,
       profile
@@ -337,8 +344,17 @@ async function processProfile({
 
     ({ previous } = findPreviousListing(
       previousListings,
-      enriched
+      analyzed
     ));
+
+    const enriched = {
+      ...analyzed,
+      title: selectListingTitle(
+        previous?.title,
+        analyzed.title
+      )
+    };
+
     inspection = getListingInspection(
       previous,
       enriched,

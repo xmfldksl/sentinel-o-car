@@ -231,9 +231,13 @@ test("Telegram 판정은 가격 사유만 표시하고 Tesla 옵션 표시는 �
 
   assert.match(message, /판정: 조건 미충족/);
   assert.match(message, /사유: 가격 초과/);
+  assert.match(
+    message,
+    /빨간색 \| [\d,]+㎞ \| [\d,]+원 \| /
+  );
   assert.doesNotMatch(
     message,
-    /연월 범위|주행거리|빨간색|계약중/
+    /연월 범위|주행거리|사유: .*빨간색|계약중/
   );
   assert.doesNotMatch(message, /옵션:/);
 });

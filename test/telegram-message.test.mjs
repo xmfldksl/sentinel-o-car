@@ -17,6 +17,7 @@ function listing(overrides = {}) {
     mileageKm: 67235,
     priceKrw: 32700000,
     region: "경기",
+    colorName: "검정색",
     vehicleNo: "12가3456",
     conditionStatus: "조건 충족",
     conditionReasons: [],
@@ -117,7 +118,7 @@ test("신규·가격변동·현재·삭제 알림은 같은 매물 본문 규칙
     );
     assert.match(
       message,
-      /67,235㎞ \| 32,700,000원 \| 경기/
+      /검정색 \| 67,235㎞ \| 32,700,000원 \| 경기/
     );
     assert.match(
       message,
@@ -126,6 +127,54 @@ test("신규·가격변동·현재·삭제 알림은 같은 매물 본문 규칙
     assert.doesNotMatch(
       message,
       /\?type=detail|#private/
+    );
+  }
+});
+
+test("매물 정보 행은 색상·주행거리·가격·지역 순서로 표시한다", () => {
+  for (const [colorName, expected] of [
+    [
+      "검정색",
+      "검정색 | 31,761㎞ | 54,500,000원 | 경기"
+    ],
+    [
+      " 검정색 ",
+      "검정색 | 31,761㎞ | 54,500,000원 | 경기"
+    ],
+    [
+      null,
+      "색상 미확인 | 31,761㎞ | 54,500,000원 | 경기"
+    ],
+    [
+      undefined,
+      "색상 미확인 | 31,761㎞ | 54,500,000원 | 경기"
+    ],
+    [
+      "",
+      "색상 미확인 | 31,761㎞ | 54,500,000원 | 경기"
+    ],
+    [
+      "   ",
+      "색상 미확인 | 31,761㎞ | 54,500,000원 | 경기"
+    ]
+  ]) {
+    const message =
+      formatTelegramMessage(
+        "신규",
+        listing({
+          colorName,
+          mileageKm: 31761,
+          priceKrw: 54500000,
+          region: "경기"
+        })
+      );
+
+    assert.equal(
+      message
+        .split("\n")
+        .includes(expected),
+      true,
+      `${String(colorName)} → ${expected}`
     );
   }
 });

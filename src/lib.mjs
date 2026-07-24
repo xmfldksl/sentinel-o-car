@@ -623,6 +623,319 @@ function normalizeColorName(value) {
   return normalized || null;
 }
 
+const VEHICLE_TITLE_MAX_LENGTH = 60;
+
+const PROMOTIONAL_TITLE_PATTERN =
+  /[#★☆•●▶♥]|\S*\/\S+\/\S*/u;
+
+function isVehicleTitleLike(value) {
+  const normalized =
+    typeof value === "string"
+      ? singleLine(value)
+      : "";
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (
+    normalized.length >
+    VEHICLE_TITLE_MAX_LENGTH
+  ) {
+    return false;
+  }
+
+  return !PROMOTIONAL_TITLE_PATTERN.test(
+    normalized
+  );
+}
+
+function asVehicleTitle(value) {
+  return isVehicleTitleLike(value)
+    ? singleLine(value)
+    : null;
+}
+
+export function selectListingTitle(
+  previousTitle,
+  nextTitle
+) {
+  return (
+    asVehicleTitle(nextTitle) ??
+    asVehicleTitle(previousTitle) ??
+    (typeof nextTitle === "string"
+      ? nextTitle
+      : previousTitle)
+  );
+}
+
+const STRUCTURED_TITLE_FULL_FIELDS = [
+  "vehicleName",
+  "carName"
+];
+
+const STRUCTURED_TITLE_PART_FIELDS = [
+  ["modelName", "modelGroupName"],
+  ["gradeName", "badgeName"],
+  [
+    "gradeDetailName",
+    "badgeDetailName",
+    "detailGradeName"
+  ]
+];
+
+function pickStructuredField(
+  source,
+  fields
+) {
+  for (const field of fields) {
+    const value = source[field];
+
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const normalized =
+      singleLine(value);
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function resolveStructuredVehicleTitle(
+  source
+) {
+  if (
+    !source ||
+    typeof source !== "object" ||
+    Array.isArray(source)
+  ) {
+    return null;
+  }
+
+  const fullName =
+    pickStructuredField(
+      source,
+      STRUCTURED_TITLE_FULL_FIELDS
+    );
+
+  if (fullName) {
+    return asVehicleTitle(fullName);
+  }
+
+  const parts = [];
+
+  for (
+    const fields of
+    STRUCTURED_TITLE_PART_FIELDS
+  ) {
+    const value =
+      pickStructuredField(
+        source,
+        fields
+      );
+
+    if (
+      !value ||
+      parts.some((part) =>
+        part.includes(value)
+      )
+    ) {
+      continue;
+    }
+
+    parts.push(value);
+  }
+
+  return asVehicleTitle(
+    parts.join(" ")
+  );
+}
+
+function collectStructuredListTitles(
+  value,
+  results = new Map()
+) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStructuredListTitles(
+        item,
+        results
+      );
+    }
+
+    return results;
+  }
+
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
+    return results;
+  }
+
+  const listingId =
+    normalizeListingId(
+      value.vehicleId ??
+        value.carId ??
+        value.listingId ??
+        value.id
+    );
+
+  if (
+    listingId &&
+    !results.has(listingId)
+  ) {
+    const title =
+      resolveStructuredVehicleTitle(
+        value
+      );
+
+    if (title) {
+      results.set(
+        listingId,
+        title
+      );
+    }
+  }
+
+  for (
+    const child of
+    Object.values(value)
+  ) {
+    collectStructuredListTitles(
+      child,
+      results
+    );
+  }
+
+  return results;
+}
+
+const VEHICLE_TITLE_ELEMENT_PATTERN =
+  /<(span|strong|em|p|div|h[1-6])\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;
+
+const VEHICLE_TITLE_CLASS_TOKENS =
+  new Set([
+    "car_name",
+    "carname",
+    "car-name",
+    "vehicle_name",
+    "vehiclename",
+    "vehicle-name",
+    "model_name",
+    "modelname",
+    "model-name",
+    "product_name",
+    "productname",
+    "product-name"
+  ]);
+
+const VEHICLE_TITLE_ATTRIBUTE_PATTERN =
+  /\bitemprop\s*=\s*(['"])\s*name\s*\1|\bdata-(?:vehicle|car|model)-name\b/i;
+
+function hasVehicleTitleMarker(
+  attributes
+) {
+  if (
+    VEHICLE_TITLE_ATTRIBUTE_PATTERN.test(
+      attributes
+    )
+  ) {
+    return true;
+  }
+
+  const classMatch =
+    attributes.match(
+      /\bclass\s*=\s*(['"])([^'"]*)\1/i
+    );
+
+  if (!classMatch) {
+    return false;
+  }
+
+  return classMatch[2]
+    .split(/\s+/)
+    .some((token) =>
+      VEHICLE_TITLE_CLASS_TOKENS.has(
+        token.toLowerCase()
+      )
+    );
+}
+
+function extractVehicleTitleElement(
+  html
+) {
+  for (
+    const match of
+    String(html).matchAll(
+      VEHICLE_TITLE_ELEMENT_PATTERN
+    )
+  ) {
+    if (
+      !hasVehicleTitleMarker(
+        match[2]
+      )
+    ) {
+      continue;
+    }
+
+    const title = asVehicleTitle(
+      stripHtml(match[3])
+    );
+
+    if (title) {
+      return title;
+    }
+  }
+
+  return null;
+}
+
+function isPromotionalToken(token) {
+  return (
+    token.startsWith("#") ||
+    /[★☆•●▶♥]/u.test(token) ||
+    (token.match(/\//g)?.length ??
+      0) >= 2
+  );
+}
+
+function extractListTextTitle(value) {
+  const chromeStripped = value
+    .replace(/^찜하기\s*/, "")
+    .replace(
+      /^'엔카믿고'는[^]*?제공합니다\s*/,
+      ""
+    )
+    .trim();
+
+  const tokens = chromeStripped
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const lastPromotionalIndex =
+    tokens.findLastIndex(
+      isPromotionalToken
+    );
+
+  const remaining = tokens.slice(
+    lastPromotionalIndex + 1
+  );
+
+  return (
+    remaining.length > 0
+      ? remaining
+      : tokens
+  )
+    .join(" ")
+    .trim();
+}
+
 const LISTING_REGION_LABELS = new Set([
   "서울",
   "부산",
@@ -646,7 +959,9 @@ const LISTING_REGION_LABELS = new Set([
 export function parseListingText({
   id,
   href,
-  text
+  text,
+  structuredTitle = null,
+  elementTitle = null
 }) {
   const normalized = text
     .replace(/\s+/g, " ")
@@ -679,24 +994,14 @@ export function parseListingText({
   const dateIndex =
     dateMatch.index ?? 0;
 
-  let title = normalized
-    .slice(0, dateIndex)
-    .trim();
-
-  title = title
-    .replace(
-      /^찜하기\s*/,
-      ""
-    )
-    .replace(
-      /^'엔카믿고'는[^]*?제공합니다\s*/,
-      ""
-    )
-    .replace(
-      /^(스마트키|내비게이션|열선시트|통풍시트|후방카메라|외장컬러|#[^\s]+)\s*/g,
-      ""
-    )
-    .trim();
+  const title =
+    asVehicleTitle(structuredTitle) ??
+    asVehicleTitle(elementTitle) ??
+    extractListTextTitle(
+      normalized
+        .slice(0, dateIndex)
+        .trim()
+    );
 
   const year =
     2000 + Number(dateMatch[1]);
@@ -769,6 +1074,11 @@ export function parseListingText({
 export function parseListHtml(html) {
   const results = new Map();
 
+  const structuredTitles =
+    collectStructuredListTitles(
+      parsePreloadedState(html)
+    );
+
   const anchorPattern =
     /<a\b[^>]*href=(['"])([^'"]*\/cars\/detail\/\d+[^'"]*)\1[^>]*>([\s\S]*?)<\/a>/gi;
 
@@ -794,7 +1104,15 @@ export function parseListHtml(html) {
         href,
         text: stripHtml(
           match[3]
-        )
+        ),
+        structuredTitle:
+          structuredTitles.get(
+            idMatch[1]
+          ) ?? null,
+        elementTitle:
+          extractVehicleTitleElement(
+            match[3]
+          )
       });
 
     if (!parsed) {
@@ -853,6 +1171,10 @@ export function analyzeDetail(
 
   return {
     ...listing,
+    title:
+      asVehicleTitle(listing.title) ??
+      resolveDetailVehicleTitle(base) ??
+      listing.title,
     listPriceKrw:
       listing.priceKrw,
     ...vehicleData,
@@ -864,6 +1186,28 @@ export function analyzeDetail(
         ? "확인"
         : "미확인"
   };
+}
+
+function resolveDetailVehicleTitle(
+  base
+) {
+  for (const source of [
+    base?.category,
+    base?.model,
+    base?.spec,
+    base
+  ]) {
+    const title =
+      resolveStructuredVehicleTitle(
+        source
+      );
+
+    if (title) {
+      return title;
+    }
+  }
+
+  return null;
 }
 
 function resolveConfirmedOption(
@@ -1958,7 +2302,10 @@ export function recordListObservation(
   const observedRecord = {
     ...previous,
     id: listing.id,
-    title: listing.title,
+    title: selectListingTitle(
+      previous?.title,
+      listing.title
+    ),
     url: listing.url,
     yearMonth:
       listing.yearMonth,
@@ -2071,7 +2418,10 @@ export function recordDetailSuccess(
   const record = {
     ...(previous ?? {}),
     id: listing.id,
-    title: listing.title,
+    title: selectListingTitle(
+      previous?.title,
+      listing.title
+    ),
     url: listing.url,
     yearMonth:
       listing.yearMonth,
@@ -2424,6 +2774,16 @@ export function formatTelegramMessage(
   }
 
   const listingFacts = [];
+
+  const colorName =
+    typeof listing?.colorName ===
+      "string"
+      ? singleLine(listing.colorName)
+      : "";
+
+  listingFacts.push(
+    colorName || "색상 미확인"
+  );
 
   if (
     Number.isFinite(
