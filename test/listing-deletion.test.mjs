@@ -4,7 +4,6 @@ import {
   applyRepresentativeState,
   needsVehicleIdentityResolution,
   reconcileListingDeletions,
-  recordListObservation,
   selectRepresentativeCandidates
 } from "../src/lib.mjs";
 
@@ -93,7 +92,7 @@ function reconcile({
   });
 }
 
-test("이전 활성 대표가 전체 목록에서 사라지면 삭제 이벤트를 한 번 만들고 상태를 보존한다", () => {
+test("이전 활성 대표가 현재 검색 결과에서 사라지면 삭제 이벤트를 한 번 만들고 상태를 보존한다", () => {
   const previous = stateRecord();
   const stateListings = {
     [previous.id]: { ...previous }
@@ -165,7 +164,7 @@ test("이전 활성 대표가 전체 목록에서 사라지면 삭제 이벤트�
   );
 });
 
-test("이전 대표 ID가 전체 목록에 그대로 있으면 삭제하지 않는다", () => {
+test("이전 대표 ID가 현재 검색 결과에 그대로 있으면 삭제하지 않는다", () => {
   const previous = stateRecord();
   const stateListings = {
     [previous.id]: { ...previous }
@@ -266,7 +265,7 @@ test("send_current에서만 기록된 매물은 이후 normal 삭제 대상이 �
   );
 });
 
-test("삭제된 동일 ID가 전체 목록에 다시 나타나면 deletedAt을 해제한다", () => {
+test("삭제된 동일 ID가 현재 검색 결과에 다시 나타나면 deletedAt을 해제한다", () => {
   const deleted = stateRecord({
     deletedAt:
       "2026-07-21T00:00:00.000Z"
@@ -322,7 +321,16 @@ test("삭제된 차량이 새 ID의 같은 차량번호 대표로 다시 나타�
     representatives: [
       {
         listing: current,
-        detailSucceeded: true
+        detailSucceeded: true,
+        stateRecord: {
+          ...deleted,
+          ...current,
+          previousListingId:
+            deleted.id,
+          firstSeenAt:
+            deleted.firstSeenAt,
+          lastSeenAt: now
+        }
       }
     ]
   });
@@ -387,7 +395,7 @@ test("listingId가 바뀌어도 현재 대표의 차량번호가 같으면 삭�
   );
 });
 
-test("로컬 조건 밖에서 새 ID로 재등록된 동일 차량도 현재 대표 상태로 승계한다", () => {
+test("현재 검색 결과에서 새 ID로 재등록된 동일 차량은 현재 대표 상태로 승계한다", () => {
   const previous = stateRecord();
   const current = listing({
     id: "43000000",
@@ -396,20 +404,23 @@ test("로컬 조건 밖에서 새 ID로 재등록된 동일 차량도 현재 대
   const stateListings = {
     [previous.id]: { ...previous }
   };
-  const identityCandidate = {
+  const currentCandidate = {
     listing: current,
     detailSucceeded: true,
-    stateRecord:
-      recordListObservation(
-        previous,
-        current,
-        now
-      )
+    stateRecord: {
+      ...previous,
+      ...current,
+      listPriceKrw:
+        current.priceKrw,
+      firstSeenAt:
+        previous.firstSeenAt,
+      lastSeenAt: now
+    }
   };
 
   applyRepresentativeState(
     stateListings,
-    identityCandidate
+    currentCandidate
   );
 
   const result = reconcile({
@@ -421,7 +432,7 @@ test("로컬 조건 밖에서 새 ID로 재등록된 동일 차량도 현재 대
       current
     ),
     representatives: [
-      identityCandidate
+      currentCandidate
     ]
   });
 
@@ -492,34 +503,7 @@ test("동일 차량 중복 매물의 대표 ID만 바뀌어도 삭제하지 않�
   );
 });
 
-test("전체 목록에는 있지만 로컬 조건 후보에서 제외된 매물은 삭제하지 않는다", () => {
-  const previous = stateRecord();
-  const stateListings = {
-    [previous.id]: { ...previous }
-  };
-
-  const result = reconcile({
-    stateListings,
-    currentListings: listingMap(
-      listing({
-        mileageKm: 151000
-      })
-    ),
-    representatives: []
-  });
-
-  assert.deepEqual(
-    result.events,
-    []
-  );
-  assert.equal(
-    stateListings[previous.id]
-      .deletedAt,
-    undefined
-  );
-});
-
-test("상세 조회에 실패해도 전체 목록에 ID가 있으면 삭제하지 않는다", () => {
+test("상세 조회에 실패해도 현재 검색 결과에 ID가 있으면 삭제하지 않는다", () => {
   const previous = stateRecord();
   const stateListings = {
     [previous.id]: { ...previous }
@@ -699,7 +683,7 @@ for (const runMode of [
   });
 }
 
-test("전체 목록이 빈 경우 방어적으로 삭제 상태와 이벤트를 만들지 않는다", () => {
+test("현재 검색 결과가 빈 경우 방어적으로 삭제 상태와 이벤트를 만들지 않는다", () => {
   const previous = stateRecord();
   const stateListings = {
     [previous.id]: { ...previous }
@@ -726,7 +710,7 @@ test("전체 목록이 빈 경우 방어적으로 삭제 상태와 이벤트를 
   );
 });
 
-test("구형 상태의 동일 차량 활성 중복 그룹은 한 번 알리고 모든 레코드를 삭제 상태로 만든다", () => {
+test("동일 차량의 활성 중복 그룹은 한 번 알리고 모든 레코드를 삭제 상태로 만든다", () => {
   const older = stateRecord({
     id: "41000000",
     lastSeenAt:
@@ -781,7 +765,7 @@ test("구형 상태의 동일 차량 활성 중복 그룹은 한 번 알리고 �
   );
 });
 
-test("구형 동일 차량 중복 중 한 ID가 현재 목록에 있으면 identity 재조회를 요구하지 않는다", () => {
+test("동일 차량 중복 중 한 ID가 현재 검색 결과에 있으면 차량 동일성 추가 확인이 필요 없다", () => {
   const current = stateRecord({
     id: "41000000"
   });
@@ -806,7 +790,7 @@ test("구형 동일 차량 중복 중 한 ID가 현재 목록에 있으면 ident
   );
 });
 
-test("차량번호 대표 ID가 사라지고 현재 차량 동일성이 없을 때만 identity 조회가 필요하다", () => {
+test("이전 대표 ID가 사라졌을 때 현재 대표의 차량번호 확인 여부를 판정한다", () => {
   const previous = stateRecord();
   const replacement = listing({
     id: "43000000"

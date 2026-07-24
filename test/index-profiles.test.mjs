@@ -1,17 +1,24 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import test from "node:test";
+
 import {
   main,
   processProfile
 } from "../src/index.mjs";
 
-function createSyntheticSearchUrl(
-  label
-) {
+const listHtml = await fs.readFile(
+  new URL(
+    "./fixtures/list.html",
+    import.meta.url
+  ),
+  "utf8"
+);
+
+function createSyntheticSearchUrl(label) {
   const url = new URL(
     "https://car.encar.com/list/car"
   );
-
   url.searchParams.set("page", "1");
   url.searchParams.set(
     "search",
@@ -24,48 +31,47 @@ function createSyntheticSearchUrl(
       sort: "MobileModifiedDate"
     })
   );
-
   return url.toString();
 }
 
-function profile(
+function rawProfile(
   id,
-  name,
-  searchKey,
-  enabled = true
-) {
-  return {
-    id,
-    name,
-    enabled,
-    searchUrl:
-      createSyntheticSearchUrl(
-        searchKey
-      ),
-    searchUrlSource: "config",
-    optionMode: "generic",
-    titleFilter: {
+  {
+    enabled = true,
+    isTesla = false,
+    titleFilter = {
       requiredAll: [],
       requiredAny: [],
       excludedAny: []
-    },
-    minYear: 2020,
-    maxYear: 2030,
-    maxMileageKm: 200000,
-    excludedColors: [],
-    excludeContractPending: true,
-    price: {
-      maxPriceKrw: 50000000
     }
+  } = {}
+) {
+  return {
+    id,
+    name: id,
+    enabled,
+    searchUrl:
+      createSyntheticSearchUrl(id),
+    isTesla,
+    titleFilter,
+    price: isTesla
+      ? {
+          maxPriceKrw: 35000000,
+          eapMaxPriceKrw: 37000000,
+          fsdMaxPriceKrw: 40000000
+        }
+      : {
+          maxPriceKrw: 35000000
+        }
   };
 }
 
-function config(profiles) {
+function rawConfig(profiles) {
   return {
     configVersion: 2,
     notifyPriceIncrease: true,
-    maxPages: 1,
-    requestDelayMs: 0,
+    maxPages: 2,
+    requestDelayMs: 25,
     profiles
   };
 }
@@ -74,11 +80,11 @@ function stateFor(profiles) {
   return {
     schemaVersion: 2,
     profiles: Object.fromEntries(
-      profiles.map((item) => [
-        item.id,
+      profiles.map((profile) => [
+        profile.id,
         {
           initializedAt:
-            "2026-01-01T00:00:00.000Z",
+            "2026-07-24T00:00:00.000Z",
           listings: {}
         }
       ])
@@ -94,9 +100,9 @@ function quietLogger() {
 }
 
 function telegramFactory(sent) {
-  return ({ token, chatId }) => ({
+  return () => ({
     async send(text) {
-      sent.push({ token, chatId, text });
+      sent.push(text);
       return {
         message_id: sent.length
       };
@@ -104,540 +110,548 @@ function telegramFactory(sent) {
   });
 }
 
-function successfulResult(
-  profileValue,
-  profileState,
-  overrides = {}
-) {
-  return {
-    profile: profileValue,
-    state: {
-      ...profileState,
-      listings: {
-        ...profileState.listings
-      },
-      updatedAt:
-        "2026-01-02T00:00:00.000Z"
-    },
-    initializedNow: false,
-    listingCount:
-      Object.keys(
-        profileState.listings
-      ).length,
-    events: [],
-    ...overrides
-  };
+function detailHtml(vehicleNo = null) {
+  return `<!doctype html>
+<html lang="ko">
+  <body>
+    <script>
+      __PRELOADED_STATE__ = ${JSON.stringify({
+        cars: {
+          base: {
+            vehicleNo,
+            spec: {
+              colorName: "빨간색"
+            },
+            options: {
+              etc: []
+            },
+            advertisement: {
+              oneLineText: null
+            },
+            photos: []
+          }
+        }
+      })};
+    </script>
+  </body>
+</html>`;
 }
 
-test("main은 enabled 프로필을 순서대로 각 searchUrl과 함께 처리한다", async () => {
+const normalizedGenericProfile = {
+  id: "profile-a",
+  name: "profile-a",
+  enabled: true,
+  searchUrl:
+    createSyntheticSearchUrl(
+      "profile-a"
+    ),
+  searchUrlSource: "config",
+  isTesla: false,
+  titleFilter: {
+    requiredAll: ["롱 레인지"],
+    requiredAny: [],
+    excludedAny: []
+  },
+  price: {
+    maxPriceKrw: 35000000
+  }
+};
+
+async function runActualProfile(
+  runMode,
+  profileState,
+  trace = []
+) {
+  return processProfile({
+    profile:
+      normalizedGenericProfile,
+    profileState,
+    runMode,
+    maxPages: 1,
+    requestDelayMs: 0,
+    notifyPriceIncrease: true,
+    requestPacer: {
+      async wait() {}
+    },
+    fetchTextImpl: async (url) => {
+      trace.push(url);
+      return url.includes(
+        "car.encar.com/list/car"
+      )
+        ? listHtml
+        : detailHtml();
+    },
+    nowIso: () =>
+      "2026-07-25T00:00:00.000Z"
+  });
+}
+
+test("main은 enabled 프로필을 순서대로 처리하고 root 실행 설정을 별도로 전달한다", async () => {
   const profiles = [
-    profile(
-      "first",
-      "첫 조건",
-      "first"
-    ),
-    profile(
-      "disabled",
-      "꺼진 조건",
-      "disabled",
-      false
-    ),
-    profile(
-      "second",
-      "둘째 조건",
-      "second"
-    )
+    rawProfile("first"),
+    rawProfile("disabled", {
+      enabled: false
+    }),
+    rawProfile("second")
   ];
   const calls = [];
   let savedState;
 
-  await main({
-    environment: {
-      RUN_MODE: "normal"
-    },
-    rawConfig: config(profiles),
-    rawState: stateFor(profiles),
-    processProfileImpl: async ({
-      profile: current,
-      profileState
-    }) => {
-      calls.push([
-        current.id,
-        current.searchUrl
-      ]);
-      return successfulResult(
-        current,
-        profileState
-      );
-    },
-    createTelegramSenderImpl:
-      telegramFactory([]),
-    saveJsonImpl: async (_path, value) => {
-      savedState = value;
-    },
-    nowIso: () =>
-      "2026-01-02T00:00:00.000Z",
-    logger: quietLogger()
-  });
-
-  assert.deepEqual(calls, [
-    [
-      "first",
-      createSyntheticSearchUrl(
-        "first"
-      )
-    ],
-    [
-      "second",
-      createSyntheticSearchUrl(
-        "second"
-      )
-    ]
-  ]);
-  assert.ok(
-    savedState.profiles.disabled
-  );
-});
-
-test("main의 공유 Encar pacer는 실패한 프로필 뒤에도 다음 프로필의 지연을 유지한다", async () => {
-  const profiles = [
-    {
-      ...profile(
-        "failed",
-        "실패 조건",
-        "failed"
-      ),
-      requestDelayMs: 100
-    },
-    {
-      ...profile(
-        "success",
-        "성공 조건",
-        "success"
-      ),
-      requestDelayMs: 250
-    }
-  ];
-  let clock = 1000;
-  const requestStarts = [];
-  const requestSleeps = [];
-  const pacers = [];
-
   const result = await main({
     environment: {
-      RUN_MODE: "normal"
+      RUN_MODE: "normal",
+      TELEGRAM_BOT_TOKEN: "test-token",
+      TELEGRAM_CHAT_ID: "test-chat"
     },
-    rawConfig: config(profiles),
+    rawConfig: rawConfig(profiles),
     rawState: stateFor(profiles),
     processProfileImpl: async ({
-      profile: current,
+      profile,
       profileState,
-      requestPacer
+      maxPages,
+      requestDelayMs,
+      notifyPriceIncrease
     }) => {
-      pacers.push(requestPacer);
-      await requestPacer.wait(
-        current.requestDelayMs
-      );
-      requestStarts.push({
-        profileId: current.id,
-        startedAt: clock
+      calls.push({
+        profile,
+        maxPages,
+        requestDelayMs,
+        notifyPriceIncrease
       });
-
-      if (current.id === "failed") {
-        throw new Error("request failed");
-      }
-
-      return successfulResult(
-        current,
-        profileState
-      );
+      return {
+        profile,
+        state: profileState,
+        initializedNow: false,
+        listingCount: 0,
+        events: []
+      };
     },
     createTelegramSenderImpl:
       telegramFactory([]),
-    saveJsonImpl: async () => {},
-    requestSleepImpl: async (delay) => {
-      requestSleeps.push(delay);
-      clock += delay;
+    saveJsonImpl: async (_path, state) => {
+      savedState = state;
     },
-    requestNowMs: () => clock,
+    logger: quietLogger(),
     nowIso: () =>
-      "2026-01-02T00:00:00.000Z",
-    logger: quietLogger()
-  });
-
-  assert.equal(
-    pacers[0],
-    pacers[1]
-  );
-  assert.deepEqual(requestStarts, [
-    {
-      profileId: "failed",
-      startedAt: 1000
-    },
-    {
-      profileId: "success",
-      startedAt: 1250
-    }
-  ]);
-  assert.deepEqual(
-    requestSleeps,
-    [250]
-  );
-  assert.equal(
-    result.profileFailures.length,
-    1
-  );
-});
-
-test("main의 실제 profile 처리는 실패한 상세 요청 뒤 다음 profile 목록에도 공유 pacing을 적용한다", async () => {
-  const profiles = [
-    {
-      ...profile(
-        "first",
-        "첫 조건",
-        "first"
-      ),
-      requestDelayMs: 100
-    },
-    {
-      ...profile(
-        "second",
-        "둘째 조건",
-        "second"
-      ),
-      requestDelayMs: 250
-    }
-  ];
-  const anonymousListHtml = `
-    <a href="/cars/detail/1001">
-      익명 차량 24/01식 1,000 km 서울 3,000만원
-    </a>
-  `;
-  let clock = 1000;
-  const requestSleeps = [];
-  const requestStarts = [];
-
-  await main({
-    environment: {
-      RUN_MODE: "normal"
-    },
-    rawConfig: config(profiles),
-    rawState: stateFor(profiles),
-    processProfileImpl: async (args) =>
-      processProfile({
-        ...args,
-        fetchTextImpl: async (url) => {
-          const kind = url.includes(
-            "/cars/detail/"
-          )
-            ? "detail"
-            : "list";
-
-          requestStarts.push({
-            profileId: args.profile.id,
-            kind,
-            startedAt: clock
-          });
-
-          if (
-            args.profile.id === "first" &&
-            kind === "detail"
-          ) {
-            throw new Error(
-              "anonymous detail failure"
-            );
-          }
-
-          return kind === "list"
-            ? anonymousListHtml
-            : "<html></html>";
-        },
-        nowIso: () =>
-          "2026-01-02T00:00:00.000Z"
-      }),
-    createTelegramSenderImpl:
-      telegramFactory([]),
-    saveJsonImpl: async () => {},
-    requestSleepImpl: async (delay) => {
-      requestSleeps.push(delay);
-      clock += delay;
-    },
-    requestNowMs: () => clock,
-    nowIso: () =>
-      "2026-01-02T00:00:00.000Z",
-    logger: quietLogger()
+      "2026-07-25T01:00:00.000Z"
   });
 
   assert.deepEqual(
-    requestStarts.slice(0, 3),
+    calls.map((entry) =>
+      entry.profile.id
+    ),
+    ["first", "second"]
+  );
+  assert.deepEqual(
+    calls.map(
+      ({
+        maxPages,
+        requestDelayMs,
+        notifyPriceIncrease
+      }) => ({
+        maxPages,
+        requestDelayMs,
+        notifyPriceIncrease
+      })
+    ),
     [
       {
-        profileId: "first",
-        kind: "list",
-        startedAt: 1000
+        maxPages: 2,
+        requestDelayMs: 25,
+        notifyPriceIncrease: true
       },
       {
-        profileId: "first",
-        kind: "detail",
-        startedAt: 1100
-      },
-      {
-        profileId: "second",
-        kind: "list",
-        startedAt: 1350
+        maxPages: 2,
+        requestDelayMs: 25,
+        notifyPriceIncrease: true
       }
     ]
   );
+  assert.equal(
+    Object.hasOwn(
+      calls[0].profile,
+      "maxPages"
+    ),
+    false
+  );
   assert.deepEqual(
-    requestSleeps.slice(0, 2),
-    [100, 250]
+    Object.keys(savedState).sort(),
+    ["profiles", "schemaVersion"]
   );
+  assert.deepEqual(savedState, result.state);
 });
 
-test("실제 프로필 목록 조회 실패는 입력 상태를 변경하거나 삭제 판정하지 않는다", async () => {
-  const currentProfile = {
-    ...profile(
-      "failed",
-      "실패 조건",
-      "fail"
-    ),
-    titleFilter: {
-      requiredAll: [],
-      requiredAny: [],
-      excludedAny: []
-    },
-    yearMonthMin: "2020-01",
-    yearMonthMax: "2030-12",
-    excludedColorTerms: [],
-    excludeContracted: true,
-    notifyPriceIncrease: true,
-    maxPages: 1,
-    requestDelayMs: 0
-  };
-  const profileState = {
+test("normal과 send_current는 같은 titleFilter를 적용하고 가격 초과도 출력한다", async () => {
+  const initialState = {
     initializedAt:
-      "2026-01-01T00:00:00.000Z",
-    listings: {
-      keep: {
-        id: "keep",
-        priceKrw: 10000000,
-        deletionTracked: true,
-        optionMode: "tesla",
-        option: "FSD",
-        hasFsd: true,
-        hasEap: false,
-        optionSource: "old-source",
-        optionEvidence: "old-evidence"
-      }
-    }
+      "2026-07-24T00:00:00.000Z",
+    listings: {}
   };
-  const before = structuredClone(
-    profileState
+  const normal = await runActualProfile(
+    "normal",
+    initialState
+  );
+  const current = await runActualProfile(
+    "send_current",
+    initialState
   );
 
-  await assert.rejects(
-    processProfile({
-      profile: currentProfile,
-      profileState,
-      runMode: "normal",
-      fetchTextImpl: async () => {
-        throw new Error("list failed");
-      },
-      nowIso: () =>
-        "2026-01-02T00:00:00.000Z"
-    }),
-    /list failed/
-  );
+  for (const result of [
+    normal,
+    current
+  ]) {
+    assert.deepEqual(
+      result.events
+        .map((event) =>
+          event.listing.id
+        )
+        .sort(),
+      ["42023180", "42383037"]
+    );
+    assert.deepEqual(
+      Object.keys(
+        result.state.listings
+      ).sort(),
+      ["42023180", "42383037"]
+    );
 
-  assert.deepEqual(profileState, before);
-  assert.equal(
-    profileState.listings.keep
-      .deletedAt,
-    undefined
+    const overPrice =
+      result.events.find(
+        (event) =>
+          event.listing.id ===
+          "42383037"
+      );
+
+    assert.equal(
+      overPrice.listing
+        .conditionStatus,
+      "조건 미충족"
+    );
+    assert.deepEqual(
+      overPrice.listing
+        .conditionReasons,
+      ["가격 초과"]
+    );
+  }
+
+  assert.deepEqual(
+    normal.events.map(
+      (event) => event.kind
+    ),
+    ["new", "new"]
   );
-  assert.equal(
-    profileState.listings.keep.option,
-    "FSD"
+  assert.deepEqual(
+    current.events.map(
+      (event) => event.kind
+    ),
+    ["current", "current"]
   );
 });
 
-test("generic 프로필의 목록 관측은 같은 id의 기존 Tesla 옵션 상태를 정리한다", async () => {
-  const listingId = "900000001";
-  const listingUrl =
-    `https://fem.encar.com/cars/detail/${listingId}`;
-  const currentProfile = {
-    ...profile(
-      "generic-transition",
-      "일반 조건",
-      "generic-transition"
-    ),
-    yearMonthMin: "2020-01",
-    yearMonthMax: "2030-12",
-    excludedColorTerms: [],
-    excludeContracted: true,
-    notifyPriceIncrease: true,
-    maxPages: 1,
-    requestDelayMs: 0
-  };
+test("titleFilter 제외 매물은 identity·상태·삭제 흐름에 다시 들어오지 않는다", async () => {
+  const trace = [];
   const previous = {
-    id: listingId,
-    title: "일반 차량",
-    url: listingUrl,
-    yearMonth: "2022-06",
-    mileageKm: 10000,
-    priceKrw: 34000000,
-    listPriceKrw: 34000000,
-    region: "서울",
-    contracted: false,
-    vehicleNo: null,
-    saleType: "NORMAL",
-    rentalUsageHistory: false,
-    totalLossHistory: false,
+    id: "previous-listing",
+    title: "이전 추적 매물",
+    url:
+      "https://example.invalid/previous-listing",
+    yearMonth: "2022-01",
+    mileageKm: 1000,
+    priceKrw: 30000000,
+    listPriceKrw: 30000000,
+    vehicleNo: "12가3456",
     firstSeenAt:
-      "2026-01-01T00:00:00.000Z",
+      "2026-07-23T00:00:00.000Z",
     lastSeenAt:
-      "2026-01-01T00:00:00.000Z",
-    lastEvaluatedAt:
-      "2026-01-01T00:00:00.000Z",
-    deletionTracked: true,
-    commonMarker: "preserved",
-    optionMode: "tesla",
-    option: "FSD",
-    hasFsd: true,
-    hasEap: false,
-    optionSource: "old-source",
-    optionEvidence: "old-evidence"
+      "2026-07-24T00:00:00.000Z",
+    deletionTracked: true
   };
-  let fetchCount = 0;
 
   const result = await processProfile({
-    profile: currentProfile,
+    profile: {
+      ...normalizedGenericProfile,
+      titleFilter: {
+        requiredAll: [
+          "절대 일치하지 않는 제목"
+        ],
+        requiredAny: [],
+        excludedAny: []
+      }
+    },
     profileState: {
       initializedAt:
-        "2026-01-01T00:00:00.000Z",
+        "2026-07-24T00:00:00.000Z",
       listings: {
-        [listingId]: previous
+        [previous.id]: previous
       }
     },
     runMode: "normal",
-    fetchTextImpl: async () => {
-      fetchCount += 1;
-      return `<a href="/cars/detail/${listingId}">일반 차량 22/06식 10,000km 서울 3,400만원</a>`;
+    maxPages: 1,
+    requestDelayMs: 0,
+    notifyPriceIncrease: true,
+    requestPacer: {
+      async wait() {}
+    },
+    fetchTextImpl: async (url) => {
+      trace.push(url);
+
+      if (
+        url.includes(
+          "car.encar.com/list/car"
+        )
+      ) {
+        return listHtml;
+      }
+
+      throw new Error(
+        "titleFilter 제외 매물은 상세 조회하면 안 됩니다"
+      );
     },
     nowIso: () =>
-      "2026-01-02T00:00:00.000Z"
+      "2026-07-25T00:00:00.000Z"
   });
 
-  const stored =
-    result.state.listings[listingId];
+  assert.equal(trace.length, 1);
+  assert.equal(result.events.length, 0);
+  assert.deepEqual(
+    Object.keys(result.state.listings),
+    [previous.id]
+  );
+  assert.equal(
+    result.state.listings[
+      previous.id
+    ].deletedAt,
+    undefined
+  );
+});
 
-  assert.equal(fetchCount, 1);
-  assert.equal(stored.optionMode, "generic");
-  assert.equal(
-    stored.commonMarker,
-    "preserved"
-  );
-  assert.equal(stored.saleType, "NORMAL");
-  assert.equal(
-    stored.rentalUsageHistory,
-    false
-  );
-  assert.equal(
-    stored.totalLossHistory,
-    false
+test("상태 정리 직후 실행은 기존 매물을 신규 알림으로 만들지 않는다", async () => {
+  const existingState = {
+    initializedAt:
+      "2026-07-24T00:00:00.000Z",
+    listings: {
+      "42023180": {
+        id: "42023180",
+        title:
+          "모델 3 롱 레인지 AWD",
+        url:
+          "https://fem.encar.com/cars/detail/42023180",
+        yearMonth: "2022-09",
+        mileageKm: 67235,
+        priceKrw: 32700000,
+        listPriceKrw: 32700000,
+        region: "경기",
+        contracted: false,
+        firstSeenAt:
+          "2026-07-20T00:00:00.000Z",
+        lastSeenAt:
+          "2026-07-24T00:00:00.000Z"
+      },
+      "42383037": {
+        id: "42383037",
+        title:
+          "모델 3 롱 레인지 AWD",
+        url:
+          "https://fem.encar.com/cars/detail/42383037",
+        yearMonth: "2022-12",
+        mileageKm: 28658,
+        priceKrw: 48700000,
+        listPriceKrw: 48700000,
+        region: "대구",
+        contracted: false,
+        firstSeenAt:
+          "2026-07-20T00:00:00.000Z",
+        lastSeenAt:
+          "2026-07-24T00:00:00.000Z"
+      }
+    }
+  };
+  const trace = [];
+  const result = await runActualProfile(
+    "normal",
+    existingState,
+    trace
   );
 
-  for (const field of [
-    "option",
-    "hasFsd",
-    "hasEap",
-    "optionSource",
-    "optionEvidence"
+  assert.equal(result.events.length, 0);
+  assert.deepEqual(
+    Object.keys(
+      result.state.listings
+    ).sort(),
+    ["42023180", "42383037"]
+  );
+  assert.equal(
+    trace.filter((url) =>
+      url.includes("/cars/detail/")
+    ).length,
+    0,
+    "정상 상태가 있고 목록 가격이 그대로인 매물은 상세 조회를 생략한다"
+  );
+
+  for (const listingId of [
+    "42023180",
+    "42383037"
   ]) {
+    const record =
+      result.state.listings[listingId];
+
     assert.equal(
-      Object.hasOwn(stored, field),
-      false
+      record.priceKrw,
+      existingState.listings[listingId]
+        .priceKrw
+    );
+    assert.equal(
+      record.lastSeenAt,
+      "2026-07-25T00:00:00.000Z"
+    );
+    assert.equal(
+      record.deletedAt,
+      undefined
     );
   }
 });
 
-test("한 프로필 실패는 그 상태를 보존하고 다음 성공 상태 저장을 막지 않는다", async () => {
+test("raw 목록에 남아 있는 titleFilter 제외 매물은 삭제로 오판하지 않는다", async () => {
+  const trace = [];
+  const excludedPrevious = {
+    id: "11111111",
+    title: "모델 3 RWD",
+    url:
+      "https://fem.encar.com/cars/detail/11111111",
+    yearMonth: "2022-08",
+    mileageKm: 95545,
+    priceKrw: 30000000,
+    listPriceKrw: 30000000,
+    vehicleNo: "12가3456",
+    firstSeenAt:
+      "2026-07-23T00:00:00.000Z",
+    lastSeenAt:
+      "2026-07-24T00:00:00.000Z",
+    deletionTracked: true
+  };
+  const detailVehicleNos = {
+    "42023180": "34나5678",
+    "42383037": "56다7890"
+  };
+
+  const result = await processProfile({
+    profile: normalizedGenericProfile,
+    profileState: {
+      initializedAt:
+        "2026-07-24T00:00:00.000Z",
+      listings: {
+        [excludedPrevious.id]:
+          excludedPrevious
+      }
+    },
+    runMode: "normal",
+    maxPages: 1,
+    requestDelayMs: 0,
+    notifyPriceIncrease: true,
+    requestPacer: {
+      async wait() {}
+    },
+    fetchTextImpl: async (url) => {
+      trace.push(url);
+
+      if (
+        url.includes(
+          "car.encar.com/list/car"
+        )
+      ) {
+        return listHtml;
+      }
+
+      const listingId = url.match(
+        /\/cars\/detail\/(\d+)/
+      )?.[1];
+
+      return detailHtml(
+        detailVehicleNos[listingId] ??
+          null
+      );
+    },
+    nowIso: () =>
+      "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.equal(
+    trace.some((url) =>
+      url.includes(
+        "/cars/detail/11111111"
+      )
+    ),
+    false,
+    "titleFilter 제외 매물은 상세 조회하지 않는다"
+  );
+  assert.deepEqual(
+    result.events
+      .map((event) => event.kind)
+      .sort(),
+    ["new", "new"]
+  );
+  assert.equal(
+    result.state.listings["11111111"]
+      .deletedAt,
+    undefined,
+    "raw 목록에 존재하는 매물은 titleFilter 제외만으로 삭제 처리하지 않는다"
+  );
+});
+
+test("한 프로필 실패는 그 상태를 보존하고 다음 프로필의 성공 상태는 저장한다", async () => {
   const profiles = [
-    profile(
-      "failed",
-      "실패 조건",
-      "fail"
-    ),
-    profile(
-      "success",
-      "성공 조건",
-      "success"
-    ),
-    profile(
-      "disabled",
-      "비활성 조건",
-      "disabled",
-      false
-    )
+    rawProfile("failed"),
+    rawProfile("succeeded")
   ];
-  const rawState = stateFor(profiles);
-  rawState.profiles.failed.listings.keep = {
-    priceKrw: 10000000,
-    adjustedPriceKrw: 13000000,
-    rentalUsageHistory: true,
-    rental: true
-  };
-  rawState.profiles.disabled.listings.keep = {
-    priceKrw: 20000000,
-    adjustedPriceKrw: 23000000,
-    rentalUsageHistory: true,
-    rental: true
-  };
-  const failedBefore = structuredClone(
-    rawState.profiles.failed
-  );
-  const disabledBefore = structuredClone(
-    rawState.profiles.disabled
-  );
+  const originalState =
+    stateFor(profiles);
+  originalState.profiles.failed
+    .listings.keep = {
+      id: "keep",
+      priceKrw: 1
+    };
   let savedState;
 
   const result = await main({
     environment: {
-      RUN_MODE: "normal"
+      RUN_MODE: "normal",
+      TELEGRAM_BOT_TOKEN: "test-token",
+      TELEGRAM_CHAT_ID: "test-chat"
     },
-    rawConfig: config(profiles),
-    rawState,
+    rawConfig: rawConfig(profiles),
+    rawState: originalState,
     processProfileImpl: async ({
-      profile: current,
+      profile,
       profileState
     }) => {
-      if (current.id === "failed") {
-        throw new Error("list failed");
+      if (profile.id === "failed") {
+        throw new Error("synthetic failure");
       }
 
-      return successfulResult(
-        current,
-        profileState,
-        {
-          state: {
-            ...profileState,
-            listings: {
-              saved: {
-                priceKrw: 20000000
-              }
+      return {
+        profile,
+        state: {
+          ...profileState,
+          listings: {
+            success: {
+              id: "success",
+              priceKrw: 2
             }
           }
-        }
-      );
+        },
+        initializedNow: false,
+        listingCount: 1,
+        events: []
+      };
     },
     createTelegramSenderImpl:
       telegramFactory([]),
-    saveJsonImpl: async (_path, value) => {
-      savedState = value;
+    saveJsonImpl: async (_path, state) => {
+      savedState = state;
     },
+    logger: quietLogger(),
     nowIso: () =>
-      "2026-01-02T00:00:00.000Z",
-    logger: quietLogger()
+      "2026-07-25T01:00:00.000Z"
   });
 
   assert.equal(
@@ -646,298 +660,45 @@ test("한 프로필 실패는 그 상태를 보존하고 다음 성공 상태 �
   );
   assert.deepEqual(
     savedState.profiles.failed,
-    failedBefore
-  );
-  assert.deepEqual(
-    savedState.profiles.disabled,
-    disabledBefore
-  );
-  assert.ok(
-    savedState.profiles.success
-      .listings.saved
-  );
-});
-
-test("모든 enabled 프로필 실패 시 상태를 저장하지 않는다", async () => {
-  const profiles = [
-    profile(
-      "one",
-      "조건 하나",
-      "one"
-    ),
-    profile(
-      "two",
-      "조건 둘",
-      "two"
-    )
-  ];
-  let saveCalled = false;
-
-  await assert.rejects(
-    main({
-      environment: {
-        RUN_MODE: "normal"
-      },
-      rawConfig: config(profiles),
-      rawState: stateFor(profiles),
-      processProfileImpl: async () => {
-        throw new Error("list failed");
-      },
-      createTelegramSenderImpl:
-        telegramFactory([]),
-      saveJsonImpl: async () => {
-        saveCalled = true;
-      },
-      logger: quietLogger()
-    }),
-    /All enabled profiles failed/
-  );
-
-  assert.equal(saveCalled, false);
-});
-
-test("동일 신규 이벤트는 한 메시지로 병합하고 양쪽 상태에 전송 결과를 기록한다", async () => {
-  const profiles = [
-    profile(
-      "one",
-      "조건 하나",
-      "one"
-    ),
-    profile(
-      "two",
-      "조건 둘",
-      "two"
-    )
-  ];
-  const rawState = stateFor(profiles);
-  const sent = [];
-  let savedState;
-
-  for (const item of profiles) {
-    rawState.profiles[item.id]
-      .listings["100"] = {
-        id: "100",
-        title: "테스트 차량",
-        priceKrw: 30000000
-      };
-  }
-
-  await main({
-    environment: {
-      RUN_MODE: "normal",
-      TELEGRAM_BOT_TOKEN:
-        "test-token",
-      TELEGRAM_CHAT_ID:
-        "test-chat"
-    },
-    rawConfig: config(profiles),
-    rawState,
-    processProfileImpl: async ({
-      profile: current,
-      profileState
-    }) => successfulResult(
-      current,
-      profileState,
-      {
-        events: [
-          {
-            kind: "new",
-            type: "신규",
-            listing: {
-              id: "100",
-              title: "테스트 차량",
-              yearMonth: "2024-01",
-              mileageKm: 10000,
-              priceKrw: 30000000,
-              region: "미확인",
-              vehicleNo: null,
-              saleType: "NORMAL",
-              optionMode: "generic",
-              url:
-                "https://example.test/cars/detail/100"
-            },
-            detailSucceeded: true,
-            profile: current,
-            profileId: current.id,
-            profileName: current.name,
-            optionMode: "generic",
-            showTeslaOption: false,
-            stateListingId: "100"
-          }
-        ]
-      }
-    ),
-    createTelegramSenderImpl:
-      telegramFactory(sent),
-    saveJsonImpl: async (_path, value) => {
-      savedState = value;
-    },
-    nowIso: () =>
-      "2026-01-02T00:00:00.000Z",
-    logger: quietLogger()
-  });
-
-  assert.equal(sent.length, 1);
-  assert.match(
-    sent[0].text,
-    /검색 조건: 조건 하나, 조건 둘/
-  );
-  assert.doesNotMatch(
-    sent[0].text,
-    /FSD|EAP|옵션: 미확인/
+    originalState.profiles.failed
   );
   assert.equal(
-    savedState.profiles.one
-      .listings["100"]
-      .telegramMessageId,
-    1
-  );
-  assert.equal(
-    savedState.profiles.two
-      .listings["100"]
-      .telegramMessageId,
-    1
+    savedState.profiles.succeeded
+      .listings.success.id,
+    "success"
   );
 });
 
-test("동일 삭제 이벤트는 한 메시지로 병합하고 모든 프로필 상태에 전송 결과를 기록한다", async () => {
-  const profiles = [
-    profile(
-      "delete-one",
-      "삭제 조건 하나",
-      "delete-one"
-    ),
-    profile(
-      "delete-two",
-      "삭제 조건 둘",
-      "delete-two"
-    )
-  ];
-  const rawState = stateFor(profiles);
-  const listingId = "deleted-synthetic";
+test("telegram_test는 상태를 읽거나 저장하지 않고 한 건만 전송한다", async () => {
   const sent = [];
-  let savedState;
-
-  for (const item of profiles) {
-    rawState.profiles[item.id]
-      .listings[listingId] = {
-        id: listingId,
-        title: "삭제 확인 차량",
-        yearMonth: "2024-01",
-        mileageKm: 10000,
-        priceKrw: 30000000,
-        region: "미확인",
-        vehicleNo: null,
-        saleType: "NORMAL",
-        optionMode: "generic",
-        url:
-          "https://example.test/cars/detail/deleted-synthetic",
-        deletedAt:
-          "2026-01-02T00:00:00.000Z"
-      };
-  }
-
-  await main({
-    environment: {
-      RUN_MODE: "normal",
-      TELEGRAM_BOT_TOKEN:
-        "test-token",
-      TELEGRAM_CHAT_ID:
-        "test-chat"
-    },
-    rawConfig: config(profiles),
-    rawState,
-    processProfileImpl: async ({
-      profile: current,
-      profileState
-    }) => successfulResult(
-      current,
-      profileState,
-      {
-        events: [
-          {
-            kind: "deleted",
-            type: "deleted",
-            listing: {
-              ...profileState.listings[
-                listingId
-              ]
-            },
-            profile: current,
-            profileId: current.id,
-            profileName: current.name,
-            optionMode: "generic",
-            showTeslaOption: false,
-            stateListingId: listingId
-          }
-        ]
-      }
-    ),
-    createTelegramSenderImpl:
-      telegramFactory(sent),
-    saveJsonImpl: async (_path, value) => {
-      savedState = value;
-    },
-    nowIso: () =>
-      "2026-01-03T00:00:00.000Z",
-    logger: quietLogger()
-  });
-
-  assert.equal(sent.length, 1);
-  assert.match(
-    sent[0].text,
-    /검색 조건: 삭제 조건 하나, 삭제 조건 둘/
-  );
-
-  for (const item of profiles) {
-    assert.equal(
-      savedState.profiles[item.id]
-        .listings[listingId]
-        .telegramMessageId,
-      1
-    );
-  }
-});
-
-test("telegram_test는 프로필 수와 무관하게 테스트 메시지 한 건만 전송한다", async () => {
-  const profiles = [
-    profile(
-      "one",
-      "조건 하나",
-      "one"
-    ),
-    profile(
-      "two",
-      "조건 둘",
-      "two"
-    )
-  ];
-  const sent = [];
-  let profileCalls = 0;
-  let saveCalled = false;
+  let stateLoaded = false;
+  let stateSaved = false;
 
   const result = await main({
     environment: {
       RUN_MODE: "telegram_test",
-      TELEGRAM_BOT_TOKEN:
-        "test-token",
-      TELEGRAM_CHAT_ID:
-        "test-chat"
+      TELEGRAM_BOT_TOKEN: "test-token",
+      TELEGRAM_CHAT_ID: "test-chat"
     },
-    rawConfig: config(profiles),
-    processProfileImpl: async () => {
-      profileCalls += 1;
+    rawConfig: rawConfig([
+      rawProfile("one")
+    ]),
+    loadJsonImpl: async () => {
+      stateLoaded = true;
+      throw new Error(
+        "state must not be loaded"
+      );
+    },
+    saveJsonImpl: async () => {
+      stateSaved = true;
     },
     createTelegramSenderImpl:
       telegramFactory(sent),
-    saveJsonImpl: async () => {
-      saveCalled = true;
-    },
     logger: quietLogger()
   });
 
   assert.equal(result.telegramTest, true);
   assert.equal(sent.length, 1);
-  assert.equal(profileCalls, 0);
-  assert.equal(saveCalled, false);
+  assert.equal(stateLoaded, false);
+  assert.equal(stateSaved, false);
 });

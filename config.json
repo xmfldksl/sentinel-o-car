@@ -1,6 +1,5 @@
 {
   "configVersion": 2,
-  "legacyStateProfileId": "tesla-model3-long-range",
   "notifyPriceIncrease": true,
   "maxPages": 2,
   "requestDelayMs": 1500,
@@ -10,7 +9,7 @@
       "name": "Model 3 AWD",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
-      "optionMode": "tesla",
+      "isTesla": true,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
@@ -18,11 +17,8 @@
       },
       "price": {
         "maxPriceKrw": 35000000,
-        "teslaOptionLimitsKrw": {
-          "eap": 37000000,
-          "fsd": 40000000,
-          "unknownOptionHardMax": 40000000
-        }
+        "eapMaxPriceKrw": 37000000,
+        "fsdMaxPriceKrw": 40000000
       }
     },
     {
@@ -30,7 +26,7 @@
       "name": "도요타 시에나",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA",
-      "optionMode": "generic",
+      "isTesla": false,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
@@ -45,11 +41,14 @@
       "name": "검색 조건 3",
       "enabled": false,
       "searchUrlEnv": "ENCAR_SEARCH_URL_3",
-      "optionMode": "generic",
+      "isTesla": false,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
+      },
+      "price": {
+        "maxPriceKrw": 0
       }
     },
     {
@@ -57,11 +56,14 @@
       "name": "검색 조건 4",
       "enabled": false,
       "searchUrlEnv": "ENCAR_SEARCH_URL_4",
-      "optionMode": "generic",
+      "isTesla": false,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
+      },
+      "price": {
+        "maxPriceKrw": 0
       }
     },
     {
@@ -69,11 +71,14 @@
       "name": "검색 조건 5",
       "enabled": false,
       "searchUrlEnv": "ENCAR_SEARCH_URL_5",
-      "optionMode": "generic",
+      "isTesla": false,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
+      },
+      "price": {
+        "maxPriceKrw": 0
       }
     }
   ]

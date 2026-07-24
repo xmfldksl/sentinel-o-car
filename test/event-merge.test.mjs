@@ -8,12 +8,12 @@ import {
 function profile(
   id,
   name,
-  optionMode = "generic"
+  isTesla = false
 ) {
   return {
     id,
     name,
-    optionMode
+    isTesla
   };
 }
 
@@ -59,6 +59,30 @@ function target(profileId, listingId) {
   return {
     profileId,
     stateListingId: listingId
+  };
+}
+
+function conditionEvent(
+  eventOptions,
+  {
+    conditionStatus,
+    conditionReasons = [],
+    isTesla = false,
+    option = null
+  }
+) {
+  const value = event(eventOptions);
+
+  return {
+    ...value,
+    listing: {
+      ...value.listing,
+      conditionStatus,
+      conditionReasons,
+      ...(isTesla
+        ? { option }
+        : {})
+    }
   };
 }
 
@@ -119,6 +143,203 @@ test("동일 신규 이벤트는 한 건으로 병합하고 프로필 이름과 
         "listing-new"
       )
     ]
+  );
+});
+
+test("프로필별 가격 판정 문맥이 다르면 동일 매물 이벤트도 분리한다", () => {
+  const generic = conditionEvent(
+    {
+      listingId:
+        "listing-condition-conflict",
+      profile: profile(
+        "profile-generic-condition",
+        "일반 가격 조건",
+        false
+      ),
+      priceKrw: 37000000
+    },
+    {
+      conditionStatus: "조건 미충족",
+      conditionReasons: ["가격 초과"],
+      isTesla: false
+    }
+  );
+  const tesla = conditionEvent(
+    {
+      listingId:
+        "listing-condition-conflict",
+      profile: profile(
+        "profile-tesla-condition",
+        "Tesla FSD 가격 조건",
+        true
+      ),
+      priceKrw: 37000000,
+      listingFields: {
+        hasFsd: true,
+        hasEap: false
+      }
+    },
+    {
+      conditionStatus: "조건 충족",
+      conditionReasons: [],
+      isTesla: true,
+      option: "FSD"
+    }
+  );
+
+  const merged = mergeProfileEvents([
+    generic,
+    tesla
+  ]);
+
+  assert.equal(merged.length, 2);
+  assert.deepEqual(
+    merged.map((item) => ({
+      profileNames: item.profileNames,
+      conditionStatus:
+        item.listing.conditionStatus,
+      option:
+        item.listing.option ?? null
+    })),
+    [
+      {
+        profileNames: [
+          "일반 가격 조건"
+        ],
+        conditionStatus:
+          "조건 미충족",
+        option: null
+      },
+      {
+        profileNames: [
+          "Tesla FSD 가격 조건"
+        ],
+        conditionStatus: "조건 충족",
+        option: "FSD"
+      }
+    ]
+  );
+});
+
+test("같은 표시 판정은 병합하고 Tesla 옵션 문맥은 분리한다", () => {
+  const sharedContext = {
+    conditionStatus: "조건 충족",
+    conditionReasons: [],
+    isTesla: false
+  };
+  const compatible = mergeProfileEvents([
+    conditionEvent(
+      {
+        listingId:
+          "listing-compatible-condition",
+        profile: profile(
+          "profile-compatible-a",
+          "호환 조건 A"
+        )
+      },
+      sharedContext
+    ),
+    conditionEvent(
+      {
+        listingId:
+          "listing-compatible-condition",
+        profile: profile(
+          "profile-compatible-b",
+          "호환 조건 B"
+        )
+      },
+      sharedContext
+    )
+  ]);
+  const differentLimit =
+    mergeProfileEvents([
+      conditionEvent(
+        {
+          listingId:
+            "listing-different-limit",
+          profile: {
+            ...profile(
+              "profile-limit-a",
+              "가격 기준 A"
+            ),
+            price: {
+              maxPriceKrw: 35000000
+            }
+          }
+        },
+        sharedContext
+      ),
+      conditionEvent(
+        {
+          listingId:
+            "listing-different-limit",
+          profile: {
+            ...profile(
+              "profile-limit-b",
+              "가격 기준 B"
+            ),
+            price: {
+              maxPriceKrw: 40000000
+            }
+          }
+        },
+        {
+          ...sharedContext
+        }
+      )
+    ]);
+  const differentTeslaOption =
+    mergeProfileEvents([
+      conditionEvent(
+        {
+          listingId:
+            "listing-different-option",
+          profile: profile(
+            "profile-option-fsd",
+            "FSD 조건",
+            true
+          )
+        },
+        {
+          ...sharedContext,
+          isTesla: true,
+          option: "FSD"
+        }
+      ),
+      conditionEvent(
+        {
+          listingId:
+            "listing-different-option",
+          profile: profile(
+            "profile-option-eap",
+            "EAP 조건",
+            true
+          )
+        },
+        {
+          ...sharedContext,
+          isTesla: true,
+          option: "EAP"
+        }
+      )
+    ]);
+
+  assert.equal(compatible.length, 1);
+  assert.deepEqual(
+    compatible[0].profileNames,
+    ["호환 조건 A", "호환 조건 B"]
+  );
+  assert.equal(
+    differentLimit.length,
+    1
+  );
+  assert.deepEqual(
+    differentLimit[0].profileNames,
+    ["가격 기준 A", "가격 기준 B"]
+  );
+  assert.equal(
+    differentTeslaOption.length,
+    2
   );
 });
 
@@ -736,7 +957,7 @@ test("Tesla 프로필이 하나라도 병합되면 옵션 표시를 유지한다
       profile: profile(
         "profile-tesla",
         "Tesla 조건",
-        "tesla"
+        true
       ),
       listingFields: {
         representative: "tesla",
@@ -754,7 +975,7 @@ test("Tesla 프로필이 하나라도 병합되면 옵션 표시를 유지한다
       profile: profile(
         "profile-generic",
         "일반 조건",
-        "generic"
+        false
       ),
       listingFields: {
         representative: "generic"
@@ -768,7 +989,7 @@ test("Tesla 프로필이 하나라도 병합되면 옵션 표시를 유지한다
       profile: profile(
         "profile-generic-a",
         "일반 조건 A",
-        "generic"
+        false
       )
     }),
     event({
@@ -777,7 +998,7 @@ test("Tesla 프로필이 하나라도 병합되면 옵션 표시를 유지한다
       profile: profile(
         "profile-generic-b",
         "일반 조건 B",
-        "generic"
+        false
       )
     })
   ]);
@@ -819,7 +1040,7 @@ test("Tesla 옵션 충돌은 대표 이벤트 우선순위로 한 기여자를 �
         profile: profile(
           "profile-option-old",
           "이전 옵션 조건",
-          "tesla"
+          true
         ),
         observedAt:
           "2026-01-01T00:00:00.000Z",
@@ -841,7 +1062,7 @@ test("Tesla 옵션 충돌은 대표 이벤트 우선순위로 한 기여자를 �
         profile: profile(
           "profile-option-new",
           "최신 옵션 조건",
-          "tesla"
+          true
         ),
         observedAt:
           "2026-01-02T00:00:00.000Z",
@@ -923,7 +1144,7 @@ test("Tesla 옵션 대표값도 상세 성공을 최신 관측보다 우선한�
       profile: profile(
         "profile-option-confirmed",
         "상세 성공 옵션",
-        "tesla"
+        true
       ),
       detailSucceeded: true,
       observedAt:
@@ -944,7 +1165,7 @@ test("Tesla 옵션 대표값도 상세 성공을 최신 관측보다 우선한�
       profile: profile(
         "profile-option-failed",
         "상세 실패 옵션",
-        "tesla"
+        true
       ),
       detailSucceeded: false,
       observedAt:
@@ -982,7 +1203,7 @@ test("generic 대표 이벤트와 여러 Tesla 기여자를 병합해도 한 Tes
       profile: profile(
         "profile-tesla-failed",
         "상세 실패 옵션",
-        "tesla"
+        true
       ),
       detailSucceeded: false,
       observedAt:
@@ -1002,7 +1223,7 @@ test("generic 대표 이벤트와 여러 Tesla 기여자를 병합해도 한 Tes
       profile: profile(
         "profile-generic-new",
         "최신 일반 조건",
-        "generic"
+        false
       ),
       detailSucceeded: true,
       observedAt:
@@ -1018,7 +1239,7 @@ test("generic 대표 이벤트와 여러 Tesla 기여자를 병합해도 한 Tes
       profile: profile(
         "profile-tesla-confirmed",
         "상세 성공 옵션",
-        "tesla"
+        true
       ),
       detailSucceeded: true,
       observedAt:

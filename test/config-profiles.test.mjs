@@ -1,31 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import {
   normalizeWatcherConfig
 } from "../src/runtime.mjs";
 
-function syntheticSearchUrl(
-  label,
-  {
-    page = 1,
-    title = `Synthetic ${label}`,
-    action = `(And.Synthetic.${label})`
-  } = {}
-) {
+function syntheticSearchUrl(label) {
   const url = new URL(
     "https://car.encar.com/list/car"
   );
 
-  url.searchParams.set(
-    "page",
-    String(page)
-  );
+  url.searchParams.set("page", "1");
   url.searchParams.set(
     "search",
     JSON.stringify({
       type: "car",
-      action,
-      title,
+      action: `(And.Synthetic.${label})`,
+      title: `Synthetic ${label}`,
       toggle: {},
       layer: "",
       sort: "MobileModifiedDate"
@@ -35,1090 +26,622 @@ function syntheticSearchUrl(
   return url.toString();
 }
 
+function titleFilter(overrides = {}) {
+  return {
+    requiredAll: [],
+    requiredAny: [],
+    excludedAny: [],
+    ...overrides
+  };
+}
+
 function genericProfile(overrides = {}) {
-  const result = {
-    id: "condition-a",
-    name: "Condition A",
+  return {
+    id: "generic-profile",
+    name: "Generic profile",
     enabled: true,
     searchUrl:
-      syntheticSearchUrl(
-        "condition-a"
-      ),
-    optionMode: "generic",
-    titleFilter: {
-      requiredAll: [],
-      requiredAny: [],
-      excludedAny: []
-    },
-    minYear: 2020,
-    maxYear: 2026,
-    maxMileageKm: 100000,
-    excludedColors: [],
-    excludeContractPending: true,
+      syntheticSearchUrl("generic"),
+    isTesla: false,
+    titleFilter: titleFilter(),
     price: {
       maxPriceKrw: 45000000
     },
     ...overrides
   };
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      overrides,
-      "searchUrl"
-    ) &&
-    overrides.searchUrl === undefined
-  ) {
-    delete result.searchUrl;
-  }
-
-  return result;
 }
 
 function teslaProfile(overrides = {}) {
   return genericProfile({
-    id: "condition-t",
-    name: "Condition T",
+    id: "tesla-profile",
+    name: "Tesla profile",
     searchUrl:
-      syntheticSearchUrl(
-        "condition-t"
-      ),
-    optionMode: "tesla",
+      syntheticSearchUrl("tesla"),
+    isTesla: true,
     price: {
       maxPriceKrw: 35000000,
-      teslaOptionLimitsKrw: {
-        eap: 37000000,
-        fsd: 40000000,
-        unknownOptionHardMax:
-          35000000
-      }
+      eapMaxPriceKrw: 37000000,
+      fsdMaxPriceKrw: 40000000
     },
     ...overrides
   });
 }
 
-function versionTwoConfig(profiles) {
+function validConfig(
+  profiles = [genericProfile()]
+) {
   return {
     configVersion: 2,
+    notifyPriceIncrease: true,
     maxPages: 2,
     requestDelayMs: 1500,
     profiles
   };
 }
 
-function legacySearchUrl() {
-  return syntheticSearchUrl(
-    "legacy-config",
-    {
-      action:
-        "(And.Year.range(202201..202212))",
-      title: "Anonymous condition"
-    }
-  );
+function without(object, key) {
+  const result = structuredClone(object);
+  delete result[key];
+  return result;
 }
 
-function legacyConfig() {
-  return {
-    requiredTitleTerms: [
-      "  Example   Model ",
-      "AWD"
-    ],
-    yearMonthMin: "2022-05",
-    yearMonthMax: "2022-12",
-    maxMileageKm: 150000,
-    priceLimitsKrw: {
-      base: 35000000,
-      eap: 37000000,
-      fsd: 40000000,
-      unknownOptionHardMax:
-        35000000
-    },
-    excludedColorTerms: [
-      "Excluded color"
-    ],
-    excludeContracted: true,
-    notifyPriceIncrease: true,
-    maxPages: 2,
-    requestDelayMs: 1500
-  };
-}
-
-test("지원하지 않는 configVersion과 boolean이 아닌 enabled를 거부한다", () => {
-  assert.throws(
-    () =>
-      normalizeWatcherConfig({
-        ...versionTwoConfig([
-          genericProfile()
-        ]),
-        configVersion: 3
-      }),
-    /configVersion must be 2/
-  );
-
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            enabled: "true"
-          })
-        ])
-      ),
-    /enabled must be a boolean/
-  );
-});
-
-test("두 프로필의 배열 순서와 서로 다른 직접/환경변수 URL을 보존한다", () => {
-  const normalized =
-    normalizeWatcherConfig(
-      versionTwoConfig([
-        genericProfile(),
-        teslaProfile({
-          searchUrl: undefined,
-          searchUrlEnv:
-            "CONDITION_T_URL"
-        })
-      ]),
-      {
-        CONDITION_T_URL:
-          syntheticSearchUrl(
-            "from-environment"
-          )
-      }
-    );
-
-  assert.deepEqual(
-    normalized.profiles.map(
-      (profile) => profile.id
-    ),
-    ["condition-a", "condition-t"]
-  );
-  assert.equal(
-    normalized.profiles[0].searchUrl,
-    syntheticSearchUrl(
-      "condition-a"
-    )
-  );
-  assert.equal(
-    normalized.profiles[1].searchUrl,
-    syntheticSearchUrl(
-      "from-environment"
-    )
-  );
-  assert.equal(
-    normalized.profiles[1]
-      .searchUrlSource,
-    "environment:CONDITION_T_URL"
-  );
-});
-
-test("disabled 프로필은 URL 환경변수가 없어도 유지하지만 enabled 프로필이 하나도 없으면 거부한다", () => {
-  const normalized =
-    normalizeWatcherConfig(
-      versionTwoConfig([
-        genericProfile({
-          id: "disabled-condition",
-          enabled: false,
-          searchUrl: undefined,
-          searchUrlEnv:
-            "MISSING_DISABLED_URL"
-        }),
-        teslaProfile()
-      ]),
-      {}
-    );
-
-  assert.deepEqual(
-    normalized.profiles.map(
-      ({ id, enabled }) => ({
-        id,
-        enabled
+test("generic과 Tesla 프로필을 정확한 v2 계약으로 정규화한다", () => {
+  const genericUrl =
+    syntheticSearchUrl("normal-generic");
+  const teslaUrl =
+    syntheticSearchUrl("normal-tesla");
+  const rawConfig = validConfig([
+    genericProfile({
+      name: "  Generic profile  ",
+      searchUrl: genericUrl,
+      titleFilter: titleFilter({
+        requiredAll: [
+          "  Alpha   One  "
+        ],
+        requiredAny: [" AWD ", " 4WD "],
+        excludedAny: [" Demo "]
       })
-    ),
-    [
-      {
-        id: "disabled-condition",
-        enabled: false
-      },
-      {
-        id: "condition-t",
-        enabled: true
-      }
-    ]
-  );
-  assert.equal(
-    normalized.profiles[0].searchUrl,
-    null
-  );
-  assert.equal(
-    normalized.profiles[0]
-      .searchUrlSource,
-    "environment:MISSING_DISABLED_URL"
-  );
+    }),
+    teslaProfile({
+      searchUrl: undefined,
+      searchUrlEnv:
+        "SYNTHETIC_TESLA_URL"
+    })
+  ]);
 
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            enabled: false
-          }),
-          teslaProfile({
-            enabled: false
-          })
-        ])
-      ),
-    /at least one profile must be enabled/
-  );
-});
-
-test("중복 id와 빈 name을 명확한 프로필 경로로 거부한다", () => {
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile(),
-          teslaProfile({
-            id: "condition-a"
-          })
-        ])
-      ),
-    /profiles\[1\] \(condition-a\)\.id must be unique/
-  );
-
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            name: "   "
-          })
-        ])
-      ),
-    /profiles\[0\] \(condition-a\)\.name must be a non-empty string/
-  );
-});
-
-test("직접 URL과 환경변수 URL의 누락·중복·프로토콜 오류를 거부한다", async (t) => {
-  await t.test(
-    "직접 URL 프로토콜",
-    () => {
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              genericProfile({
-                searchUrl:
-                  "ftp://example.test/search"
-              })
-            ])
-          ),
-        /엔카 검색 URL의 호스트 또는 경로를 지원하지 않습니다/
-      );
-    }
-  );
-
-  await t.test(
-    "환경변수 누락",
-    () => {
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              genericProfile({
-                searchUrl: undefined,
-                searchUrlEnv:
-                  "MISSING_SEARCH_URL"
-              })
-            ]),
-            {}
-          ),
-        /references missing environment variable MISSING_SEARCH_URL/
-      );
-    }
-  );
-
-  await t.test(
-    "환경변수 URL 프로토콜",
-    () => {
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              genericProfile({
-                searchUrl: undefined,
-                searchUrlEnv:
-                  "CONDITION_URL"
-              })
-            ]),
-            {
-              CONDITION_URL:
-                "file:///tmp/search"
-            }
-          ),
-        /엔카 검색 URL의 호스트 또는 경로를 지원하지 않습니다/
-      );
-    }
-  );
-
-  await t.test(
-    "두 URL 공급 방식 동시 지정",
-    () => {
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              genericProfile({
-                searchUrlEnv:
-                  "CONDITION_URL"
-              })
-            ]),
-            {
-              CONDITION_URL:
-                syntheticSearchUrl(
-                  "from-environment"
-                )
-            }
-          ),
-        /must define exactly one of searchUrl or searchUrlEnv/
-      );
-    }
-  );
-});
-
-test("지원하지 않는 optionMode를 거부한다", () => {
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            optionMode: "unknown"
-          })
-        ])
-      ),
-    /profiles\[0\] \(condition-a\)\.optionMode must be generic or tesla/
-  );
-});
-
-test("optionMode를 생략하면 generic을 적용한다", () => {
-  const profile = genericProfile();
-  delete profile.optionMode;
+  delete rawConfig.profiles[1].searchUrl;
 
   const normalized =
     normalizeWatcherConfig(
-      versionTwoConfig([profile])
-    );
-
-  assert.equal(
-    normalized.profiles[0].optionMode,
-    "generic"
-  );
-});
-
-test("기본 가격과 구형 base 가격은 0 이상의 유한한 정수여야 한다", async (t) => {
-  for (const invalidValue of [
-    null,
-    -1,
-    1.5,
-    Number.POSITIVE_INFINITY,
-    "35000000"
-  ]) {
-    await t.test(
-      `새 maxPriceKrw ${String(
-        invalidValue
-      )}`,
-      () => {
-        assert.throws(
-          () =>
-            normalizeWatcherConfig(
-              versionTwoConfig([
-                genericProfile({
-                  price: {
-                    maxPriceKrw:
-                      invalidValue
-                  }
-                })
-              ])
-            ),
-          /price\.maxPriceKrw must be a non-negative integer/
-        );
+      rawConfig,
+      {
+        SYNTHETIC_TESLA_URL:
+          teslaUrl,
+        MAX_PAGES: "3"
       }
-    );
-  }
-
-  await t.test(
-    "구형 base",
-    () => {
-      const profile = genericProfile();
-      delete profile.price;
-      profile.priceLimitsKrw = {
-        base: -1
-      };
-
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              profile
-            ])
-          ),
-        /priceLimitsKrw\.base must be a non-negative integer/
-      );
-    }
-  );
-});
-
-test("generic 프로필은 price를 생략하면 프로그램 내부 가격 상한을 적용하지 않는다", () => {
-  const profile = genericProfile();
-  delete profile.price;
-
-  const normalized =
-    normalizeWatcherConfig(
-      versionTwoConfig([profile])
     );
 
   assert.deepEqual(
-    normalized.profiles[0].price,
-    {
-      maxPriceKrw:
-        Number.MAX_SAFE_INTEGER
-    }
-  );
-});
-
-test("테슬라 옵션별 가격은 모두 0 이상의 유한한 정수여야 한다", async (t) => {
-  const cases = [
-    ["eap", null],
-    ["eap", -1],
-    ["fsd", 1.25],
+    Object.keys(normalized).sort(),
     [
-      "unknownOptionHardMax",
-      Number.POSITIVE_INFINITY
+      "configVersion",
+      "maxPages",
+      "notifyPriceIncrease",
+      "profiles",
+      "requestDelayMs"
     ]
-  ];
-
-  for (const [field, value] of cases) {
-    await t.test(
-      `${field} ${String(value)}`,
-      () => {
-        assert.throws(
-          () =>
-            normalizeWatcherConfig(
-              versionTwoConfig([
-                teslaProfile({
-                  price: {
-                    maxPriceKrw:
-                      35000000,
-                    teslaOptionLimitsKrw: {
-                      eap: 37000000,
-                      fsd: 40000000,
-                      unknownOptionHardMax:
-                        35000000,
-                      [field]: value
-                    }
-                  }
-                })
-              ])
-            ),
-          new RegExp(
-            `teslaOptionLimitsKrw\\.${field} must be a non-negative integer`
-          )
-        );
-      }
-    );
-  }
-});
-
-test("generic 설정 정규화는 Tesla 옵션별 가격 getter를 읽지 않고 경고 후 무시한다", () => {
-  const price = {
-    maxPriceKrw: 45000000
-  };
-  const warnings = [];
-
-  Object.defineProperty(
-    price,
-    "teslaOptionLimitsKrw",
-    {
-      enumerable: true,
-      get() {
-        throw new Error(
-          "Tesla limits must not be read"
-        );
-      }
-    }
   );
-
-  const normalized = normalizeWatcherConfig(
-    versionTwoConfig([
-      genericProfile({ price })
-    ]),
-    {},
-    {
-      warn(message) {
-        warnings.push(message);
-      }
-    }
-  );
-
   assert.deepEqual(
-    normalized.profiles[0].price,
-    { maxPriceKrw: 45000000 }
-  );
-  assert.equal(warnings.length, 1);
-  assert.match(
-    warnings[0],
-    /teslaOptionLimitsKrw is ignored/
-  );
-});
-
-test("titleFilter 배열 형식과 비어 있지 않은 항목을 검증한다", () => {
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            titleFilter: {
-              requiredAll: [],
-              requiredAny:
-                "Condition",
-              excludedAny: []
-            }
-          })
-        ])
-      ),
-    /titleFilter\.requiredAny must be an array of strings/
-  );
-
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            titleFilter: {
-              requiredAll: ["   "],
-              requiredAny: [],
-              excludedAny: []
-            }
-          })
-        ])
-      ),
-    /titleFilter\.requiredAll\[0\] must be a non-empty string/
-  );
-});
-
-test("연식, 주행거리, 제외 색상 값을 검증한다", async (t) => {
-  await t.test(
-    "minYear가 maxYear보다 큼",
-    () => {
-      assert.throws(
-        () =>
-          normalizeWatcherConfig(
-            versionTwoConfig([
-              genericProfile({
-                minYear: 2026,
-                maxYear: 2025
-              })
-            ])
-          ),
-        /minYear must not be greater than .*maxYear/
-      );
+    {
+      ...normalized,
+      profiles: undefined
+    },
+    {
+      configVersion: 2,
+      notifyPriceIncrease: true,
+      maxPages: 3,
+      requestDelayMs: 1500,
+      profiles: undefined
     }
   );
+  assert.equal(
+    normalized.profiles.length,
+    2
+  );
 
-  for (const value of [null, -1]) {
-    await t.test(
-      `주행거리 ${String(value)}`,
-      () => {
-        assert.throws(
-          () =>
-            normalizeWatcherConfig(
-              versionTwoConfig([
-                genericProfile({
-                  maxMileageKm: value
-                })
-              ])
-            ),
-          /maxMileageKm must be a non-negative integer/
-        );
-      }
+  for (const profile of normalized.profiles) {
+    assert.deepEqual(
+      Object.keys(profile).sort(),
+      [
+        "enabled",
+        "id",
+        "isTesla",
+        "name",
+        "price",
+        "searchUrl",
+        "searchUrlSource",
+        "titleFilter"
+      ]
+    );
+    assert.deepEqual(
+      Object.keys(
+        profile.titleFilter
+      ).sort(),
+      [
+        "excludedAny",
+        "requiredAll",
+        "requiredAny"
+      ]
     );
   }
 
-  await t.test("제외 색상", () => {
-    assert.throws(
-      () =>
-        normalizeWatcherConfig(
-          versionTwoConfig([
-            genericProfile({
-              excludedColors:
-                "excluded"
-            })
-          ])
-        ),
-      /excludedColors must be an array of strings/
-    );
+  const [generic, tesla] =
+    normalized.profiles;
+
+  assert.deepEqual(generic, {
+    id: "generic-profile",
+    name: "Generic profile",
+    enabled: true,
+    searchUrl: genericUrl,
+    searchUrlSource: "config",
+    isTesla: false,
+    titleFilter: {
+      requiredAll: ["alpha one"],
+      requiredAny: ["awd", "4wd"],
+      excludedAny: ["demo"]
+    },
+    price: {
+      maxPriceKrw: 45000000
+    }
   });
+  assert.deepEqual(
+    Object.keys(generic.price),
+    ["maxPriceKrw"]
+  );
+
+  assert.deepEqual(tesla, {
+    id: "tesla-profile",
+    name: "Tesla profile",
+    enabled: true,
+    searchUrl: teslaUrl,
+    searchUrlSource:
+      "environment:SYNTHETIC_TESLA_URL",
+    isTesla: true,
+    titleFilter: {
+      requiredAll: [],
+      requiredAny: [],
+      excludedAny: []
+    },
+    price: {
+      maxPriceKrw: 35000000,
+      eapMaxPriceKrw: 37000000,
+      fsdMaxPriceKrw: 40000000
+    }
+  });
+  assert.deepEqual(
+    Object.keys(tesla.price),
+    [
+      "maxPriceKrw",
+      "eapMaxPriceKrw",
+      "fsdMaxPriceKrw"
+    ]
+  );
 });
 
-test("명시적으로 null인 사용자 설정 필드는 누락값 기본값으로 처리하지 않는다", async (t) => {
+test("필수 필드, 형식과 모든 계층의 미지원 필드를 거부한다", async (t) => {
   const cases = [
     {
-      name: "configVersion",
-      config: {
-        ...versionTwoConfig([
-          genericProfile()
-        ]),
-        configVersion: null
+      name: "config object",
+      value: null,
+      pattern: /config must be an object/
+    },
+    {
+      name: "required root field",
+      value: without(
+        validConfig(),
+        "notifyPriceIncrease"
+      ),
+      pattern:
+        /config\.notifyPriceIncrease is required/
+    },
+    {
+      name: "profiles-less config",
+      value: without(
+        validConfig(),
+        "profiles"
+      ),
+      pattern:
+        /config\.profiles is required/
+    },
+    {
+      name: "unknown root field",
+      value: {
+        ...validConfig(),
+        unexpectedRootField: true
+      },
+      pattern:
+        /config contains unknown field unexpectedRootField/
+    },
+    {
+      name: "configVersion format",
+      value: {
+        ...validConfig(),
+        configVersion: 1
       },
       pattern: /configVersion must be 2/
     },
     {
-      name: "profile id",
-      config: versionTwoConfig([
-        genericProfile({ id: null })
-      ]),
-      pattern: /profiles\[0\]\.id must be a non-empty string/
+      name: "root boolean format",
+      value: {
+        ...validConfig(),
+        notifyPriceIncrease: "true"
+      },
+      pattern:
+        /config\.notifyPriceIncrease must be a boolean/
     },
     {
-      name: "profile name",
-      config: versionTwoConfig([
+      name: "root maxPages format",
+      value: {
+        ...validConfig(),
+        maxPages: 0
+      },
+      pattern:
+        /config\.maxPages must be a positive integer/
+    },
+    {
+      name: "root requestDelayMs format",
+      value: {
+        ...validConfig(),
+        requestDelayMs: -1
+      },
+      pattern:
+        /config\.requestDelayMs must be a non-negative integer/
+    },
+    {
+      name: "profiles format",
+      value: {
+        ...validConfig(),
+        profiles: {}
+      },
+      pattern:
+        /profiles must be a non-empty array/
+    },
+    {
+      name: "empty profiles",
+      value: validConfig([]),
+      pattern:
+        /profiles must be a non-empty array/
+    },
+    {
+      name: "profile object",
+      value: validConfig([null]),
+      pattern:
+        /profiles\[0\] must be an object/
+    },
+    {
+      name: "required profile field",
+      value: validConfig([
+        without(
+          genericProfile(),
+          "isTesla"
+        )
+      ]),
+      pattern:
+        /profiles\[0\]\.isTesla is required/
+    },
+    {
+      name: "unknown profile field",
+      value: validConfig([
+        genericProfile({
+          unexpectedProfileField: true
+        })
+      ]),
+      pattern:
+        /profiles\[0\] contains unknown field unexpectedProfileField/
+    },
+    {
+      name: "profile id format",
+      value: validConfig([
+        genericProfile({ id: "  " })
+      ]),
+      pattern:
+        /profiles\[0\]\.id must be a non-empty string/
+    },
+    {
+      name: "reserved default profile id",
+      value: validConfig([
+        genericProfile({
+          id: "default"
+        })
+      ]),
+      pattern:
+        /profiles\[0\]\.id must not be "default"/
+    },
+    {
+      name: "profile name format",
+      value: validConfig([
         genericProfile({ name: null })
       ]),
-      pattern: /name must be a non-empty string/
+      pattern:
+        /name must be a non-empty string/
     },
     {
-      name: "enabled",
-      config: versionTwoConfig([
-        genericProfile({ enabled: null })
+      name: "profile enabled format",
+      value: validConfig([
+        genericProfile({
+          enabled: "true"
+        })
       ]),
-      pattern: /enabled must be a boolean/
+      pattern:
+        /enabled must be a boolean/
     },
     {
-      name: "searchUrl",
-      config: versionTwoConfig([
-        genericProfile({ searchUrl: null })
+      name: "profile isTesla format",
+      value: validConfig([
+        genericProfile({
+          isTesla: "false"
+        })
       ]),
-      pattern: /searchUrl must be a non-empty string/
+      pattern:
+        /isTesla must be a boolean/
     },
     {
-      name: "searchUrlEnv",
-      config: versionTwoConfig([
+      name: "missing profile URL",
+      value: validConfig([
+        without(
+          genericProfile(),
+          "searchUrl"
+        )
+      ]),
+      pattern:
+        /must define exactly one of searchUrl or searchUrlEnv/
+    },
+    {
+      name: "duplicate profile URL sources",
+      value: validConfig([
+        genericProfile({
+          searchUrlEnv:
+            "SYNTHETIC_URL"
+        })
+      ]),
+      environment: {
+        SYNTHETIC_URL:
+          syntheticSearchUrl(
+            "duplicate-url-source"
+          )
+      },
+      pattern:
+        /must define exactly one of searchUrl or searchUrlEnv/
+    },
+    {
+      name: "missing enabled URL environment",
+      value: validConfig([
         genericProfile({
           searchUrl: undefined,
-          searchUrlEnv: null
+          searchUrlEnv:
+            "MISSING_SYNTHETIC_URL"
         })
-      ]),
-      pattern: /searchUrlEnv must be a non-empty string/
+      ].map((profile) => {
+        delete profile.searchUrl;
+        return profile;
+      })),
+      environment: {},
+      pattern:
+        /references missing environment variable MISSING_SYNTHETIC_URL/
     },
     {
-      name: "optionMode",
-      config: versionTwoConfig([
+      name: "titleFilter object",
+      value: validConfig([
         genericProfile({
-          optionMode: null,
-          vehicleProfile: {
-            optionMode: "tesla"
+          titleFilter: []
+        })
+      ]),
+      pattern:
+        /titleFilter must be an object/
+    },
+    {
+      name: "titleFilter required key",
+      value: validConfig([
+        genericProfile({
+          titleFilter: {
+            requiredAll: [],
+            excludedAny: []
           }
         })
       ]),
-      pattern: /optionMode must be generic or tesla/
+      pattern:
+        /titleFilter\.requiredAny is required/
     },
     {
-      name: "price",
-      config: versionTwoConfig([
+      name: "unknown titleFilter field",
+      value: validConfig([
+        genericProfile({
+          titleFilter: {
+            ...titleFilter(),
+            unexpectedTitleFilterField: []
+          }
+        })
+      ]),
+      pattern:
+        /titleFilter contains unknown field unexpectedTitleFilterField/
+    },
+    {
+      name: "titleFilter array format",
+      value: validConfig([
+        genericProfile({
+          titleFilter: titleFilter({
+            requiredAny: "AWD"
+          })
+        })
+      ]),
+      pattern:
+        /titleFilter\.requiredAny must be an array of strings/
+    },
+    {
+      name: "titleFilter item format",
+      value: validConfig([
+        genericProfile({
+          titleFilter: titleFilter({
+            excludedAny: ["  "]
+          })
+        })
+      ]),
+      pattern:
+        /titleFilter\.excludedAny\[0\] must be a non-empty string/
+    },
+    {
+      name: "price object",
+      value: validConfig([
         genericProfile({ price: null })
       ]),
-      pattern: /price must be an object/
+      pattern:
+        /price must be an object/
     },
     {
-      name: "titleFilter",
-      config: versionTwoConfig([
-        genericProfile({
-          titleFilter: null
-        })
+      name: "required generic price",
+      value: validConfig([
+        genericProfile({ price: {} })
       ]),
-      pattern: /titleFilter must be an object/
+      pattern:
+        /price\.maxPriceKrw is required/
     },
     {
-      name: "titleFilter.requiredAll",
-      config: versionTwoConfig([
+      name: "generic price format",
+      value: validConfig([
         genericProfile({
-          titleFilter: {
-            requiredAll: null,
-            requiredAny: [],
-            excludedAny: []
+          price: {
+            maxPriceKrw: -1
           }
         })
       ]),
-      pattern: /titleFilter\.requiredAll must be an array of strings/
+      pattern:
+        /price\.maxPriceKrw must be a non-negative integer/
     },
     {
-      name: "titleFilter.requiredAny",
-      config: versionTwoConfig([
+      name: "generic forbids Tesla price key",
+      value: validConfig([
         genericProfile({
-          titleFilter: {
-            requiredAll: [],
-            requiredAny: null,
-            excludedAny: []
+          price: {
+            maxPriceKrw: 45000000,
+            eapMaxPriceKrw:
+              47000000
           }
         })
       ]),
-      pattern: /titleFilter\.requiredAny must be an array of strings/
+      pattern:
+        /price contains unknown field eapMaxPriceKrw/
     },
     {
-      name: "titleFilter.excludedAny",
-      config: versionTwoConfig([
+      name: "generic forbids FSD price key",
+      value: validConfig([
         genericProfile({
-          titleFilter: {
-            requiredAll: [],
-            requiredAny: [],
-            excludedAny: null
+          price: {
+            maxPriceKrw: 45000000,
+            fsdMaxPriceKrw:
+              50000000
           }
         })
       ]),
-      pattern: /titleFilter\.excludedAny must be an array of strings/
+      pattern:
+        /price contains unknown field fsdMaxPriceKrw/
     },
     {
-      name: "minYear",
-      config: versionTwoConfig([
-        genericProfile({ minYear: null })
-      ]),
-      pattern: /minYear must be a non-negative integer/
-    },
-    {
-      name: "maxYear",
-      config: versionTwoConfig([
-        genericProfile({ maxYear: null })
-      ]),
-      pattern: /maxYear must be a non-negative integer/
-    },
-    {
-      name: "excludedColors",
-      config: versionTwoConfig([
-        genericProfile({
-          excludedColors: null
+      name: "Tesla requires EAP price",
+      value: validConfig([
+        teslaProfile({
+          price: {
+            maxPriceKrw: 35000000,
+            fsdMaxPriceKrw:
+              40000000
+          }
         })
       ]),
-      pattern: /excludedColors must be an array of strings/
+      pattern:
+        /price\.eapMaxPriceKrw is required/
     },
     {
-      name: "excludeContractPending",
-      config: versionTwoConfig([
-        genericProfile({
-          excludeContractPending: null
+      name: "Tesla requires FSD price",
+      value: validConfig([
+        teslaProfile({
+          price: {
+            maxPriceKrw: 35000000,
+            eapMaxPriceKrw:
+              37000000
+          }
         })
       ]),
-      pattern: /excludeContractPending must be a boolean/
+      pattern:
+        /price\.fsdMaxPriceKrw is required/
     },
     {
-      name: "notifyPriceIncrease",
-      config: versionTwoConfig([
-        genericProfile({
-          notifyPriceIncrease: null
+      name: "Tesla price format",
+      value: validConfig([
+        teslaProfile({
+          price: {
+            maxPriceKrw: 35000000,
+            eapMaxPriceKrw: 1.5,
+            fsdMaxPriceKrw:
+              40000000
+          }
         })
       ]),
-      pattern: /notifyPriceIncrease must be a boolean/
+      pattern:
+        /price\.eapMaxPriceKrw must be a non-negative integer/
     },
     {
-      name: "maxPages",
-      config: versionTwoConfig([
-        genericProfile({ maxPages: null })
-      ]),
-      pattern: /maxPages must be a positive integer/
-    },
-    {
-      name: "requestDelayMs",
-      config: versionTwoConfig([
-        genericProfile({
-          requestDelayMs: null
+      name: "unknown price field",
+      value: validConfig([
+        teslaProfile({
+          price: {
+            maxPriceKrw: 35000000,
+            eapMaxPriceKrw:
+              37000000,
+            fsdMaxPriceKrw:
+              40000000,
+            unexpectedPriceField: true
+          }
         })
       ]),
-      pattern: /requestDelayMs must be a non-negative integer/
+      pattern:
+        /price contains unknown field unexpectedPriceField/
     },
     {
-      name: "root maxPages",
-      config: {
-        ...versionTwoConfig([
-          genericProfile({ maxPages: 1 })
-        ]),
-        maxPages: null
-      },
-      pattern: /config\.maxPages must be a positive integer/
+      name: "duplicate profile id",
+      value: validConfig([
+        genericProfile(),
+        teslaProfile({
+          id: "generic-profile"
+        })
+      ]),
+      pattern: /id must be unique/
     },
     {
-      name: "root requestDelayMs",
-      config: {
-        ...versionTwoConfig([
-          genericProfile({
-            requestDelayMs: 0
-          })
-        ]),
-        requestDelayMs: null
-      },
-      pattern: /config\.requestDelayMs must be a non-negative integer/
-    },
-    {
-      name: "root notifyPriceIncrease",
-      config: {
-        ...versionTwoConfig([
-          genericProfile({
-            notifyPriceIncrease: false
-          })
-        ]),
-        notifyPriceIncrease: null
-      },
-      pattern: /config\.notifyPriceIncrease must be a boolean/
-    },
-    {
-      name: "legacyStateProfileId",
-      config: {
-        ...versionTwoConfig([
-          genericProfile()
-        ]),
-        legacyStateProfileId: null
-      },
-      pattern: /legacyStateProfileId must be a non-empty string/
+      name: "at least one enabled profile",
+      value: validConfig([
+        genericProfile({
+          enabled: false
+        })
+      ]),
+      pattern:
+        /at least one profile must be enabled/
     }
   ];
 
   for (const {
     name,
-    config,
+    value,
+    environment = {},
     pattern
   } of cases) {
     await t.test(name, () => {
       assert.throws(
         () =>
           normalizeWatcherConfig(
-            config,
-            {}
+            value,
+            environment
           ),
         pattern
       );
     });
   }
-});
-
-test("명시적 null은 환경변수 override가 있어도 거부한다", () => {
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        {
-          ...legacyConfig(),
-          maxPages: null
-        },
-        {
-          GITHUB_ACTIONS: "true",
-          ENCAR_SEARCH_URL:
-            legacySearchUrl(),
-          MAX_PAGES: "3"
-        }
-      ),
-    /config\.maxPages must be a positive integer/
-  );
-
-  assert.throws(
-    () =>
-      normalizeWatcherConfig(
-        versionTwoConfig([
-          genericProfile({
-            maxPages: null
-          })
-        ]),
-        { MAX_PAGES: "3" }
-      ),
-    /profiles\[0\].*maxPages must be a positive integer/
-  );
-});
-
-test("생략된 선택 필드에만 안전한 기본값을 적용한다", () => {
-  const profile = genericProfile();
-
-  delete profile.optionMode;
-  delete profile.price;
-  delete profile.titleFilter.requiredAll;
-  delete profile.titleFilter.requiredAny;
-  delete profile.titleFilter.excludedAny;
-  delete profile.minYear;
-  delete profile.maxYear;
-  delete profile.maxMileageKm;
-  delete profile.excludedColors;
-  delete profile.excludeContractPending;
-
-  const normalized = normalizeWatcherConfig(
-    {
-      configVersion: 2,
-      profiles: [profile]
-    }
-  ).profiles[0];
-
-  assert.equal(
-    normalized.optionMode,
-    "generic"
-  );
-  assert.deepEqual(normalized.price, {
-    maxPriceKrw:
-      Number.MAX_SAFE_INTEGER
-  });
-  assert.deepEqual(normalized.titleFilter, {
-    requiredAll: [],
-    requiredAny: [],
-    excludedAny: []
-  });
-  assert.equal(
-    normalized.yearMonthMin,
-    "0000-01"
-  );
-  assert.equal(
-    normalized.yearMonthMax,
-    "9999-12"
-  );
-  assert.equal(
-    normalized.maxMileageKm,
-    Number.MAX_SAFE_INTEGER
-  );
-  assert.deepEqual(
-    normalized.excludedColorTerms,
-    []
-  );
-  assert.equal(
-    normalized.excludeContracted,
-    true
-  );
-  assert.equal(normalized.maxPages, 1);
-  assert.equal(
-    normalized.requestDelayMs,
-    1500
-  );
-});
-
-test("legacyStateProfileId는 구성된 disabled 프로필도 가리킬 수 있지만 알 수 없는 id는 거부한다", () => {
-  const normalized =
-    normalizeWatcherConfig({
-      ...versionTwoConfig([
-        genericProfile(),
-        genericProfile({
-          id: "condition-disabled",
-          name: "Disabled condition",
-          enabled: false,
-          searchUrl:
-            syntheticSearchUrl(
-              "disabled-condition"
-            )
-        })
-      ]),
-      legacyStateProfileId:
-        "condition-disabled"
-    });
-
-  assert.equal(
-    normalized.legacyStateProfileId,
-    "condition-disabled"
-  );
-
-  assert.throws(
-    () =>
-      normalizeWatcherConfig({
-        ...versionTwoConfig([
-          genericProfile()
-        ]),
-        legacyStateProfileId:
-          "missing-condition"
-      }),
-    /legacyStateProfileId must match a configured profile id/
-  );
-});
-
-test("새 price, titleFilter, 연식 필드는 충돌하거나 잘못된 구형 필드보다 우선한다", () => {
-  const normalized =
-    normalizeWatcherConfig(
-      versionTwoConfig([
-        genericProfile({
-          titleFilter: {
-            requiredAll: [
-              "  Example   Model "
-            ],
-            requiredAny: ["AWD", "4WD"],
-            excludedAny: ["Excluded"]
-          },
-          requiredTitleTerms:
-            "invalid legacy value",
-          yearMonthMin:
-            "invalid legacy value",
-          yearMonthMax:
-            "invalid legacy value",
-          price: {
-            maxPriceKrw: 42000000
-          },
-          priceLimitsKrw:
-            "invalid legacy value"
-        })
-      ])
-    );
-  const [profile] =
-    normalized.profiles;
-
-  assert.deepEqual(profile.price, {
-    maxPriceKrw: 42000000
-  });
-  assert.deepEqual(
-    profile.titleFilter,
-    {
-      requiredAll: ["example model"],
-      requiredAny: ["awd", "4wd"],
-      excludedAny: ["excluded"]
-    }
-  );
-  assert.equal(
-    profile.yearMonthMin,
-    "2020-01"
-  );
-  assert.equal(
-    profile.yearMonthMax,
-    "2026-12"
-  );
-});
-
-test("profiles 없는 구형 설정은 default 테슬라 프로필과 기존 필드를 사용한다", () => {
-  const url = legacySearchUrl();
-  const normalized =
-    normalizeWatcherConfig(
-      legacyConfig(),
-      {
-        GITHUB_ACTIONS: "true",
-        ENCAR_SEARCH_URL: url
-      }
-    );
-  const [profile] =
-    normalized.profiles;
-
-  assert.equal(
-    normalized.legacyConfig,
-    true
-  );
-  assert.equal(profile.id, "default");
-  assert.equal(profile.name, "Default");
-  assert.equal(
-    profile.optionMode,
-    "tesla"
-  );
-  assert.equal(profile.searchUrl, url);
-  assert.deepEqual(profile.price, {
-    maxPriceKrw: 35000000,
-    teslaOptionLimitsKrw: {
-      eap: 37000000,
-      fsd: 40000000,
-      unknownOptionHardMax:
-        35000000
-    }
-  });
-  assert.deepEqual(
-    profile.titleFilter,
-    {
-      requiredAll: [
-        "example model",
-        "awd"
-      ],
-      requiredAny: [],
-      excludedAny: []
-    }
-  );
 });

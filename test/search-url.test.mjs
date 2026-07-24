@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_SEARCH_URL,
   createSearchUrlFingerprint,
   normalizeEncarSearchUrl,
-  resolveSearchUrl,
   setPage
 } from "../src/lib.mjs";
 
@@ -114,27 +112,6 @@ const currentUrl = createCurrentUrl(
     searchOverrides: currentSearch
   }
 );
-
-test("GitHub Actions 환경에서 ENCAR_SEARCH_URL 누락 시 오류", () => {
-  assert.throws(
-    () =>
-      resolveSearchUrl({
-        GITHUB_ACTIONS: "true"
-      }),
-    /GitHub Actions에서는 ENCAR_SEARCH_URL repository variable이 필요합니다/
-  );
-});
-
-test("GitHub Actions 환경에서 ENCAR_SEARCH_URL이 공백이면 오류", () => {
-  assert.throws(
-    () =>
-      resolveSearchUrl({
-        GITHUB_ACTIONS: "true",
-        ENCAR_SEARCH_URL: "  \t\n"
-      }),
-    /GitHub Actions에서는 ENCAR_SEARCH_URL repository variable이 필요합니다/
-  );
-});
 
 test("현재 형식 URL은 검색조건과 정상 page를 유지한다", () => {
   const normalized =
@@ -388,81 +365,6 @@ test("변환된 URL은 페이지 순회 시 page만 변경할 수 있다", () =>
   );
 });
 
-test("resolveSearchUrl은 기존 형식도 정규화된 URL로 반환한다", () => {
-  const legacyUrl =
-    createLegacyUrl(
-      "resolve-legacy",
-      { page: 2 }
-    );
-  const result =
-    resolveSearchUrl({
-      GITHUB_ACTIONS: "true",
-      ENCAR_SEARCH_URL: legacyUrl
-    });
-  const normalizedUrl =
-    new URL(result.url);
-
-  assert.equal(
-    result.source,
-    "repository variable"
-  );
-  assert.equal(
-    normalizedUrl.host,
-    "car.encar.com"
-  );
-  assert.equal(
-    normalizedUrl.searchParams.get(
-      "page"
-    ),
-    "2"
-  );
-  assert.equal(
-    result.url,
-    normalizeEncarSearchUrl(
-      legacyUrl
-    )
-  );
-  assert.notEqual(result.url, legacyUrl);
-});
-
-test("resolveSearchUrl은 현재 URL의 title과 Year.range를 보존한다", () => {
-  const result =
-    resolveSearchUrl({
-      GITHUB_ACTIONS: "true",
-      ENCAR_SEARCH_URL: currentUrl
-    });
-  const resolvedUrl =
-    new URL(result.url);
-  const resolvedSearch = JSON.parse(
-    resolvedUrl.searchParams.get(
-      "search"
-    )
-  );
-
-  assert.equal(
-    result.source,
-    "repository variable"
-  );
-  assert.equal(
-    resolvedUrl.host,
-    "car.encar.com"
-  );
-  assert.equal(
-    resolvedUrl.searchParams.get(
-      "page"
-    ),
-    "3"
-  );
-  assert.equal(
-    resolvedSearch.title,
-    currentSearch.title
-  );
-  assert.match(
-    resolvedSearch.action,
-    /Year\.range\(202205\.\.202212\)/
-  );
-});
-
 test("현재 형식 URL에서 search 쿼리가 없으면 명확한 오류", () => {
   assert.throws(
     () =>
@@ -635,24 +537,22 @@ test("Tesla와 Toyota 합성 URL은 서로 섞이지 않는다", () => {
       }
     );
 
-  const teslaResult =
-    resolveSearchUrl({
-      GITHUB_ACTIONS: "true",
-      ENCAR_SEARCH_URL: teslaUrl
-    });
-  const toyotaResult =
-    resolveSearchUrl({
-      GITHUB_ACTIONS: "true",
-      ENCAR_SEARCH_URL: toyotaUrl
-    });
+  const normalizedTeslaUrl =
+    normalizeEncarSearchUrl(
+      teslaUrl
+    );
+  const normalizedToyotaUrl =
+    normalizeEncarSearchUrl(
+      toyotaUrl
+    );
 
   const teslaConditions =
     readSearchConditions(
-      teslaResult.url
+      normalizedTeslaUrl
     );
   const toyotaConditions =
     readSearchConditions(
-      toyotaResult.url
+      normalizedToyotaUrl
     );
 
   assert.match(
@@ -670,22 +570,6 @@ test("Tesla와 Toyota 합성 URL은 서로 섞이지 않는다", () => {
   assert.doesNotMatch(
     toyotaConditions.action,
     /Manufacturer\.테슬라/
-  );
-});
-
-test("로컬 환경에서는 정규화된 기본 URL을 사용할 수 있다", () => {
-  const result =
-    resolveSearchUrl({});
-
-  assert.equal(
-    result.source,
-    "default"
-  );
-  assert.equal(
-    result.url,
-    normalizeEncarSearchUrl(
-      DEFAULT_SEARCH_URL
-    )
   );
 });
 

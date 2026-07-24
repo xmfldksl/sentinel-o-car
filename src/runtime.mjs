@@ -1,8 +1,5 @@
 import {
-  TESLA_OPTION_STATE_FIELDS,
   createTelegramMessageRequest,
-  migrateLegacyState,
-  resolveSearchUrl,
   sleep
 } from "./lib.mjs";
 import {
@@ -11,12 +8,13 @@ import {
 
 const SUPPORTED_CONFIG_VERSION = 2;
 const STATE_SCHEMA_VERSION = 2;
-const LEGACY_STATE_MIGRATION_FIELD =
-  "legacyStateMigratedToProfileId";
-const DEFAULT_MAX_PAGES = 1;
-const DEFAULT_REQUEST_DELAY_MS = 1500;
-const UNBOUNDED_YEAR_MONTH_MIN = "0000-01";
-const UNBOUNDED_YEAR_MONTH_MAX = "9999-12";
+const TESLA_OPTION_EVENT_FIELDS = [
+  "option",
+  "hasFsd",
+  "hasEap",
+  "optionSource",
+  "optionEvidence"
+];
 
 function isPlainObject(value) {
   return Boolean(
@@ -33,6 +31,36 @@ function hasOwn(object, key) {
   );
 }
 
+function requireExactKeys(
+  source,
+  path,
+  {
+    required,
+    allowed = required
+  }
+) {
+  const allowedKeys = new Set(allowed);
+  const unknownKeys = Object.keys(
+    source
+  ).filter(
+    (key) => !allowedKeys.has(key)
+  );
+
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `${path} contains unknown field ${unknownKeys[0]}`
+    );
+  }
+
+  for (const key of required) {
+    if (!hasOwn(source, key)) {
+      throw new Error(
+        `${path}.${key} is required`
+      );
+    }
+  }
+}
+
 function requireNonEmptyString(value, path) {
   if (
     typeof value !== "string" ||
@@ -44,6 +72,95 @@ function requireNonEmptyString(value, path) {
   }
 
   return value.trim();
+}
+
+function requireIsoTimestampString(
+  value,
+  path
+) {
+  const normalized =
+    typeof value === "string"
+      ? value.trim()
+      : "";
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(
+      normalized
+    );
+  let hasValidParts = false;
+
+  if (match) {
+    const [
+      ,
+      yearText,
+      monthText,
+      dayText,
+      hourText,
+      minuteText,
+      secondText,
+      offsetHourText,
+      offsetMinuteText
+    ] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const hour = Number(hourText);
+    const minute = Number(minuteText);
+    const second = Number(secondText);
+    const isLeapYear =
+      year % 4 === 0 &&
+      (
+        year % 100 !== 0 ||
+        year % 400 === 0
+      );
+    const daysInMonth = [
+      31,
+      isLeapYear ? 29 : 28,
+      31,
+      30,
+      31,
+      30,
+      31,
+      31,
+      30,
+      31,
+      30,
+      31
+    ];
+    const offsetHour =
+      offsetHourText === undefined
+        ? 0
+        : Number(offsetHourText);
+    const offsetMinute =
+      offsetMinuteText === undefined
+        ? 0
+        : Number(offsetMinuteText);
+
+    hasValidParts =
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= daysInMonth[month - 1] &&
+      hour <= 23 &&
+      minute <= 59 &&
+      second <= 59 &&
+      offsetHour <= 23 &&
+      offsetMinute <= 59;
+  }
+
+  if (
+    !normalized ||
+    normalized !== value ||
+    !hasValidParts ||
+    !Number.isFinite(
+      Date.parse(normalized)
+    )
+  ) {
+    throw new Error(
+      `${path} must be a valid ISO timestamp string`
+    );
+  }
+
+  return normalized;
 }
 
 function requireBoolean(value, path) {
@@ -101,15 +218,10 @@ function normalizeStringArray(
   value,
   path,
   {
-    defaultValue = [],
     normalize = (item) => item.trim(),
     rejectEmpty = false
   } = {}
 ) {
-  if (value === undefined) {
-    return [...defaultValue];
-  }
-
   if (!Array.isArray(value)) {
     throw new Error(
       `${path} must be an array of strings`
@@ -142,174 +254,52 @@ function normalizeTitleFilter(
   source,
   path
 ) {
-  if (hasOwn(source, "titleFilter")) {
-    if (!isPlainObject(source.titleFilter)) {
-      throw new Error(
-        `${path}.titleFilter must be an object`
-      );
-    }
-
-    return {
-      requiredAll: normalizeStringArray(
-        source.titleFilter.requiredAll,
-        `${path}.titleFilter.requiredAll`,
-        {
-          normalize:
-            normalizeComparableText,
-          rejectEmpty: true
-        }
-      ),
-      requiredAny: normalizeStringArray(
-        source.titleFilter.requiredAny,
-        `${path}.titleFilter.requiredAny`,
-        {
-          normalize:
-            normalizeComparableText,
-          rejectEmpty: true
-        }
-      ),
-      excludedAny: normalizeStringArray(
-        source.titleFilter.excludedAny,
-        `${path}.titleFilter.excludedAny`,
-        {
-          normalize:
-            normalizeComparableText,
-          rejectEmpty: true
-        }
-      )
-    };
+  if (!isPlainObject(source.titleFilter)) {
+    throw new Error(
+      `${path}.titleFilter must be an object`
+    );
   }
+
+  requireExactKeys(
+    source.titleFilter,
+    `${path}.titleFilter`,
+    {
+      required: [
+        "requiredAll",
+        "requiredAny",
+        "excludedAny"
+      ]
+    }
+  );
 
   return {
     requiredAll: normalizeStringArray(
-      source.requiredTitleTerms,
-      `${path}.requiredTitleTerms`,
+      source.titleFilter.requiredAll,
+      `${path}.titleFilter.requiredAll`,
       {
         normalize:
           normalizeComparableText,
         rejectEmpty: true
       }
     ),
-    requiredAny: [],
-    excludedAny: []
-  };
-}
-
-function normalizeYearMonth(value, path) {
-  if (
-    typeof value !== "string" ||
-    !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(
-      value
+    requiredAny: normalizeStringArray(
+      source.titleFilter.requiredAny,
+      `${path}.titleFilter.requiredAny`,
+      {
+        normalize:
+          normalizeComparableText,
+        rejectEmpty: true
+      }
+    ),
+    excludedAny: normalizeStringArray(
+      source.titleFilter.excludedAny,
+      `${path}.titleFilter.excludedAny`,
+      {
+        normalize:
+          normalizeComparableText,
+        rejectEmpty: true
+      }
     )
-  ) {
-    throw new Error(
-      `${path} must use YYYY-MM`
-    );
-  }
-
-  return value;
-}
-
-function normalizeYearRange(source, path) {
-  const hasMinYear = hasOwn(
-    source,
-    "minYear"
-  );
-  const hasMaxYear = hasOwn(
-    source,
-    "maxYear"
-  );
-
-  if (hasMinYear || hasMaxYear) {
-    if (!hasMinYear || !hasMaxYear) {
-      throw new Error(
-        `${path}.minYear and ${path}.maxYear must be provided together`
-      );
-    }
-
-    const minYear =
-      requireNonNegativeInteger(
-        source.minYear,
-        `${path}.minYear`
-      );
-    const maxYear =
-      requireNonNegativeInteger(
-        source.maxYear,
-        `${path}.maxYear`
-      );
-
-    if (minYear > maxYear) {
-      throw new Error(
-        `${path}.minYear must not be greater than ${path}.maxYear`
-      );
-    }
-
-    if (minYear > 9999 || maxYear > 9999) {
-      throw new Error(
-        `${path}.minYear and ${path}.maxYear must not exceed 9999`
-      );
-    }
-
-    return {
-      yearMonthMin: `${String(
-        minYear
-      ).padStart(4, "0")}-01`,
-      yearMonthMax: `${String(
-        maxYear
-      ).padStart(4, "0")}-12`
-    };
-  }
-
-  const hasYearMonthMin = hasOwn(
-    source,
-    "yearMonthMin"
-  );
-  const hasYearMonthMax = hasOwn(
-    source,
-    "yearMonthMax"
-  );
-
-  if (
-    hasYearMonthMin ||
-    hasYearMonthMax
-  ) {
-    if (
-      !hasYearMonthMin ||
-      !hasYearMonthMax
-    ) {
-      throw new Error(
-        `${path}.yearMonthMin and ${path}.yearMonthMax must be provided together`
-      );
-    }
-
-    const yearMonthMin =
-      normalizeYearMonth(
-        source.yearMonthMin,
-        `${path}.yearMonthMin`
-      );
-    const yearMonthMax =
-      normalizeYearMonth(
-        source.yearMonthMax,
-        `${path}.yearMonthMax`
-      );
-
-    if (yearMonthMin > yearMonthMax) {
-      throw new Error(
-        `${path}.yearMonthMin must not be greater than ${path}.yearMonthMax`
-      );
-    }
-
-    return {
-      yearMonthMin,
-      yearMonthMax
-    };
-  }
-
-  return {
-    yearMonthMin:
-      UNBOUNDED_YEAR_MONTH_MIN,
-    yearMonthMax:
-      UNBOUNDED_YEAR_MONTH_MAX
   };
 }
 
@@ -381,54 +371,13 @@ function normalizeProfileSearchUrl(
   };
 }
 
-function normalizeOptionMode(
-  value,
-  path,
-  defaultValue
-) {
-  const optionMode =
-    value === undefined
-      ? defaultValue
-      : value;
-
-  if (
-    optionMode !== "generic" &&
-    optionMode !== "tesla"
-  ) {
-    throw new Error(
-      `${path} must be generic or tesla`
-    );
-  }
-
-  return optionMode;
-}
-
 function normalizePrice(
   source,
-  optionMode,
-  path,
-  warn
+  isTesla,
+  path
 ) {
-  const hasNewPrice = hasOwn(
-    source,
-    "price"
-  );
-  const priceSource = hasNewPrice
-    ? source.price
-    : source.priceLimitsKrw;
-  const pricePath = hasNewPrice
-    ? `${path}.price`
-    : `${path}.priceLimitsKrw`;
-
-  if (
-    priceSource === undefined &&
-    optionMode === "generic"
-  ) {
-    return {
-      maxPriceKrw:
-        Number.MAX_SAFE_INTEGER
-    };
-  }
+  const pricePath = `${path}.price`;
+  const priceSource = source.price;
 
   if (!isPlainObject(priceSource)) {
     throw new Error(
@@ -436,325 +385,132 @@ function normalizePrice(
     );
   }
 
-  const maxPriceKrw =
-    requireNonNegativeInteger(
-      hasNewPrice
-        ? priceSource.maxPriceKrw
-        : priceSource.base,
-      hasNewPrice
-        ? `${pricePath}.maxPriceKrw`
-        : `${pricePath}.base`
-    );
+  const requiredKeys = isTesla
+    ? [
+        "maxPriceKrw",
+        "eapMaxPriceKrw",
+        "fsdMaxPriceKrw"
+      ]
+    : ["maxPriceKrw"];
 
-  if (optionMode === "generic") {
-    const hasIgnoredLimits = hasNewPrice
-      ? hasOwn(
-          priceSource,
-          "teslaOptionLimitsKrw"
-        )
-      : [
-          "eap",
-          "fsd",
-          "unknownOptionHardMax"
-        ].some((key) =>
-          hasOwn(priceSource, key)
-        );
-
-    if (hasIgnoredLimits) {
-      warn(
-        `${pricePath}.teslaOptionLimitsKrw is ignored because ${path}.optionMode is generic`
-      );
+  requireExactKeys(
+    priceSource,
+    pricePath,
+    {
+      required: requiredKeys
     }
-
-    return {
-      maxPriceKrw
-    };
-  }
-
-  const optionLimits = hasNewPrice
-    ? priceSource.teslaOptionLimitsKrw
-    : priceSource;
-
-  const limitsPath = hasNewPrice
-    ? `${pricePath}.teslaOptionLimitsKrw`
-    : pricePath;
-
-  if (!isPlainObject(optionLimits)) {
-    throw new Error(
-      `${limitsPath} must be an object in tesla mode`
-    );
-  }
+  );
 
   return {
-    maxPriceKrw,
-    teslaOptionLimitsKrw: {
-      eap: requireNonNegativeInteger(
-        optionLimits.eap,
-        `${limitsPath}.eap`
-      ),
-      fsd: requireNonNegativeInteger(
-        optionLimits.fsd,
-        `${limitsPath}.fsd`
-      ),
-      unknownOptionHardMax:
-        requireNonNegativeInteger(
-          optionLimits.unknownOptionHardMax,
-          `${limitsPath}.unknownOptionHardMax`
-        )
-    }
-  };
-}
-
-function resolveAliasedValue(
-  source,
-  preferredKey,
-  legacyKey,
-  fallback
-) {
-  if (hasOwn(source, preferredKey)) {
-    return source[preferredKey];
-  }
-
-  if (hasOwn(source, legacyKey)) {
-    return source[legacyKey];
-  }
-
-  return fallback;
-}
-
-function normalizeRuntimeInteger(
-  profile,
-  rootConfig,
-  environment,
-  key,
-  defaultValue,
-  path,
-  { positive = false } = {}
-) {
-  let value;
-
-  if (hasOwn(profile, key)) {
-    if (positive) {
-      requirePositiveInteger(
-        profile[key],
-        path
-      );
-    } else {
+    maxPriceKrw:
       requireNonNegativeInteger(
-        profile[key],
-        path
-      );
-    }
-  }
-
-  if (
-    key === "maxPages" &&
-    typeof environment?.MAX_PAGES ===
-      "string" &&
-    environment.MAX_PAGES.trim()
-  ) {
-    value = Number(
-      environment.MAX_PAGES
-    );
-  } else if (hasOwn(profile, key)) {
-    value = profile[key];
-  } else if (hasOwn(rootConfig, key)) {
-    value = rootConfig[key];
-  } else {
-    value = defaultValue;
-  }
-
-  return positive
-    ? requirePositiveInteger(value, path)
-    : requireNonNegativeInteger(
-        value,
-        path
-      );
+        priceSource.maxPriceKrw,
+        `${pricePath}.maxPriceKrw`
+      ),
+    ...(isTesla
+      ? {
+          eapMaxPriceKrw:
+            requireNonNegativeInteger(
+              priceSource.eapMaxPriceKrw,
+              `${pricePath}.eapMaxPriceKrw`
+            ),
+          fsdMaxPriceKrw:
+            requireNonNegativeInteger(
+              priceSource.fsdMaxPriceKrw,
+              `${pricePath}.fsdMaxPriceKrw`
+            )
+        }
+      : {})
+  };
 }
 
 function normalizeProfile(
   source,
   index,
-  rootConfig,
-  environment,
-  warn,
-  { legacy = false } = {}
+  environment
 ) {
-  const basePath = legacy
-    ? "config"
-    : `profiles[${index}]`;
-  const id = legacy
-    ? "default"
-    : requireNonEmptyString(
-        source.id,
-        `${basePath}.id`
-      );
-  const path = legacy
-    ? basePath
-    : `${basePath} (${id})`;
-  const name = legacy
-    ? "Default"
-    : requireNonEmptyString(
-        source.name,
-        `${path}.name`
-      );
-  const enabled = legacy
-    ? true
-    : requireBoolean(
-        source.enabled,
-        `${path}.enabled`
-      );
+  const basePath = `profiles[${index}]`;
 
-  const search = legacy
-    ? (() => {
-        const resolved =
-          resolveSearchUrl(
-            environment
-          );
+  requireExactKeys(
+    source,
+    basePath,
+    {
+      required: [
+        "id",
+        "name",
+        "enabled",
+        "isTesla",
+        "titleFilter",
+        "price"
+      ],
+      allowed: [
+        "id",
+        "name",
+        "enabled",
+        "searchUrl",
+        "searchUrlEnv",
+        "isTesla",
+        "titleFilter",
+        "price"
+      ]
+    }
+  );
 
-        return {
-          searchUrl: resolved.url,
-          searchUrlSource:
-            resolved.source
-        };
-      })()
-    : normalizeProfileSearchUrl(
-        source,
-        environment,
-        path,
-        enabled
-      );
+  const id = requireNonEmptyString(
+    source.id,
+    `${basePath}.id`
+  );
 
-  const legacyOptionMode =
-    source.vehicleProfile
-      ?.optionMode;
-  const optionMode =
-    normalizeOptionMode(
-      hasOwn(source, "optionMode")
-        ? source.optionMode
-        : legacyOptionMode,
-      `${path}.optionMode`,
-      legacy ? "tesla" : "generic"
+  if (id === "default") {
+    throw new Error(
+      `${basePath}.id must not be "default"`
     );
+  }
+
+  const path = `${basePath} (${id})`;
+  const name = requireNonEmptyString(
+    source.name,
+    `${path}.name`
+  );
+  const enabled = requireBoolean(
+    source.enabled,
+    `${path}.enabled`
+  );
+  const isTesla = requireBoolean(
+    source.isTesla,
+    `${path}.isTesla`
+  );
+  const search = normalizeProfileSearchUrl(
+    source,
+    environment,
+    path,
+    enabled
+  );
   const titleFilter =
     normalizeTitleFilter(
       source,
       path
     );
-  const yearRange =
-    normalizeYearRange(
-      source,
-      path
-    );
-  const maxMileageKm =
-    requireNonNegativeInteger(
-      hasOwn(source, "maxMileageKm")
-        ? source.maxMileageKm
-        : Number.MAX_SAFE_INTEGER,
-      `${path}.maxMileageKm`
-    );
-  const excludedColorTerms =
-    normalizeStringArray(
-      resolveAliasedValue(
-        source,
-        "excludedColors",
-        "excludedColorTerms",
-        []
-      ),
-      `${path}.${
-        hasOwn(source, "excludedColors")
-          ? "excludedColors"
-          : "excludedColorTerms"
-      }`,
-      {
-        normalize: (item) =>
-          item
-            .trim()
-            .replace(/\s+/g, " ")
-            .toLowerCase(),
-        rejectEmpty: true
-      }
-    );
-  const excludeContracted =
-    requireBoolean(
-      resolveAliasedValue(
-        source,
-        "excludeContractPending",
-        "excludeContracted",
-        true
-      ),
-      `${path}.${
-        hasOwn(
-          source,
-          "excludeContractPending"
-        )
-          ? "excludeContractPending"
-          : "excludeContracted"
-      }`
-    );
   const price = normalizePrice(
     source,
-    optionMode,
-    path,
-    warn
+    isTesla,
+    path
   );
-  const notifyPriceIncrease =
-    requireBoolean(
-      hasOwn(
-        source,
-        "notifyPriceIncrease"
-      )
-        ? source.notifyPriceIncrease
-        : hasOwn(
-              rootConfig,
-              "notifyPriceIncrease"
-            )
-          ? rootConfig.notifyPriceIncrease
-          : false,
-      `${path}.notifyPriceIncrease`
-    );
-  const maxPages =
-    normalizeRuntimeInteger(
-      source,
-      rootConfig,
-      environment,
-      "maxPages",
-      DEFAULT_MAX_PAGES,
-      `${path}.maxPages`,
-      { positive: true }
-    );
-  const requestDelayMs =
-    normalizeRuntimeInteger(
-      source,
-      rootConfig,
-      environment,
-      "requestDelayMs",
-      DEFAULT_REQUEST_DELAY_MS,
-      `${path}.requestDelayMs`
-    );
 
   return {
     id,
     name,
     enabled,
     ...search,
-    optionMode,
+    isTesla,
     titleFilter,
-    ...yearRange,
-    maxMileageKm,
-    excludedColorTerms,
-    excludeContracted,
-    price,
-    notifyPriceIncrease,
-    maxPages,
-    requestDelayMs
+    price
   };
 }
 
 export function normalizeWatcherConfig(
   rawConfig,
-  environment = process.env,
-  { warn = () => {} } = {}
+  environment = process.env
 ) {
   if (!isPlainObject(rawConfig)) {
     throw new Error(
@@ -762,83 +518,57 @@ export function normalizeWatcherConfig(
     );
   }
 
+  requireExactKeys(
+    rawConfig,
+    "config",
+    {
+      required: [
+        "configVersion",
+        "notifyPriceIncrease",
+        "maxPages",
+        "requestDelayMs",
+        "profiles"
+      ]
+    }
+  );
+
   if (
-    hasOwn(rawConfig, "configVersion") &&
     rawConfig.configVersion !==
-      SUPPORTED_CONFIG_VERSION
+    SUPPORTED_CONFIG_VERSION
   ) {
     throw new Error(
       `configVersion must be ${SUPPORTED_CONFIG_VERSION}`
     );
   }
 
-  if (typeof warn !== "function") {
-    throw new Error(
-      "warn must be a function"
-    );
-  }
-
-  const hasProfiles = hasOwn(
-    rawConfig,
-    "profiles"
-  );
-
-  if (hasOwn(rawConfig, "maxPages")) {
-    requirePositiveInteger(
-      rawConfig.maxPages,
-      "config.maxPages"
-    );
-  }
-
-  if (
-    hasOwn(
-      rawConfig,
-      "requestDelayMs"
-    )
-  ) {
-    requireNonNegativeInteger(
-      rawConfig.requestDelayMs,
-      "config.requestDelayMs"
-    );
-  }
-
-  if (
-    hasOwn(
-      rawConfig,
-      "notifyPriceIncrease"
-    )
-  ) {
+  const notifyPriceIncrease =
     requireBoolean(
       rawConfig.notifyPriceIncrease,
       "config.notifyPriceIncrease"
     );
-  }
-
-  if (!hasProfiles) {
-    if (hasOwn(rawConfig, "configVersion")) {
-      throw new Error(
-        "profiles must be a non-empty array when configVersion is present"
-      );
-    }
-
-    return {
-      configVersion:
-        SUPPORTED_CONFIG_VERSION,
-      legacyConfig: true,
-      legacyStateProfileId:
-        "default",
-      profiles: [
-        normalizeProfile(
-          rawConfig,
-          0,
-          rawConfig,
-          environment,
-          warn,
-          { legacy: true }
+  const configuredMaxPages =
+    requirePositiveInteger(
+      rawConfig.maxPages,
+      "config.maxPages"
+    );
+  const requestDelayMs =
+    requireNonNegativeInteger(
+      rawConfig.requestDelayMs,
+      "config.requestDelayMs"
+    );
+  const maxPagesOverride =
+    environment?.MAX_PAGES;
+  const maxPages =
+    typeof maxPagesOverride ===
+        "string" &&
+      maxPagesOverride.trim()
+      ? requirePositiveInteger(
+          Number(
+            maxPagesOverride
+          ),
+          "environment.MAX_PAGES"
         )
-      ]
-    };
-  }
+      : configuredMaxPages;
 
   if (
     !Array.isArray(rawConfig.profiles) ||
@@ -861,9 +591,7 @@ export function normalizeWatcherConfig(
         return normalizeProfile(
           profile,
           index,
-          rawConfig,
-          environment,
-          warn
+          environment
         );
       }
     );
@@ -892,32 +620,12 @@ export function normalizeWatcherConfig(
     );
   }
 
-  let legacyStateProfileId = null;
-
-  if (
-    hasOwn(
-      rawConfig,
-      "legacyStateProfileId"
-    )
-  ) {
-    legacyStateProfileId =
-      requireNonEmptyString(
-        rawConfig.legacyStateProfileId,
-        "legacyStateProfileId"
-      );
-
-    if (!seenIds.has(legacyStateProfileId)) {
-      throw new Error(
-        "legacyStateProfileId must match a configured profile id"
-      );
-    }
-  }
-
   return {
     configVersion:
       SUPPORTED_CONFIG_VERSION,
-    legacyConfig: false,
-    legacyStateProfileId,
+    notifyPriceIncrease,
+    maxPages,
+    requestDelayMs,
     profiles
   };
 }
@@ -928,50 +636,137 @@ function createEmptyProfileState() {
   };
 }
 
-function normalizeProfileState(value) {
+function normalizeProfileState(
+  value,
+  path
+) {
   if (!isPlainObject(value)) {
-    return createEmptyProfileState();
+    throw new Error(
+      `${path} must be an object`
+    );
   }
 
-  const cloned = structuredClone(value);
-
-  if (!isPlainObject(cloned.listings)) {
-    return {
-      ...cloned,
-      listings: {}
-    };
-  }
-
-  return cloned;
-}
-
-function normalizeLegacyProfileState(value) {
-  return normalizeProfileState(
-    migrateLegacyState(value)
+  requireExactKeys(
+    value,
+    path,
+    {
+      required: ["listings"],
+      allowed: [
+        "listings",
+        "initializedAt",
+        "updatedAt"
+      ]
+    }
   );
-}
 
-function hasMeaningfulLegacyState(state) {
-  if (!isPlainObject(state)) {
-    return false;
+  if (!isPlainObject(value.listings)) {
+    throw new Error(
+      `${path}.listings must be an object`
+    );
   }
 
-  if (
-    isPlainObject(state.listings) &&
-    Object.keys(state.listings).length >
-      0
+  for (const field of [
+    "initializedAt",
+    "updatedAt"
+  ]) {
+    if (hasOwn(value, field)) {
+      requireIsoTimestampString(
+        value[field],
+        `${path}.${field}`
+      );
+    }
+  }
+
+  for (
+    const [listingId, record] of
+    Object.entries(value.listings)
   ) {
-    return true;
+    if (!isPlainObject(record)) {
+      throw new Error(
+        `${path}.listings.${listingId} must be an object`
+      );
+    }
   }
 
-  return [
-    state.initializedAt,
-    state.updatedAt
-  ].some(
-    (value) =>
-      typeof value === "string" &&
-      value.trim()
-  );
+  return structuredClone(value);
+}
+
+function collectConfiguredProfileIds(
+  normalizedConfig
+) {
+  const configuredIds = new Set();
+
+  for (
+    const [index, profile] of
+    normalizedConfig.profiles.entries()
+  ) {
+    if (!isPlainObject(profile)) {
+      throw new Error(
+        `normalizedConfig.profiles[${index}] must be an object`
+      );
+    }
+
+    const profileId =
+      requireNonEmptyString(
+        profile.id,
+        `normalizedConfig.profiles[${index}].id`
+      );
+
+    if (profileId === "default") {
+      throw new Error(
+        `normalizedConfig.profiles[${index}].id must not be "default"`
+      );
+    }
+
+    if (configuredIds.has(profileId)) {
+      throw new Error(
+        `normalizedConfig.profiles[${index}].id must be unique`
+      );
+    }
+
+    configuredIds.add(profileId);
+  }
+
+  return configuredIds;
+}
+
+function rejectDefaultState(state) {
+  if (hasOwn(state.profiles, "default")) {
+    throw new Error(
+      "state.profiles.default is not supported"
+    );
+  }
+}
+
+function normalizeStateProfiles(
+  state,
+  configuredProfileIds
+) {
+  const profiles =
+    Object.create(null);
+
+  for (
+    const [profileId, profileState] of
+    Object.entries(state.profiles)
+  ) {
+    profiles[profileId] =
+      normalizeProfileState(
+        profileState,
+        `state.profiles.${profileId}`
+      );
+  }
+
+  for (
+    const profileId of
+    configuredProfileIds
+  ) {
+    if (!hasOwn(profiles, profileId)) {
+      profiles[profileId] =
+        createEmptyProfileState();
+    }
+  }
+
+  return profiles;
 }
 
 export function normalizeWatcherState(
@@ -994,202 +789,57 @@ export function normalizeWatcherState(
     );
   }
 
-  const state = isPlainObject(rawState)
-    ? rawState
-    : {};
+  const configuredProfileIds =
+    collectConfiguredProfileIds(
+      normalizedConfig
+    );
+
+  if (!isPlainObject(rawState)) {
+    throw new Error(
+      "state must be an object"
+    );
+  }
+
+  requireExactKeys(
+    rawState,
+    "state",
+    {
+      required: [
+        "schemaVersion",
+        "profiles"
+      ],
+      allowed: [
+        "schemaVersion",
+        "profiles"
+      ]
+    }
+  );
 
   if (
-    hasOwn(state, "schemaVersion") &&
-    state.schemaVersion !==
-      STATE_SCHEMA_VERSION
+    rawState.schemaVersion !==
+    STATE_SCHEMA_VERSION
   ) {
     throw new Error(
       `state.schemaVersion must be ${STATE_SCHEMA_VERSION}`
     );
   }
 
-  const isVersionTwoState =
-    state.schemaVersion ===
-      STATE_SCHEMA_VERSION &&
-    isPlainObject(state.profiles);
-
-  if (isVersionTwoState) {
-    const profiles =
-      Object.create(null);
-
-    for (
-      const [profileId, profileState] of
-      Object.entries(state.profiles)
-    ) {
-      profiles[profileId] =
-        normalizeProfileState(
-          profileState
-        );
-    }
-
-    const legacyStateProfileId =
-      normalizedConfig.legacyConfig
-        ? null
-        : normalizedConfig
-            .legacyStateProfileId;
-    let completedLegacyStateProfileId =
-      typeof state[
-        LEGACY_STATE_MIGRATION_FIELD
-      ] === "string" &&
-      state[
-        LEGACY_STATE_MIGRATION_FIELD
-      ].trim()
-        ? state[
-            LEGACY_STATE_MIGRATION_FIELD
-          ].trim()
-        : null;
-
-    if (
-      legacyStateProfileId &&
-      legacyStateProfileId !== "default" &&
-      !completedLegacyStateProfileId
-    ) {
-      const hasDefaultState = hasOwn(
-        profiles,
-        "default"
-      );
-      const legacyDefaultState =
-        hasDefaultState
-          ? profiles.default
-          : null;
-      const targetState = hasOwn(
-        profiles,
-        legacyStateProfileId
-      )
-        ? profiles[legacyStateProfileId]
-        : null;
-      const legacyDefaultMeaningful =
-        hasMeaningfulLegacyState(
-          legacyDefaultState
-        );
-      const targetMeaningful =
-        hasMeaningfulLegacyState(
-          targetState
-        );
-
-      if (
-        legacyDefaultMeaningful &&
-        targetMeaningful
-      ) {
-        throw new Error(
-          `state.profiles.default and state.profiles.${legacyStateProfileId} both contain state; refusing legacy state move`
-        );
-      }
-
-      if (legacyDefaultMeaningful) {
-        profiles[legacyStateProfileId] =
-          legacyDefaultState;
-      }
-
-      if (
-        hasDefaultState &&
-        !normalizedConfig.profiles.some(
-          (profile) =>
-            profile.id === "default"
-        )
-      ) {
-        delete profiles.default;
-      } else if (
-        hasDefaultState &&
-        legacyDefaultMeaningful
-      ) {
-        delete profiles.default;
-      }
-
-      completedLegacyStateProfileId =
-        legacyStateProfileId;
-    }
-
-    for (
-      const profile of
-      normalizedConfig.profiles
-    ) {
-      if (!hasOwn(profiles, profile.id)) {
-        profiles[profile.id] =
-          createEmptyProfileState();
-      }
-    }
-
-    const normalizedState = {
-      ...state,
-      schemaVersion:
-        STATE_SCHEMA_VERSION,
-      profiles
-    };
-
-    if (completedLegacyStateProfileId) {
-      normalizedState[
-        LEGACY_STATE_MIGRATION_FIELD
-      ] = completedLegacyStateProfileId;
-    }
-
-    return normalizedState;
-  }
-
-  const meaningful =
-    hasMeaningfulLegacyState(state);
-  let targetProfileId = null;
-
-  if (normalizedConfig.legacyConfig) {
-    targetProfileId = "default";
-  } else if (
-    normalizedConfig
-      .legacyStateProfileId
-  ) {
-    targetProfileId =
-      normalizedConfig
-        .legacyStateProfileId;
-  } else if (
-    normalizedConfig.profiles.length ===
-      1
-  ) {
-    targetProfileId =
-      normalizedConfig.profiles[0].id;
-  } else if (meaningful) {
+  if (!isPlainObject(rawState.profiles)) {
     throw new Error(
-      "legacy state requires legacyStateProfileId when multiple profiles are configured"
+      "state.profiles must be an object"
     );
   }
 
-  const profiles = Object.create(null);
+  rejectDefaultState(rawState);
 
-  for (
-    const profile of
-    normalizedConfig.profiles
-  ) {
-    profiles[profile.id] =
-      profile.id === targetProfileId &&
-      meaningful
-        ? normalizeLegacyProfileState(
-            state
-          )
-        : createEmptyProfileState();
-  }
-
-  const normalizedState = {
+  return {
     schemaVersion:
       STATE_SCHEMA_VERSION,
-    profiles
+    profiles: normalizeStateProfiles(
+      rawState,
+      configuredProfileIds
+    )
   };
-
-  if (
-    normalizedConfig
-      .legacyStateProfileId &&
-    normalizedConfig
-      .legacyStateProfileId !== "default"
-  ) {
-    normalizedState[
-      LEGACY_STATE_MIGRATION_FIELD
-    ] = normalizedConfig
-      .legacyStateProfileId;
-  }
-
-  return normalizedState;
 }
 
 export async function runProfilesSequentially(
@@ -1264,43 +914,9 @@ export async function runProfilesSequentially(
 }
 
 function normalizeEventKind(event) {
-  const rawKind =
-    event?.kind ??
-    event?.eventKind ??
-    event?.type;
-
-  if (rawKind === "신규") {
-    return "new";
-  }
-
-  if (
-    rawKind === "현재 검색 결과"
-  ) {
-    return "current";
-  }
-
-  if (
-    rawKind === "deleted" ||
-    rawKind === "매물삭제"
-  ) {
-    return "deleted";
-  }
-
-  if (
-    typeof rawKind === "string" &&
-    rawKind.startsWith("가격 인하")
-  ) {
-    return "price-decrease";
-  }
-
-  if (
-    typeof rawKind === "string" &&
-    rawKind.startsWith("가격 인상")
-  ) {
-    return "price-increase";
-  }
-
-  return String(rawKind ?? "unknown")
+  return String(
+    event?.kind ?? "unknown"
+  )
     .trim()
     .toLowerCase()
     .replaceAll("_", "-");
@@ -1328,24 +944,11 @@ function getListingId(event) {
 }
 
 function getPreviousPrice(event) {
-  return (
-    event?.previousPriceKrw ??
-    event?.oldPriceKrw ??
-    event?.priceChange
-      ?.previousPriceKrw ??
-    event?.previous?.priceKrw ??
-    null
-  );
+  return event?.previousPriceKrw ?? null;
 }
 
 function getNewPrice(event) {
-  return (
-    event?.newPriceKrw ??
-    event?.currentPriceKrw ??
-    event?.priceChange?.newPriceKrw ??
-    event?.listing?.priceKrw ??
-    null
-  );
+  return event?.newPriceKrw ?? null;
 }
 
 function collectProfileNames(event) {
@@ -1361,16 +964,6 @@ function collectProfileNames(event) {
 
   if (event?.profile?.name) {
     values.push(event.profile.name);
-  }
-
-  if (Array.isArray(event?.profiles)) {
-    for (const profile of event.profiles) {
-      values.push(
-        typeof profile === "string"
-          ? profile
-          : profile?.name
-      );
-    }
   }
 
   return [
@@ -1396,16 +989,7 @@ function collectStateTargets(event) {
     ? event.stateTargets
         .filter(isPlainObject)
         .map((target) => ({
-          ...target,
-          ...(target.stateListingId ===
-            undefined &&
-          target.listingId !== undefined
-            ? {
-                stateListingId: String(
-                  target.listingId
-                )
-              }
-            : {})
+          ...target
         }))
     : [];
   const profileId =
@@ -1452,29 +1036,53 @@ function eventShowsTeslaOption(event) {
     return true;
   }
 
-  if (
-    event?.optionMode === "tesla" ||
-    event?.profile?.optionMode ===
-      "tesla"
-  ) {
-    return true;
-  }
+  return event?.profile?.isTesla === true;
+}
+
+function getConditionMergeSignature(
+  event
+) {
+  const conditionStatus =
+    event?.listing?.conditionStatus;
+  const rawReasons =
+    event?.listing?.conditionReasons;
+  const conditionReasons =
+    Array.isArray(rawReasons)
+      ? rawReasons.map((reason) =>
+          String(reason).trim()
+        )
+      : [];
 
   if (
-    Array.isArray(event?.profiles) &&
-    event.profiles.some(
-      (profile) =>
-        profile?.optionMode ===
-        "tesla"
-    )
+    (
+      typeof conditionStatus !==
+        "string" ||
+      !conditionStatus.trim()
+    ) &&
+    conditionReasons.length === 0
   ) {
-    return true;
+    return null;
   }
 
-  return (
-    Array.isArray(event?.optionModes) &&
-    event.optionModes.includes("tesla")
-  );
+  const isTesla =
+    eventShowsTeslaOption(event);
+  const rawOption =
+    event?.listing?.option;
+
+  return JSON.stringify({
+    conditionStatus:
+      typeof conditionStatus ===
+        "string"
+        ? conditionStatus.trim()
+        : null,
+    conditionReasons,
+    isTesla,
+    option:
+      isTesla &&
+      typeof rawOption === "string"
+        ? rawOption.trim()
+        : null
+  });
 }
 
 function parseIsoTimestamp(value) {
@@ -1711,7 +1319,7 @@ function mergeTeslaOptionFields(
 
   for (
     const field of
-    TESLA_OPTION_STATE_FIELDS
+    TESLA_OPTION_EVENT_FIELDS
   ) {
     delete listing[field];
 
@@ -1875,6 +1483,15 @@ export function mergeProfileEvents(
         signatures
       );
       key = `${baseKey}\u0000${signature}`;
+    }
+
+    const conditionSignature =
+      getConditionMergeSignature(
+        rawEvent
+      );
+
+    if (conditionSignature !== null) {
+      key = `${key}\u0000condition:${conditionSignature}`;
     }
 
     const event = normalizeEventEnvelope(

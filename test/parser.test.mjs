@@ -1,20 +1,28 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import test from "node:test";
+
 import {
   analyzeDetail,
   evaluateListing,
-  matchesBasicCriteria,
+  matchesTitleFilter,
   parseListHtml,
   parseListingText
 } from "../src/lib.mjs";
 
-const config = JSON.parse(
-  await fs.readFile(
-    new URL("../config.json", import.meta.url),
-    "utf8"
-  )
-);
+const teslaProfile = {
+  isTesla: true,
+  titleFilter: {
+    requiredAll: [],
+    requiredAny: [],
+    excludedAny: []
+  },
+  price: {
+    maxPriceKrw: 35000000,
+    eapMaxPriceKrw: 37000000,
+    fsdMaxPriceKrw: 40000000
+  }
+};
 
 function detailHtml(base, body = "테스트 차량") {
   return `<!doctype html>
@@ -44,20 +52,34 @@ function listing(overrides = {}) {
   };
 }
 
-test("목록 HTML에서 매물을 파싱하고 중복 ID를 제거한다", async () => {
+function detailBase(overrides = {}) {
+  return {
+    vehicleNo: "12가3456",
+    spec: {
+      colorName: "검정색"
+    },
+    options: {
+      etc: []
+    },
+    advertisement: {
+      oneLineText: null
+    },
+    photos: [],
+    ...overrides
+  };
+}
+
+test("목록 HTML에서 필수 구조를 파싱하고 중복 ID를 제거한다", async () => {
   const html = await fs.readFile(
     new URL("./fixtures/list.html", import.meta.url),
     "utf8"
   );
-
   const listings = parseListHtml(html);
-
-  assert.equal(listings.length, 3);
-
   const target = listings.find(
     (item) => item.id === "42023180"
   );
 
+  assert.equal(listings.length, 3);
   assert.equal(
     target.title,
     "모델 3 롱 레인지 AWD"
@@ -65,9 +87,18 @@ test("목록 HTML에서 매물을 파싱하고 중복 ID를 제거한다", async
   assert.equal(target.yearMonth, "2022-09");
   assert.equal(target.mileageKm, 67235);
   assert.equal(target.priceKrw, 32700000);
+  assert.equal(
+    parseListingText({
+      id: "invalid",
+      href:
+        "https://example.invalid/listing/invalid",
+      text: "필수 연식 주행거리 가격 구조 없음"
+    }),
+    null
+  );
 });
 
-test("목록 지역은 특정 연료명 없이 주행거리와 가격 사이에서만 판정한다", () => {
+test("목록 지역은 주행거리와 가격 사이의 구조에서만 판정한다", () => {
   const cases = [
     ["전기 경기", "경기"],
     ["가솔린 서울", "서울"],
@@ -91,349 +122,178 @@ test("목록 지역은 특정 연료명 없이 주행거리와 가격 사이에�
       metadata
     );
   }
+});
 
-  for (const { title, metadata } of [
+test("연식과 주행거리는 titleFilter 판정에 영향을 주지 않는다", () => {
+  const profile = {
+    ...teslaProfile,
+    titleFilter: {
+      requiredAll: ["모델 3"],
+      requiredAny: ["AWD"],
+      excludedAny: ["RWD"]
+    }
+  };
+
+  assert.equal(
+    matchesTitleFilter(
+      "모델 3 AWD",
+      profile
+    ),
+    true
+  );
+  assert.equal(
+    matchesTitleFilter(
+      "모델 3 RWD AWD",
+      profile
+    ),
+    false
+  );
+  assert.equal(
+    matchesTitleFilter(
+      {
+        toString: () => "모델 3 AWD",
+        yearMonth: "1900-01",
+        mileageKm: Number.MAX_SAFE_INTEGER
+      },
+      profile
+    ),
+    true
+  );
+});
+
+test("Tesla 옵션은 구조화 값과 제한된 판매자 문구에서만 확인한다", async (t) => {
+  const cases = [
     {
-      title: "서울 익명 차량",
-      metadata: "가솔린"
+      name: "판매자 FSD",
+      base: detailBase({
+        advertisement: {
+          oneLineText:
+            "완전무사고. FSD 구매완료."
+        }
+      }),
+      body: "렌터카 사용 이력",
+      expectedOption: "FSD",
+      expectedSource: "판매자 설명"
     },
     {
-      title: "경기 익명 차량",
-      metadata: ""
+      name: "구조화 EAP",
+      base: detailBase({
+        options: {
+          etc: [
+            "향상된 오토파일럿 (EAP)"
+          ]
+        }
+      }),
+      expectedOption: "EAP",
+      expectedSource: "구조화 옵션"
+    },
+    {
+      name: "FSD Lite",
+      base: detailBase({
+        photos: [
+          {
+            desc: "FSD Lite 가능"
+          }
+        ]
+      }),
+      expectedOption: "미확인",
+      expectedSource: "미확인"
     }
-  ]) {
-    const parsed = parseListingText({
-      id: "anonymous-listing",
-      href:
-        "https://example.invalid/listing/anonymous",
-      text:
-        `${title} 24/01식 1,000 km ${metadata} 3,000 만원`
-    });
+  ];
 
-    assert.equal(
-      parsed.region,
-      "미확인"
-    );
+  for (const entry of cases) {
+    await t.test(entry.name, () => {
+      const analyzed = analyzeDetail(
+        detailHtml(
+          entry.base,
+          entry.body
+        ),
+        listing(),
+        teslaProfile
+      );
+
+      assert.equal(
+        analyzed.option,
+        entry.expectedOption
+      );
+      assert.equal(
+        analyzed.optionSource,
+        entry.expectedSource
+      );
+      assert.equal(
+        analyzed.rentalUsageHistory,
+        null
+      );
+      assert.equal(
+        analyzed.totalLossHistory,
+        null
+      );
+    });
   }
 });
 
-test("사용자 기본 조건을 적용한다", () => {
-  const testConfig = {
-    titleFilter: {
-      requiredAll: [
-        "모델 3",
-        "롱 레인지",
-        "AWD"
-      ],
-      requiredAny: [],
-      excludedAny: []
-    },
-    yearMonthMin: "2022-05",
-    yearMonthMax: "2022-12",
-    maxMileageKm: 150000
-  };
-  const target = {
-    title: "모델 3 롱 레인지 AWD",
-    yearMonth: "2022-09",
-    mileageKm: 67235
-  };
-
-  assert.equal(
-    matchesBasicCriteria(target, testConfig),
-    true
-  );
-
-  assert.equal(
-    matchesBasicCriteria(
-      { ...target, mileageKm: 150001 },
-      testConfig
+test("색상과 계약 상태는 사실로 남지만 가격 조건 판정에는 사용하지 않는다", () => {
+  const analyzed = analyzeDetail(
+    detailHtml(
+      detailBase({
+        spec: {
+          colorName: "빨간색"
+        }
+      }),
+      "빨간색 계약중 렌트 전손"
     ),
-    false
-  );
-
-  assert.equal(
-    matchesBasicCriteria(
-      { ...target, yearMonth: "2023-01" },
-      testConfig
-    ),
-    false
-  );
-
-  assert.equal(
-    matchesBasicCriteria(
-      { ...target, title: "모델 3 RWD" },
-      testConfig
-    ),
-    false
-  );
-});
-
-test("판매자 설명의 FSD 구매완료 문구는 유지하고 렌터카 자유 문구는 이력으로 판정하지 않는다", () => {
-  const html = detailHtml(
-    {
-      vehicleNo: "12가3456",
-      spec: {
-        colorName: "검정색"
-      },
-      options: {
-        etc: []
-      },
-      advertisement: {
-        oneLineText:
-          "완전무사고. FSD 구매완료. 라이젠."
-      },
-      photos: []
-    },
-    "렌터카 사용 이력"
-  );
-
-  const enriched = analyzeDetail(
-    html,
-    listing({ priceKrw: 36000000 }),
-    config
-  );
-
-  const result = evaluateListing(
-    enriched,
-    config
-  );
-
-  assert.equal(result.hasFsd, true);
-  assert.equal(result.hasEap, false);
-  assert.equal(result.option, "FSD");
-  assert.equal(
-    result.optionSource,
-    "판매자 설명"
-  );
-  assert.equal(result.saleType, "NORMAL");
-  assert.equal(
-    result.rentalUsageHistory,
-    null
-  );
-  assert.equal(
-    result.totalLossHistory,
-    null
-  );
-  assert.equal(
-    result.adjustedPriceKrw,
-    36000000
-  );
-  assert.equal(result.limitKrw, 40000000);
-  assert.equal(result.priceRule, "FSD 기준");
-  assert.equal(result.eligible, true);
-});
-
-test("구조화 옵션의 EAP를 확인하고 EAP 가격 한도를 적용한다", () => {
-  const html = detailHtml({
-    vehicleNo: "12가3456",
-    spec: {
-      colorName: "검정색"
-    },
-    options: {
-      etc: [
-        "향상된 오토파일럿 (EAP)"
-      ]
-    },
-    advertisement: {
-      oneLineText: null
-    },
-    photos: []
-  });
-
-  const enriched = analyzeDetail(
-    html,
-    listing({ priceKrw: 36000000 }),
-    config
-  );
-
-  const result = evaluateListing(
-    enriched,
-    config
-  );
-
-  assert.equal(result.hasFsd, false);
-  assert.equal(result.hasEap, true);
-  assert.equal(result.option, "EAP");
-  assert.equal(
-    result.optionSource,
-    "구조화 옵션"
-  );
-  assert.equal(result.limitKrw, 37000000);
-  assert.equal(result.priceRule, "EAP 기준");
-  assert.equal(result.eligible, true);
-});
-
-test("FSD Lite 가능 문구는 FSD 보유로 인정하지 않고 기본 가격 한도를 적용한다", () => {
-  const html = detailHtml({
-    vehicleNo: "12가3456",
-    spec: {
-      colorName: "검정색"
-    },
-    options: {
-      etc: []
-    },
-    advertisement: {
-      oneLineText: null
-    },
-    photos: [
-      {
-        desc: "FSD Lite 가능"
-      }
-    ]
-  });
-
-  const enriched = analyzeDetail(
-    html,
-    listing({ priceKrw: 36000000 }),
-    config
-  );
-
-  const result = evaluateListing(
-    enriched,
-    config
-  );
-
-  assert.equal(result.hasFsd, false);
-  assert.equal(result.hasEap, false);
-  assert.equal(result.option, "미확인");
-  assert.equal(result.optionSource, "미확인");
-  assert.equal(result.limitKrw, 35000000);
-  assert.equal(
-    result.priceRule,
-    "일반 차량 기준"
-  );
-  assert.equal(result.eligible, false);
-  assert.deepEqual(
-    result.excludedReasons,
-    ["가격 초과"]
-  );
-});
-
-test("페이지 공통 본문의 색상과 옵션 단어는 판정에 사용하지 않는다", () => {
-  const html = detailHtml(
-    {
-      vehicleNo: "12가3456",
-      spec: {
-        colorName: "검정색"
-      },
-      options: {
-        etc: []
-      },
-      advertisement: {
-        oneLineText: null
-      },
-      photos: []
-    },
-    "빨간색 FSD EAP 완전자율주행 향상된 오토파일럿 안내"
-  );
-
-  const enriched = analyzeDetail(
-    html,
-    listing(),
-    config
-  );
-
-  const result = evaluateListing(
-    enriched,
-    config
-  );
-
-  assert.equal(result.colorName, "검정색");
-  assert.equal(result.redColor, false);
-  assert.equal(result.hasFsd, false);
-  assert.equal(result.hasEap, false);
-  assert.equal(result.option, "미확인");
-  assert.equal(result.eligible, true);
-});
-
-test("구조화 외장색이 빨간색이면 계약중과 함께 제외한다", () => {
-  const testConfig = {
-    optionMode: "tesla",
-    excludedColors: [
-      "빨간색",
-      "적색",
-      "레드"
-    ],
-    excludeContractPending: true,
-    price: {
-      maxPriceKrw: 35000000,
-      teslaOptionLimitsKrw: {
-        eap: 37000000,
-        fsd: 40000000,
-        unknownOptionHardMax: 40000000
-      }
-    }
-  };
-  const html = detailHtml({
-    vehicleNo: "12가3456",
-    spec: {
-      colorName: "빨간색"
-    },
-    options: {
-      etc: []
-    },
-    advertisement: {
-      oneLineText: null
-    },
-    photos: []
-  });
-
-  const enriched = analyzeDetail(
-    html,
     listing({
       contracted: true,
-      priceKrw: 32000000
+      priceKrw: 35000000
     }),
-    testConfig
+    teslaProfile
+  );
+  const evaluated = evaluateListing(
+    analyzed,
+    teslaProfile
   );
 
-  const result = evaluateListing(
-    enriched,
-    testConfig
+  assert.equal(analyzed.colorName, "빨간색");
+  assert.equal(analyzed.contracted, true);
+  assert.equal(
+    evaluated.conditionStatus,
+    "조건 충족"
   );
-
-  assert.equal(result.colorName, "빨간색");
-  assert.equal(result.redColor, true);
-  assert.equal(result.eligible, false);
   assert.deepEqual(
-    result.excludedReasons,
-    ["계약중", "빨간색 계열"]
+    evaluated.conditionReasons,
+    []
   );
 });
 
-test("FSD와 EAP가 모두 확정되면 FSD 가격 기준을 우선한다", () => {
-  const html = detailHtml({
-    vehicleNo: "12가3456",
-    spec: {
-      colorName: "검정색"
-    },
-    options: {
-      etc: [
-        "향상된 오토파일럿 (EAP)"
-      ]
-    },
-    advertisement: {
-      oneLineText: "FSD 구매완료"
-    },
-    photos: []
-  });
-
-  const enriched = analyzeDetail(
-    html,
-    listing({ priceKrw: 39000000 }),
-    config
+test("EAP와 FSD가 모두 확인되면 FSD 기준을 우선하고 사실 값은 모두 보존한다", () => {
+  const analyzed = analyzeDetail(
+    detailHtml(
+      detailBase({
+        options: {
+          etc: [
+            "향상된 오토파일럿 (EAP)"
+          ]
+        },
+        advertisement: {
+          oneLineText: "FSD 구매완료"
+        }
+      })
+    ),
+    listing({
+      priceKrw: 39000000
+    }),
+    teslaProfile
+  );
+  const evaluated = evaluateListing(
+    analyzed,
+    teslaProfile
   );
 
-  const result = evaluateListing(
-    enriched,
-    config
+  assert.equal(evaluated.option, "FSD");
+  assert.equal(evaluated.hasFsd, true);
+  assert.equal(evaluated.hasEap, true);
+  assert.equal(
+    evaluated.conditionStatus,
+    "조건 충족"
   );
-
-  assert.equal(enriched.hasFsd, true);
-  assert.equal(enriched.hasEap, true);
-  assert.equal(result.option, "FSD");
-  assert.equal(result.hasFsd, true);
-  assert.equal(result.hasEap, false);
-  assert.equal(result.limitKrw, 40000000);
-  assert.equal(result.eligible, true);
 });

@@ -8,39 +8,11 @@ export {
   normalizeEncarSearchUrl
 };
 
-export const DEFAULT_SEARCH_URL =
-  "https://car.encar.com/list/car?page=1&search=%7B%22type%22%3A%22car%22%2C%22action%22%3A%22%28And.Hidden.N._.MultiView2Hidden.N._.MultiViewHidden.N._.%28C.CarType.N._.%28C.Manufacturer.%ED%85%8C%EC%8A%AC%EB%9D%BC._.%28C.ModelGroup.%EB%AA%A8%EB%8D%B8+3._.Model.%EB%AA%A8%EB%8D%B8+3.%29%29%29%29%22%2C%22toggle%22%3A%7B%7D%2C%22layer%22%3A%22%22%2C%22sort%22%3A%22MobileModifiedDate%22%7D";
-
 function singleLine(value) {
   return String(value)
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function resolveVehicleConfig(config) {
-  if (Array.isArray(config?.profiles)) {
-    return (
-      config.profiles.find(
-        (profile) =>
-          profile?.enabled !== false
-      ) ??
-      config.profiles[0] ??
-      config
-    );
-  }
-
-  return config;
-}
-
-function getOptionMode(config) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  return vehicleConfig?.optionMode ===
-    "generic"
-    ? "generic"
-    : "tesla";
 }
 
 function normalizeFilterText(value) {
@@ -55,51 +27,29 @@ function normalizeFilterTerms(
     : [];
 }
 
-function resolveTitleFilter(config) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  if (
-    vehicleConfig?.titleFilter &&
-    typeof vehicleConfig.titleFilter ===
-      "object" &&
-    !Array.isArray(
-      vehicleConfig.titleFilter
-    )
-  ) {
-    return {
-      requiredAll:
-        normalizeFilterTerms(
-          vehicleConfig.titleFilter
-            .requiredAll
-        ),
-      requiredAny:
-        normalizeFilterTerms(
-          vehicleConfig.titleFilter
-            .requiredAny
-        ),
-      excludedAny:
-        normalizeFilterTerms(
-          vehicleConfig.titleFilter
-            .excludedAny
-        )
-    };
-  }
-
+function resolveTitleFilter(profile) {
   return {
     requiredAll:
       normalizeFilterTerms(
-        vehicleConfig
-          ?.requiredTitleTerms
+        profile?.titleFilter
+          ?.requiredAll
       ),
-    requiredAny: [],
-    excludedAny: []
+    requiredAny:
+      normalizeFilterTerms(
+        profile?.titleFilter
+          ?.requiredAny
+      ),
+    excludedAny:
+      normalizeFilterTerms(
+        profile?.titleFilter
+          ?.excludedAny
+      )
   };
 }
 
-function matchesTitleFilter(
+export function matchesTitleFilter(
   title,
-  config
+  profile
 ) {
   const normalizedTitle =
     normalizeFilterText(title);
@@ -108,7 +58,7 @@ function matchesTitleFilter(
     requiredAll,
     requiredAny,
     excludedAny
-  } = resolveTitleFilter(config);
+  } = resolveTitleFilter(profile);
 
   return (
     requiredAll.every((term) =>
@@ -126,77 +76,11 @@ function matchesTitleFilter(
   );
 }
 
-function resolveYearMonthBounds(
-  config
-) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  const yearMonthMin =
-    vehicleConfig?.yearMonthMin ??
-    (
-      Number.isInteger(
-        vehicleConfig?.minYear
-      )
-        ? `${vehicleConfig.minYear}-01`
-        : null
-    );
-
-  const yearMonthMax =
-    vehicleConfig?.yearMonthMax ??
-    (
-      Number.isInteger(
-        vehicleConfig?.maxYear
-      )
-        ? `${vehicleConfig.maxYear}-12`
-        : null
-    );
-
-  return {
-    yearMonthMin,
-    yearMonthMax
-  };
-}
-
 export function createSearchUrlFingerprint(urlString) {
   return createHash("sha256")
     .update(urlString, "utf8")
     .digest("hex")
     .slice(0, 12);
-}
-
-export function resolveSearchUrl(
-  environment = process.env
-) {
-  const configuredUrl =
-    environment.ENCAR_SEARCH_URL;
-
-  const hasConfiguredUrl =
-    typeof configuredUrl === "string" &&
-    configuredUrl.trim().length > 0;
-
-  if (
-    environment.GITHUB_ACTIONS ===
-      "true" &&
-    !hasConfiguredUrl
-  ) {
-    throw new Error(
-      "GitHub Actions에서는 ENCAR_SEARCH_URL repository variable이 필요합니다."
-    );
-  }
-
-  const source = hasConfiguredUrl
-    ? "repository variable"
-    : "default";
-
-  return {
-    source,
-    url: normalizeEncarSearchUrl(
-      hasConfiguredUrl
-        ? configuredUrl.trim()
-        : DEFAULT_SEARCH_URL
-    )
-  };
 }
 
 const HTML_ENTITIES = new Map([
@@ -424,17 +308,6 @@ function extractStructuredSaleData(
     rentalUsageHistory: null,
     totalLossHistory: null
   };
-}
-
-export function parsePreloadedVehicleData(
-  html
-) {
-  const state =
-    parsePreloadedState(html);
-
-  return extractVehicleData(
-    state?.cars?.base
-  );
 }
 
 function maskVehicleNo(value) {
@@ -750,32 +623,6 @@ function normalizeColorName(value) {
   return normalized || null;
 }
 
-function isExcludedColor(
-  colorName,
-  config
-) {
-  if (!colorName) {
-    return false;
-  }
-
-  const normalizedColor =
-    colorName.toLowerCase();
-
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  return (
-    vehicleConfig
-      .excludedColorTerms ??
-    vehicleConfig.excludedColors ??
-    []
-  ).some((term) =>
-    normalizedColor.includes(
-      String(term).toLowerCase()
-    )
-  );
-}
-
 const LISTING_REGION_LABELS = new Set([
   "서울",
   "부산",
@@ -977,9 +824,6 @@ export function analyzeDetail(
   listing,
   config
 ) {
-  const text =
-    stripHtml(html);
-
   const state =
     parsePreloadedState(html);
 
@@ -997,37 +841,14 @@ export function analyzeDetail(
       listing.priceKrw
     );
 
-  const optionMode =
-    getOptionMode(config);
-
   const optionData =
-    optionMode === "tesla"
+    config.isTesla
       ? detectConfirmedOptions(base)
       : {};
 
   const colorName =
     normalizeColorName(
       base?.spec?.colorName
-    );
-
-  const redColor =
-    isExcludedColor(
-      colorName,
-      config
-    );
-
-  const smokingNegated =
-    /비흡연|흡연\s*(없|무)|담배\s*(없|무)/i.test(
-      text
-    );
-
-  const smokingWarning =
-    !smokingNegated &&
-    /흡연|담배/i.test(text);
-
-  const tuningWarning =
-    /사제|튜닝|서스펜션|다운스프링|휠\s*교체|조명\s*튜닝/i.test(
-      text
     );
 
   return {
@@ -1037,100 +858,12 @@ export function analyzeDetail(
     ...vehicleData,
     ...saleData,
     ...optionData,
-    optionMode,
     colorName,
     colorStatus:
       colorName
         ? "확인"
-        : "미확인",
-    redColor,
-    smokingWarning,
-    tuningWarning,
-    detailTextSample:
-      text.slice(0, 500)
+        : "미확인"
   };
-}
-
-export function matchesBasicCriteria(
-  listing,
-  config
-) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  const titleOk =
-    matchesTitleFilter(
-      listing.title,
-      config
-    );
-
-  const {
-    yearMonthMin,
-    yearMonthMax
-  } = resolveYearMonthBounds(
-    config
-  );
-
-  return (
-    titleOk &&
-    listing.yearMonth >=
-      yearMonthMin &&
-    listing.yearMonth <=
-      yearMonthMax &&
-    listing.mileageKm <=
-      vehicleConfig.maxMileageKm
-  );
-}
-
-export function getBasicCriteriaFailureReasons(
-  listing,
-  config
-) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  const reasons = [];
-
-  const titleOk =
-    matchesTitleFilter(
-      listing.title,
-      config
-    );
-
-  const {
-    yearMonthMin,
-    yearMonthMax
-  } = resolveYearMonthBounds(
-    config
-  );
-
-  if (!titleOk) {
-    reasons.push(
-      "차종/트림 불일치"
-    );
-  }
-
-  if (
-    listing.yearMonth <
-      yearMonthMin ||
-    listing.yearMonth >
-      yearMonthMax
-  ) {
-    reasons.push(
-      "연월 범위 초과"
-    );
-  }
-
-  if (
-    listing.mileageKm >
-    vehicleConfig.maxMileageKm
-  ) {
-    reasons.push(
-      "주행거리 초과"
-    );
-  }
-
-  return reasons;
 }
 
 function resolveConfirmedOption(
@@ -1152,214 +885,74 @@ function resolveConfirmedOption(
 }
 
 function resolvePricePolicy(
-  config,
-  optionMode = getOptionMode(config)
+  profile
 ) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  if (
-    vehicleConfig?.price &&
-    typeof vehicleConfig.price ===
-      "object" &&
-    !Array.isArray(vehicleConfig.price)
-  ) {
-    const maxPriceKrw =
-      vehicleConfig.price
-        .maxPriceKrw;
-
-    if (optionMode !== "tesla") {
-      return { maxPriceKrw };
-    }
-
-    const optionLimits =
-      vehicleConfig.price
-        .teslaOptionLimitsKrw ?? {};
-
-    return {
-      maxPriceKrw,
-      eap:
-        optionLimits.eap ??
-        maxPriceKrw,
-      fsd:
-        optionLimits.fsd ??
-        maxPriceKrw,
-      unknownOptionHardMax:
-        optionLimits
-          .unknownOptionHardMax ??
-        maxPriceKrw
-    };
-  }
-
   const maxPriceKrw =
-    vehicleConfig
-      ?.priceLimitsKrw?.base;
+    profile.price.maxPriceKrw;
 
-  if (optionMode !== "tesla") {
+  if (!profile.isTesla) {
     return { maxPriceKrw };
   }
 
   return {
     maxPriceKrw,
-    eap:
-      vehicleConfig
-        ?.priceLimitsKrw?.eap,
-    fsd:
-      vehicleConfig
-        ?.priceLimitsKrw?.fsd,
-    unknownOptionHardMax:
-      vehicleConfig
-        ?.priceLimitsKrw
-        ?.unknownOptionHardMax ??
-      vehicleConfig
-        ?.priceLimitsKrw?.base
+    eap: profile.price.eapMaxPriceKrw,
+    fsd: profile.price.fsdMaxPriceKrw
   };
-}
-
-function shouldExcludeContracted(
-  config
-) {
-  const vehicleConfig =
-    resolveVehicleConfig(config);
-
-  return (
-    vehicleConfig
-      ?.excludeContractPending ??
-    vehicleConfig?.excludeContracted ??
-    false
-  );
 }
 
 export function evaluateListing(
   listing,
-  config
+  profile
 ) {
-  const optionMode =
-    getOptionMode(config);
-
   const option =
-    optionMode === "tesla"
+    profile.isTesla
       ? resolveConfirmedOption(
           listing
         )
       : null;
 
   const pricePolicy =
-    resolvePricePolicy(
-      config,
-      optionMode
-    );
+    resolvePricePolicy(profile);
 
-  const adjustedPriceKrw =
-    listing.priceKrw;
-
-  let limitKrw =
+  let selectedMaxPriceKrw =
     pricePolicy.maxPriceKrw;
 
-  let reason =
-    optionMode === "generic"
-      ? "단일 최대가격 기준"
-      : "일반 차량 기준";
-
   if (
-    optionMode === "tesla" &&
+    profile.isTesla &&
     option === "FSD"
   ) {
-    limitKrw =
+    selectedMaxPriceKrw =
       pricePolicy.fsd;
-
-    reason =
-      "FSD 기준";
   } else if (
-    optionMode === "tesla" &&
+    profile.isTesla &&
     option === "EAP"
   ) {
-    limitKrw =
+    selectedMaxPriceKrw =
       pricePolicy.eap;
-
-    reason =
-      "EAP 기준";
   }
 
-  const excludedReasons = [];
-
-  if (
-    shouldExcludeContracted(
-      config
-    ) &&
-    listing.contracted
-  ) {
-    excludedReasons.push(
-      "계약중"
-    );
-  }
-
-  if (listing.redColor) {
-    excludedReasons.push(
-      "빨간색 계열"
-    );
-  }
-
-  if (
-    adjustedPriceKrw >
-    limitKrw
-  ) {
-    excludedReasons.push(
-      "가격 초과"
-    );
-  }
-
-  const warnings = [];
-
-  if (
-    optionMode === "tesla" &&
-    option === "미확인" &&
-    adjustedPriceKrw >
-      pricePolicy.maxPriceKrw
-  ) {
-    warnings.push(
-      "EAP 또는 FSD 포함 여부 확인 필요"
-    );
-  }
-
-  if (
-    listing.smokingWarning
-  ) {
-    warnings.push(
-      "흡연 관련 문구 확인 필요"
-    );
-  }
-
-  if (
-    listing.tuningWarning
-  ) {
-    warnings.push(
-      "튜닝 관련 문구 확인 필요"
-    );
-  }
+  const conditionReasons =
+    listing.priceKrw >
+      selectedMaxPriceKrw
+      ? ["가격 초과"]
+      : [];
 
   const evaluated = {
     ...listing,
-    optionMode,
-    ...(optionMode === "tesla"
+    ...(profile.isTesla
       ? {
-          option,
-          hasFsd:
-            option === "FSD",
-          hasEap:
-            option === "EAP"
+          option
         }
       : {}),
-    adjustedPriceKrw,
-    limitKrw,
-    priceRule: reason,
-    eligible:
-      excludedReasons.length === 0,
-    excludedReasons,
-    warnings
+    conditionStatus:
+      conditionReasons.length === 0
+        ? "조건 충족"
+        : "조건 미충족",
+    conditionReasons
   };
 
-  if (optionMode === "generic") {
+  if (!profile.isTesla) {
     delete evaluated.option;
     delete evaluated.hasFsd;
     delete evaluated.hasEap;
@@ -1372,117 +965,41 @@ export function evaluateListing(
 
 export function prepareSendCurrentListing(
   listing,
-  config,
+  profile,
   {
-    detailSucceeded,
-    errorMessage
+    detailSucceeded
   } = {}
 ) {
-  const optionMode =
-    getOptionMode(config);
-
-  const pricePolicy =
-    resolvePricePolicy(
-      config,
-      optionMode
-    );
-
-  const failureLimitKrw =
-    optionMode === "tesla"
-      ? pricePolicy
-          .unknownOptionHardMax
-      : pricePolicy.maxPriceKrw;
-
-  const reasons = [
-    ...getBasicCriteriaFailureReasons(
-      listing,
-      config
-    )
-  ];
-
-  let result = listing;
-
   if (detailSucceeded) {
-    reasons.push(
-      ...(
-        listing.excludedReasons ??
-        []
-      )
-    );
-  } else {
-    if (
-      shouldExcludeContracted(
-        config
-      ) &&
-      listing.contracted
-    ) {
-      reasons.push(
-        "계약중"
-      );
-    }
-
-    if (
-      listing.priceKrw >
-      failureLimitKrw
-    ) {
-      reasons.push(
-        "가격 초과"
-      );
-    }
-
-    reasons.push(
-      "상세 확인 실패"
-    );
-
-    if (
-      optionMode === "tesla" &&
-      listing.priceKrw >
-      pricePolicy.maxPriceKrw
-    ) {
-      reasons.push(
-        "옵션 미확인"
-      );
-    }
-
-    result = {
+    return {
       ...listing,
-      optionMode,
-      ...(optionMode === "tesla"
-        ? {
-            option:
-              "상세 확인 실패"
-          }
-        : {}),
-      adjustedPriceKrw:
-        listing.priceKrw,
-      limitKrw:
-        failureLimitKrw,
-      priceRule:
-        "상세 확인 실패",
-      eligible: false,
-      excludedReasons: [],
-      warnings: errorMessage
-        ? [
-            `상세 확인 실패: ${errorMessage}`
-          ]
-        : [
-            "상세 확인 실패"
-          ],
-      detailFailed: true
+      detailFailed: false
     };
-
-    if (optionMode === "generic") {
-      delete result.option;
-      delete result.hasFsd;
-      delete result.hasEap;
-      delete result.optionSource;
-      delete result.optionEvidence;
-    }
   }
 
-  const conditionReasons = [
-    ...new Set(reasons)
-  ];
+  const conditionReasons =
+    listing.priceKrw >
+      profile.price.maxPriceKrw
+      ? ["가격 초과"]
+      : [];
+
+  const result = {
+    ...listing,
+    ...(profile.isTesla
+      ? {
+          option: "미확인"
+        }
+      : {}),
+    detailFailed: true
+  };
+
+  if (!profile.isTesla) {
+    delete result.option;
+    delete result.hasFsd;
+    delete result.hasEap;
+    delete result.optionSource;
+    delete result.optionEvidence;
+  }
 
   return {
     ...result,
@@ -1491,8 +1008,7 @@ export function prepareSendCurrentListing(
         ? "조건 충족"
         : "조건 미충족",
     conditionReasons,
-    detailFailed:
-      !detailSucceeded
+    detailFailed: true
   };
 }
 
@@ -1550,7 +1066,6 @@ export function getListingInspection(
 
   return {
     isNew,
-    priceChanged,
     priceDropped:
       priceChanged &&
       currentComparisonPriceKrw <
@@ -1560,10 +1075,13 @@ export function getListingInspection(
       currentComparisonPriceKrw >
         previousComparisonPriceKrw,
     shouldInspect:
-      runMode ===
-      "send_current" ||
+      runMode === "send_current" ||
       isNew ||
-      listPriceChanged
+      listPriceChanged ||
+      Boolean(
+        previous
+          ?.lastDetailFetchFailedAt
+      )
   };
 }
 
@@ -1676,20 +1194,6 @@ function isBetterRepresentative(
     return Boolean(
       candidate.detailSucceeded
     );
-  }
-
-  if (
-    Boolean(
-      candidate.listing
-        ?.contracted
-    ) !==
-    Boolean(
-      current.listing
-        ?.contracted
-    )
-  ) {
-    return !candidate.listing
-      ?.contracted;
   }
 
   return (
@@ -2094,12 +1598,11 @@ export function reconcileListingDeletions({
           restoredListingId
         ] ??
         currentRepresentative
-          .stateRecord ??
-        recordListObservation(
-          record,
-          currentRepresentative.listing,
-          now
-        );
+          .stateRecord;
+
+      if (!stateRecord) {
+        continue;
+      }
 
       applyRepresentativeState(
         stateListings,
@@ -2406,7 +1909,7 @@ export function formatDuplicateListingLog(
   }`;
 }
 
-export const TESLA_OPTION_STATE_FIELDS = [
+const TESLA_OPTION_STATE_FIELDS = [
   "option",
   "hasFsd",
   "hasEap",
@@ -2414,16 +1917,13 @@ export const TESLA_OPTION_STATE_FIELDS = [
   "optionEvidence"
 ];
 
-export function sanitizeListingStateForOptionMode(
+function sanitizeListingStateForProfile(
   record,
-  optionMode
+  isTesla
 ) {
-  if (
-    optionMode !== "generic" &&
-    optionMode !== "tesla"
-  ) {
+  if (typeof isTesla !== "boolean") {
     throw new Error(
-      "optionMode must be generic or tesla"
+      "isTesla must be a boolean"
     );
   }
 
@@ -2435,12 +1935,9 @@ export function sanitizeListingStateForOptionMode(
     return record;
   }
 
-  const sanitized = {
-    ...record,
-    optionMode
-  };
+  const sanitized = { ...record };
 
-  if (optionMode === "generic") {
+  if (!isTesla) {
     for (
       const field of
       TESLA_OPTION_STATE_FIELDS
@@ -2452,60 +1949,11 @@ export function sanitizeListingStateForOptionMode(
   return sanitized;
 }
 
-export function recordDetailFailure(
-  previous,
-  listing,
-  now,
-  errorMessage,
-  optionMode
-) {
-  const {
-    priceKrw:
-      observedPriceKrw,
-    listText: _listText,
-    ...observation
-  } = listing;
-
-  const record = previous
-    ? {
-        ...previous
-      }
-    : {
-        ...observation,
-        firstSeenAt: now
-      };
-
-  const failedRecord = {
-    ...record,
-    vehicleNo:
-      normalizeVehicleNo(
-        listing.vehicleNo
-      ) ??
-      normalizeVehicleNo(
-        previous?.vehicleNo
-      ),
-    lastSeenAt: now,
-    lastObservedPriceKrw:
-      observedPriceKrw,
-    lastDetailFetchFailedAt:
-      now,
-    lastDetailFetchError:
-      errorMessage
-  };
-
-  return optionMode === undefined
-    ? failedRecord
-    : sanitizeListingStateForOptionMode(
-        failedRecord,
-        optionMode
-      );
-}
-
 export function recordListObservation(
   previous,
   listing,
   now,
-  optionMode
+  isTesla
 ) {
   const observedRecord = {
     ...previous,
@@ -2541,88 +1989,66 @@ export function recordListObservation(
     lastSeenAt: now
   };
 
-  return optionMode === undefined
-    ? observedRecord
-    : sanitizeListingStateForOptionMode(
-        observedRecord,
-        optionMode
-      );
+  return sanitizeListingStateForProfile(
+    observedRecord,
+    isTesla
+  );
 }
 
-export function migrateLegacyState(
-  state
+export function recordDetailFailure(
+  previous,
+  listing,
+  now,
+  errorMessage,
+  isTesla
 ) {
-  if (
-    !state ||
-    typeof state !== "object" ||
-    Array.isArray(state) ||
-    !state.listings ||
-    typeof state.listings !==
-      "object" ||
-    Array.isArray(state.listings)
-  ) {
-    return state;
-  }
+  const {
+    priceKrw:
+      observedPriceKrw,
+    listText: _listText,
+    ...observation
+  } = listing;
 
-  const listings = {};
+  const record = previous
+    ? {
+        ...previous
+      }
+    : {
+        ...observation,
+        firstSeenAt: now
+      };
 
-  for (
-    const [listingId, record] of
-    Object.entries(state.listings)
-  ) {
-    if (
-      !record ||
-      typeof record !== "object" ||
-      Array.isArray(record)
-    ) {
-      listings[listingId] = record;
-      continue;
-    }
-
-    const {
-      rental: _legacyRental,
-      ...migratedRecord
-    } = record;
-
-    migratedRecord.rentalUsageHistory =
-      migratedRecord
-        .rentalUsageHistory ?? null;
-
-    migratedRecord.totalLossHistory =
-      migratedRecord
-        .totalLossHistory ?? null;
-
-    if (
-      Number.isFinite(
-        migratedRecord.priceKrw
-      )
-    ) {
-      migratedRecord.adjustedPriceKrw =
-        migratedRecord.priceKrw;
-    }
-
-    listings[listingId] =
-      migratedRecord;
-  }
-
-  return {
-    ...state,
-    listings
+  const failedRecord = {
+    ...record,
+    vehicleNo:
+      normalizeVehicleNo(
+        listing.vehicleNo
+      ) ??
+      normalizeVehicleNo(
+        previous?.vehicleNo
+      ),
+    lastSeenAt: now,
+    lastObservedPriceKrw:
+      observedPriceKrw,
+    lastDetailFetchFailedAt:
+      now,
+    lastDetailFetchError:
+      errorMessage
   };
+
+  return sanitizeListingStateForProfile(
+    failedRecord,
+    isTesla
+  );
 }
 
 export function recordDetailSuccess(
   previous,
   listing,
   evaluated,
-  now
+  now,
+  isTesla
 ) {
-  const optionMode =
-    evaluated?.optionMode ===
-      "generic"
-      ? "generic"
-      : "tesla";
-
   const previousId =
     previous?.id
       ? String(previous.id)
@@ -2679,8 +2105,7 @@ export function recordDetailSuccess(
       previous?.firstSeenAt ??
       now,
     lastSeenAt: now,
-    optionMode,
-    ...(optionMode === "tesla"
+    ...(isTesla
       ? {
           option:
             evaluated.option,
@@ -2698,8 +2123,6 @@ export function recordDetailSuccess(
       evaluated.colorName,
     colorStatus:
       evaluated.colorStatus,
-    redColor:
-      evaluated.redColor,
     saleType,
     monthlyFeeKrw:
       saleType === "NORMAL"
@@ -2715,25 +2138,16 @@ export function recordDetailSuccess(
     totalLossHistory:
       evaluated.totalLossHistory ??
       null,
-    adjustedPriceKrw:
-      evaluated.adjustedPriceKrw,
-    limitKrw:
-      evaluated.limitKrw,
-    priceRule:
-      evaluated.priceRule,
-    eligible:
-      evaluated.eligible,
     lastEvaluatedAt: now
   };
 
   delete record.lastObservedPriceKrw;
   delete record.lastDetailFetchFailedAt;
   delete record.lastDetailFetchError;
-  delete record.rental;
 
-  return sanitizeListingStateForOptionMode(
+  return sanitizeListingStateForProfile(
     record,
-    optionMode
+    isTesla
   );
 }
 
@@ -2759,8 +2173,7 @@ export function createListingEvent({
   }
 
   if (
-    !detailSucceeded ||
-    !listing.eligible
+    !detailSucceeded
   ) {
     return null;
   }
@@ -2941,9 +2354,7 @@ export function formatTelegramMessage(
   {
     profileNames =
       listing?.profileNames ?? [],
-    showTeslaOption =
-      listing?.optionMode !==
-        "generic"
+    showTeslaOption = false
   } = {}
 ) {
   const displayEventType =
@@ -3075,7 +2486,6 @@ export function formatTelegramMessage(
   ) {
     lines.push("판매방식: 렌트");
   } else if (
-    !showTeslaOption &&
     listing?.saleType === "NORMAL"
   ) {
     lines.push("판매방식: 일반");

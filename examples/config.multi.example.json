@@ -9,17 +9,12 @@
       "name": "일반 차량 예시",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_3",
-      "optionMode": "generic",
+      "isTesla": false,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
       },
-      "yearMonthMin": "2021-01",
-      "yearMonthMax": "2026-12",
-      "maxMileageKm": 100000,
-      "excludedColors": [],
-      "excludeContractPending": true,
       "price": {
         "maxPriceKrw": 45000000
       }
@@ -29,24 +24,16 @@
       "name": "Tesla 옵션 예시",
       "enabled": true,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3",
-      "optionMode": "tesla",
+      "isTesla": true,
       "titleFilter": {
         "requiredAll": [],
         "requiredAny": [],
         "excludedAny": []
       },
-      "yearMonthMin": "2021-01",
-      "yearMonthMax": "2026-12",
-      "maxMileageKm": 100000,
-      "excludedColors": [],
-      "excludeContractPending": true,
       "price": {
         "maxPriceKrw": 35000000,
-        "teslaOptionLimitsKrw": {
-          "eap": 37000000,
-          "fsd": 40000000,
-          "unknownOptionHardMax": 35000000
-        }
+        "eapMaxPriceKrw": 37000000,
+        "fsdMaxPriceKrw": 40000000
       }
     }
   ]

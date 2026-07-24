@@ -37,23 +37,15 @@ function normalizedProfile(
     searchUrl:
       "https://example.test/search",
     searchUrlSource: "config",
-    optionMode: "generic",
+    isTesla: false,
     titleFilter: {
       requiredAll: [],
       requiredAny: [],
       excludedAny: []
     },
-    yearMonthMin: "2020-01",
-    yearMonthMax: "2030-12",
-    maxMileageKm: 200000,
-    excludedColorTerms: [],
-    excludeContracted: true,
     price: {
       maxPriceKrw: 50000000
     },
-    notifyPriceIncrease: true,
-    maxPages: 1,
-    requestDelayMs: 25,
     ...overrides
   };
 }
@@ -193,12 +185,11 @@ test("Encar와 Telegram pacer는 서로의 clock과 sleep 상태에 영향을 �
 
 test("모든 목록 페이지 fetch는 공유 pacer 대기 직후 시작한다", async () => {
   const trace = [];
-  const profile = normalizedProfile({
-    maxPages: 2,
-    requestDelayMs: 31
-  });
+  const profile = normalizedProfile();
 
   await collectProfileListings(profile, {
+    maxPages: 2,
+    requestDelayMs: 31,
     requestPacer:
       tracingRequestPacer(trace),
     fetchTextImpl: async () => {
@@ -219,9 +210,7 @@ test("모든 목록 페이지 fetch는 공유 pacer 대기 직후 시작한다",
 test("일반 상세 fetch는 목록과 같은 pacer를 사용한다", async () => {
   const trace = [];
   let fetchCount = 0;
-  const profile = normalizedProfile({
-    requestDelayMs: 37
-  });
+  const profile = normalizedProfile();
 
   await processProfile({
     profile,
@@ -229,6 +218,9 @@ test("일반 상세 fetch는 목록과 같은 pacer를 사용한다", async () =
       listings: {}
     },
     runMode: "send_current",
+    maxPages: 1,
+    requestDelayMs: 37,
+    notifyPriceIncrease: true,
     requestPacer:
       tracingRequestPacer(trace),
     fetchTextImpl: async () => {
@@ -246,11 +238,10 @@ test("일반 상세 fetch는 목록과 같은 pacer를 사용한다", async () =
   assert.ok(fetchCount > 1);
 });
 
-test("차량번호 식별 fetch도 목록과 같은 pacer를 사용한다", async () => {
+test("titleFilter 제외 매물은 별도 차량번호 식별 fetch를 만들지 않는다", async () => {
   const trace = [];
   let fetchCount = 0;
   const profile = normalizedProfile({
-    requestDelayMs: 41,
     titleFilter: {
       requiredAll: [
         "never matching title"
@@ -281,6 +272,9 @@ test("차량번호 식별 fetch도 목록과 같은 pacer를 사용한다", asyn
       }
     },
     runMode: "normal",
+    maxPages: 1,
+    requestDelayMs: 41,
+    notifyPriceIncrease: true,
     requestPacer:
       tracingRequestPacer(trace),
     fetchTextImpl: async () => {
@@ -295,5 +289,5 @@ test("차량번호 식별 fetch도 목록과 같은 pacer를 사용한다", asyn
   });
 
   assertEveryFetchWasPaced(trace, 41);
-  assert.ok(fetchCount > 1);
+  assert.equal(fetchCount, 1);
 });

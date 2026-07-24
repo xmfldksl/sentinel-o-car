@@ -9,18 +9,16 @@ import {
   formatTelegramMessage,
   getListingInspection,
   loadJson,
-  matchesBasicCriteria,
+  matchesTitleFilter,
   needsVehicleIdentityResolution,
   normalizeVehicleNo,
   parseListHtml,
-  parsePreloadedVehicleData,
   prepareSendCurrentListing,
   recordDetailFailure,
   recordDetailSuccess,
   recordListObservation,
   reconcileListingDeletions,
   recordTelegramDelivery,
-  sanitizeListingStateForOptionMode,
   saveJson,
   selectRepresentativeCandidates,
   setPage,
@@ -95,6 +93,8 @@ function logProfileSearch(profile) {
 async function collectProfileListings(
   profile,
   {
+    maxPages,
+    requestDelayMs,
     fetchTextImpl = fetchText,
     requestPacer: providedRequestPacer,
     sleepImpl = sleep,
@@ -113,7 +113,7 @@ async function collectProfileListings(
 
   for (
     let page = 1;
-    page <= profile.maxPages;
+    page <= maxPages;
     page += 1
   ) {
     const pageUrl = setPage(
@@ -126,7 +126,7 @@ async function collectProfileListings(
     );
 
     await requestPacer.wait(
-      profile.requestDelayMs
+      requestDelayMs
     );
     const html = await fetchTextImpl(
       pageUrl
@@ -166,14 +166,11 @@ function createProfileEventEnvelope(
     profile: {
       id: profile.id,
       name: profile.name,
-      optionMode: profile.optionMode
+      isTesla: profile.isTesla
     },
     profileId: profile.id,
     profileName: profile.name,
     profileNames: [profile.name],
-    optionMode: profile.optionMode,
-    showTeslaOption:
-      profile.optionMode === "tesla",
     observedAt,
     stateTargets: [
       {
@@ -188,6 +185,9 @@ async function processProfile({
   profile,
   profileState,
   runMode,
+  maxPages,
+  requestDelayMs,
+  notifyPriceIncrease,
   fetchTextImpl = fetchText,
   sleepImpl = sleep,
   requestPacer: providedRequestPacer,
@@ -201,46 +201,28 @@ async function processProfile({
       sleepImpl,
       nowMs
     });
-  const clonedState = structuredClone(
-    profileState ?? { listings: {} }
-  );
   const state =
-    clonedState &&
-    typeof clonedState === "object" &&
-    !Array.isArray(clonedState)
-      ? clonedState
-      : { listings: {} };
+    structuredClone(profileState);
 
-  if (
-    !state.listings ||
-    typeof state.listings !== "object" ||
-    Array.isArray(state.listings)
-  ) {
-    state.listings = {};
-  }
-
-  if (profile.optionMode === "generic") {
-    state.listings = Object.fromEntries(
-      Object.entries(state.listings).map(
-        ([listingId, record]) => [
-          listingId,
-          sanitizeListingStateForOptionMode(
-            record,
-            profile.optionMode
-          )
-        ]
-      )
-    );
-  }
-
-  const listingsById =
+  const collectedListingsById =
     await collectProfileListings(
       profile,
       {
         fetchTextImpl,
-        requestPacer
+        requestPacer,
+        maxPages,
+        requestDelayMs
       }
     );
+  const listingsById = new Map(
+    [...collectedListingsById].filter(
+      ([, listing]) =>
+        matchesTitleFilter(
+          listing.title,
+          profile
+        )
+    )
+  );
   const now = nowIso();
   const wasInitialized = Boolean(
     state.initializedAt
@@ -257,13 +239,6 @@ async function processProfile({
   for (const listing of listingsById.values()) {
     const order = listingOrder;
     listingOrder += 1;
-
-    if (
-      !isSendCurrent &&
-      !matchesBasicCriteria(listing, profile)
-    ) {
-      continue;
-    }
 
     let { previous } = findPreviousListing(
       previousListings,
@@ -290,7 +265,7 @@ async function processProfile({
           previous,
           observedListing,
           now,
-          profile.optionMode
+          profile.isTesla
         ),
         event: null
       });
@@ -298,7 +273,7 @@ async function processProfile({
     }
 
     await requestPacer.wait(
-      profile.requestDelayMs
+      requestDelayMs
     );
 
     let detailHtml;
@@ -323,8 +298,7 @@ async function processProfile({
             failedListing,
             profile,
             {
-              detailSucceeded: false,
-              errorMessage: error.message
+              detailSucceeded: false
             }
           )
         : failedListing;
@@ -336,7 +310,7 @@ async function processProfile({
         listing: eventListing,
         detailSucceeded: false,
         notifyPriceIncrease:
-          profile.notifyPriceIncrease
+          notifyPriceIncrease
       });
 
       candidates.push({
@@ -348,7 +322,7 @@ async function processProfile({
           failedListing,
           now,
           error.message,
-          profile.optionMode
+          profile.isTesla
         ),
         event
       });
@@ -383,15 +357,6 @@ async function processProfile({
         )
       : evaluated;
 
-    if (
-      !isSendCurrent &&
-      !evaluated.eligible
-    ) {
-      console.log(
-        `${profileLabel(profile)} Excluded ${listing.id}: ${evaluated.excludedReasons.join(", ")}`
-      );
-    }
-
     const event = createListingEvent({
       runMode,
       wasInitialized,
@@ -400,7 +365,7 @@ async function processProfile({
       listing: eventListing,
       detailSucceeded: true,
       notifyPriceIncrease:
-        profile.notifyPriceIncrease
+        notifyPriceIncrease
     });
 
     candidates.push({
@@ -411,7 +376,8 @@ async function processProfile({
         previous,
         enriched,
         evaluated,
-        now
+        now,
+        profile.isTesla
       ),
       event
     });
@@ -438,174 +404,26 @@ async function processProfile({
     );
   }
 
-  let deletionRepresentatives = representatives;
-  let identityStateRepresentatives = [];
-  let identityResolutionComplete = true;
-
   const needsIdentityResolution =
     runMode === "normal" &&
     wasInitialized &&
     needsVehicleIdentityResolution({
       previousListings,
-      currentListings: listingsById,
+      currentListings:
+        collectedListingsById,
       representatives
     });
-
-  if (needsIdentityResolution) {
-    const candidateByListingId = new Map(
-      candidates.map((candidate) => [
-        String(candidate.listing.id),
-        candidate
-      ])
-    );
-    const identityCandidates = [];
-    let identityOrder = 0;
-
-    for (const listing of listingsById.values()) {
-      const order = identityOrder;
-      identityOrder += 1;
-
-      const listingId = String(listing.id);
-      const candidate =
-        candidateByListingId.get(listingId);
-
-      if (candidate) {
-        if (
-          !normalizeVehicleNo(
-            candidate.listing.vehicleNo
-          )
-        ) {
-          identityResolutionComplete = false;
-        }
-        continue;
-      }
-
-      const previous =
-        previousListings[listingId];
-      const previousVehicleNo =
-        normalizeVehicleNo(
-          previous?.vehicleNo
-        );
-
-      if (previousVehicleNo) {
-        identityCandidates.push({
-          order,
-          listing: {
-            ...listing,
-            vehicleNo: previousVehicleNo
-          },
-          detailSucceeded: false,
-          stateRecord: null
-        });
-        continue;
-      }
-
-      await requestPacer.wait(
-        profile.requestDelayMs
-      );
-
-      let detailHtml;
-      try {
-        detailHtml = await fetchTextImpl(
-          listing.url
-        );
-      } catch (error) {
-        identityResolutionComplete = false;
-        console.warn(
-          `${profileLabel(profile)} Identity detail fetch failed for ${listing.id}:`,
-          error.message
-        );
-        continue;
-      }
-
-      const { vehicleNo } =
-        parsePreloadedVehicleData(
-          detailHtml
-        );
-
-      if (!vehicleNo) {
-        identityResolutionComplete = false;
-        console.warn(
-          `${profileLabel(profile)} Vehicle identity unavailable for ${listing.id}; deletion notification deferred.`
-        );
-        continue;
-      }
-
-      const identityListing = {
-        ...listing,
-        vehicleNo
-      };
-      const {
-        previous: matchedPrevious,
-        matchedBy
-      } = findPreviousListing(
-        previousListings,
-        identityListing
-      );
-      const hasCurrentPreviousVehicleListing =
-        Object.entries(previousListings).some(
-          ([previousListingId, record]) =>
-            normalizeVehicleNo(
-              record?.vehicleNo
-            ) === vehicleNo &&
-            listingsById.has(
-              previousListingId
-            )
-        );
-      const shouldApplyIdentityState = Boolean(
-        matchedPrevious &&
-          (
-            matchedBy === "listingId" ||
-            !hasCurrentPreviousVehicleListing
-          )
-      );
-
-      identityCandidates.push({
-        order,
-        listing: identityListing,
-        detailSucceeded: true,
-        stateRecord: shouldApplyIdentityState
-          ? recordListObservation(
-              matchedPrevious,
-              identityListing,
-              now,
-              profile.optionMode
-            )
-          : null
-      });
-    }
-
-    deletionRepresentatives =
-      selectRepresentativeCandidates([
-        ...representatives,
-        ...identityCandidates
-      ]).representatives;
-
-    const standardVehicleNos = new Set(
-      representatives
-        .map((candidate) =>
+  const identityResolutionComplete =
+    !needsIdentityResolution ||
+    (listingsById.size ===
+      collectedListingsById.size &&
+      candidates.every((candidate) =>
+        Boolean(
           normalizeVehicleNo(
             candidate.listing.vehicleNo
           )
         )
-        .filter(Boolean)
-    );
-
-    identityStateRepresentatives =
-      selectRepresentativeCandidates(
-        identityCandidates.filter(
-          (candidate) =>
-            candidate.stateRecord
-        )
-      ).representatives.filter(
-        (candidate) =>
-          !standardVehicleNos.has(
-            normalizeVehicleNo(
-              candidate.listing.vehicleNo
-            )
-          )
-      );
-  }
+      ));
 
   for (const candidate of representatives) {
     const previousMatch = findPreviousListing(
@@ -633,31 +451,13 @@ async function processProfile({
     }
   }
 
-  for (
-    const candidate of
-    identityStateRepresentatives
-  ) {
-    applyRepresentativeState(
-      state.listings,
-      {
-        ...candidate,
-        stateRecord: {
-          ...candidate.stateRecord,
-          deletionTracked:
-            candidate.stateRecord
-              .deletionTracked !== false
-        }
-      }
-    );
-  }
-
   const deletionResult =
     reconcileListingDeletions({
       stateListings: state.listings,
       previousListings,
-      currentListings: listingsById,
-      representatives:
-        deletionRepresentatives,
+      currentListings:
+        collectedListingsById,
+      representatives,
       identityResolutionComplete,
       now,
       runMode,
@@ -713,7 +513,7 @@ function createInitializationMessage(results) {
   return [
     "매물 감시를 시작했습니다.",
     `검색 조건: ${profileNames.join(", ")}`,
-    `현재 조건 대상 ${listingCount}건을 기준점으로 저장했습니다.`,
+    `현재 검색 결과 ${listingCount}건을 기준점으로 저장했습니다.`,
     "이후 신규 매물과 가격 변경, 매물삭제를 알립니다."
   ].join("\n");
 }
@@ -743,11 +543,7 @@ async function main({
     );
   const config = normalizeWatcherConfig(
     rawConfig,
-    environment,
-    {
-      warn: (message) =>
-        logger.warn(message)
-    }
+    environment
   );
   const runMode =
     environment.RUN_MODE || "normal";
@@ -803,7 +599,12 @@ async function main({
         profileState:
           state.profiles[profile.id],
         runMode,
-        requestPacer
+        requestPacer,
+        maxPages: config.maxPages,
+        requestDelayMs:
+          config.requestDelayMs,
+        notifyPriceIncrease:
+          config.notifyPriceIncrease
       });
 
       state.profiles[profile.id] =
@@ -884,7 +685,6 @@ async function main({
     }
   }
 
-  state.updatedAt = nowIso();
   await saveJsonImpl(statePath, state);
 
   logger.log(

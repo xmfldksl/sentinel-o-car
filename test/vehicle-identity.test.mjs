@@ -9,18 +9,18 @@ import {
   formatDuplicateListingLog,
   getListingInspection,
   normalizeVehicleNo,
-  parsePreloadedVehicleData,
   recordDetailFailure,
   recordDetailSuccess,
   selectRepresentativeCandidates
 } from "../src/lib.mjs";
 
-const config = JSON.parse(
+const rawConfig = JSON.parse(
   await fs.readFile(
     new URL("../config.json", import.meta.url),
     "utf8"
   )
 );
+const config = rawConfig.profiles[0];
 
 const detailHtml = await fs.readFile(
   new URL(
@@ -52,7 +52,6 @@ function listing(overrides = {}) {
     monthlyFeeKrw: null,
     rentalUsageHistory: null,
     totalLossHistory: null,
-    eligible: true,
     ...overrides
   };
 }
@@ -74,8 +73,7 @@ function eventFor(
 ) {
   const inspection = getListingInspection(
     previous,
-    current,
-    "normal"
+    current
   );
 
   return createListingEvent({
@@ -89,16 +87,7 @@ function eventFor(
   });
 }
 
-test("__PRELOADED_STATE__에서 차량번호와 매물 ID를 추출한다", () => {
-  assert.deepEqual(
-    parsePreloadedVehicleData(detailHtml),
-    {
-      vehicleNo: "12가3456",
-      vehicleId: "42023180",
-      queryCarId: "42023180"
-    }
-  );
-
+test("상세 분석은 __PRELOADED_STATE__의 차량 식별자를 사용한다", () => {
   const analyzed = analyzeDetail(
     detailHtml,
     listing({
@@ -136,11 +125,6 @@ test("구조화 색상과 옵션 및 판매자 설명을 함께 분석한다", (
   );
 
   assert.equal(
-    analyzed.redColor,
-    false
-  );
-
-  assert.equal(
     analyzed.hasFsd,
     true
   );
@@ -174,10 +158,16 @@ test("차량번호의 공백과 하이픈을 제거해 정규화한다", () => {
 });
 
 test("차량번호가 없거나 형식이 잘못되면 null을 반환한다", () => {
+  const analyzed = analyzeDetail(
+    "<html></html>",
+    listing({
+      vehicleNo: undefined
+    }),
+    config
+  );
+
   assert.equal(
-    parsePreloadedVehicleData(
-      "<html></html>"
-    ).vehicleNo,
+    analyzed.vehicleNo,
     null
   );
 
@@ -222,11 +212,6 @@ test("잘못된 __PRELOADED_STATE__ JSON이면 본문 문구만으로 옵션을 
   assert.equal(
     analyzed.colorName,
     null
-  );
-
-  assert.equal(
-    analyzed.redColor,
-    false
   );
 
   assert.equal(
@@ -293,8 +278,7 @@ test("다른 매물 ID라도 차량번호가 같으면 기존 상태로 연결�
 
   const inspection = getListingInspection(
     match.previous,
-    current,
-    "normal"
+    current
   );
 
   assert.equal(
@@ -327,7 +311,8 @@ test("새 ID의 미확정 상세 실패 기록보다 같은 차량번호의 확�
         vehicleNo: null
       },
       "2026-07-19T00:00:00.000Z",
-      "timeout"
+      "timeout",
+      true
     );
 
   const match = findPreviousListing(
@@ -341,15 +326,15 @@ test("새 ID의 미확정 상세 실패 기록보다 같은 차량번호의 확�
   const inspection =
     getListingInspection(
       match.previous,
-      current,
-      "normal"
+      current
     );
 
   const record = recordDetailSuccess(
     match.previous,
     current,
     current,
-    now
+    now,
+    true
   );
 
   assert.equal(
@@ -414,7 +399,8 @@ test("같은 차량번호 재등록의 가격이 낮아지면 기존 가격과 �
     previous,
     current,
     current,
-    now
+    now,
+    true
   );
 
   assert.match(
@@ -472,7 +458,7 @@ test("같은 차량번호 재등록의 가격이 높아지면 설정에 따라 �
   );
 });
 
-test("같은 실행의 동일 차량은 우선순위에 따른 대표 한 건만 남긴다", () => {
+test("같은 실행의 동일 차량은 상세 성공과 검색 순서로 대표 한 건만 남긴다", () => {
   const failed = {
     order: 0,
     listing: listing({
@@ -522,7 +508,7 @@ test("같은 실행의 동일 차량은 우선순위에 따른 대표 한 건만
   assert.equal(
     selected.representatives[0]
       .listing.id,
-    "3"
+    "2"
   );
 
   assert.equal(

@@ -4,51 +4,31 @@ import test from "node:test";
 import {
   analyzeDetail,
   evaluateListing,
-  formatTelegramMessage,
-  getBasicCriteriaFailureReasons,
-  matchesBasicCriteria,
+  matchesTitleFilter,
   prepareSendCurrentListing,
   recordDetailFailure,
-  recordDetailSuccess,
-  recordListObservation,
-  sanitizeListingStateForOptionMode
+  recordDetailSuccess
 } from "../src/lib.mjs";
 
-const TESLA_STATE_FIELDS = [
-  "option",
-  "hasFsd",
-  "hasEap",
-  "optionSource",
-  "optionEvidence"
-];
-
-const genericConfig = {
-  optionMode: "generic",
+const genericProfile = {
+  isTesla: false,
   titleFilter: {
     requiredAll: [],
     requiredAny: [],
     excludedAny: []
   },
-  yearMonthMin: "2020-01",
-  yearMonthMax: "2030-12",
-  maxMileageKm: 200000,
-  excludedColorTerms: [],
-  excludeContracted: true,
   price: {
     maxPriceKrw: 35000000
   }
 };
 
-const teslaConfig = {
-  ...genericConfig,
-  optionMode: "tesla",
+const teslaProfile = {
+  ...genericProfile,
+  isTesla: true,
   price: {
     maxPriceKrw: 35000000,
-    teslaOptionLimitsKrw: {
-      eap: 37000000,
-      fsd: 40000000,
-      unknownOptionHardMax: 36000000
-    }
+    eapMaxPriceKrw: 37000000,
+    fsdMaxPriceKrw: 40000000
   }
 };
 
@@ -57,8 +37,6 @@ function listing(overrides = {}) {
     id: "anonymous-listing",
     title: "Alpha One Touring",
     url: "https://example.invalid/listing/anonymous",
-    year: 2024,
-    month: 6,
     yearMonth: "2024-06",
     mileageKm: 50000,
     priceKrw: 34000000,
@@ -72,9 +50,6 @@ function listing(overrides = {}) {
     totalLossHistory: null,
     colorName: null,
     colorStatus: "미확인",
-    redColor: false,
-    smokingWarning: false,
-    tuningWarning: false,
     ...overrides
   };
 }
@@ -93,424 +68,164 @@ function detailHtml(base, body = "익명 테스트 차량") {
 </html>`;
 }
 
-function assertHasNoTeslaStateFields(value) {
-  for (const field of TESLA_STATE_FIELDS) {
-    assert.equal(
-      Object.hasOwn(value, field),
-      false,
-      `generic 결과에 ${field} 필드가 없어야 한다`
-    );
-  }
-}
-
-test("generic 모드는 단일 최대가격 이하만 통과시킨다", () => {
-  const below = evaluateListing(
-    listing({ priceKrw: 35000000 }),
-    genericConfig
-  );
-  const above = evaluateListing(
-    listing({ priceKrw: 35000001 }),
-    genericConfig
-  );
-
-  assert.equal(below.limitKrw, 35000000);
-  assert.equal(below.eligible, true);
-  assert.equal(above.limitKrw, 35000000);
-  assert.equal(above.eligible, false);
-  assert.deepEqual(above.excludedReasons, [
-    "가격 초과"
-  ]);
-  assertHasNoTeslaStateFields(below);
-  assertHasNoTeslaStateFields(above);
-});
-
-test("generic 가격 판정은 Tesla 옵션별 가격 필드에 접근하지 않는다", () => {
-  const price = {
-    maxPriceKrw: 35000000
-  };
-
-  Object.defineProperty(
-    price,
-    "teslaOptionLimitsKrw",
+test("generic과 Tesla는 같은 가격 판정 형태를 사용하고 Tesla만 옵션별 기준을 선택한다", async (t) => {
+  const cases = [
     {
-      enumerable: true,
-      get() {
-        throw new Error(
-          "generic 모드가 Tesla 옵션별 가격을 읽었다"
-        );
-      }
-    }
-  );
-
-  const config = {
-    ...genericConfig,
-    price
-  };
-  const candidate = listing({
-    priceKrw: 35000000,
-    hasFsd: true,
-    hasEap: true
-  });
-  const evaluated = evaluateListing(
-    candidate,
-    config
-  );
-  const detailFailed =
-    prepareSendCurrentListing(
-      candidate,
-      config,
-      {
-        detailSucceeded: false,
-        errorMessage:
-          "anonymous failure"
-      }
-    );
-
-  assert.equal(
-    evaluated.limitKrw,
-    35000000
-  );
-  assert.equal(
-    detailFailed.limitKrw,
-    35000000
-  );
-  assertHasNoTeslaStateFields(
-    evaluated
-  );
-  assertHasNoTeslaStateFields(
-    detailFailed
-  );
-});
-
-test("generic 상세 분석은 Tesla 옵션 및 판매자 옵션 문구 필드를 읽지 않는다", (t) => {
-  const advertisement = {
-    price: 3400
-  };
-
-  Object.defineProperty(
-    advertisement,
-    "oneLineText",
+      name: "generic",
+      profile: genericProfile,
+      facts: {},
+      option: undefined,
+      limit: 35000000
+    },
     {
-      enumerable: true,
-      get() {
-        throw new Error(
-          "generic 모드가 FSD/EAP 판매자 문구를 읽었다"
-        );
-      }
-    }
-  );
-
-  const base = {
-    vehicleNo: null,
-    advertisement,
-    spec: {
-      colorName: "무채색"
-    }
-  };
-
-  for (const field of [
-    "options",
-    "contents",
-    "photos"
-  ]) {
-    Object.defineProperty(base, field, {
-      enumerable: true,
-      get() {
-        throw new Error(
-          `generic 모드가 Tesla 옵션 필드 ${field}를 읽었다`
-        );
-      }
-    });
-  }
-
-  t.mock.method(JSON, "parse", () => ({
-    cars: { base }
-  }));
-
-  const analyzed = analyzeDetail(
-    `<!doctype html>
-<main>FSD 구매완료 EAP 구매완료</main>
-<script>__PRELOADED_STATE__ = {};</script>`,
-    listing(),
-    genericConfig
-  );
-
-  assert.equal(analyzed.saleType, "NORMAL");
-  assert.equal(analyzed.priceKrw, 34000000);
-  assertHasNoTeslaStateFields(analyzed);
-});
-
-test("generic 신규 가격변경 현재매물 매물삭제 메시지는 모두 프로필을 표시하고 옵션 문구를 숨긴다", () => {
-  const eventTypes = [
-    "신규",
-    "가격 인하 31,000,000원 → 30,000,000원",
-    "가격 인상 29,000,000원 → 30,000,000원",
-    "현재 검색 결과",
-    "deleted"
-  ];
-
-  for (const eventType of eventTypes) {
-    const message = formatTelegramMessage(
-      eventType,
-      listing({
-        option: "FSD",
+      name: "Tesla 기본",
+      profile: teslaProfile,
+      facts: {
+        hasFsd: false,
+        hasEap: false
+      },
+      option: "미확인",
+      limit: 35000000
+    },
+    {
+      name: "Tesla EAP",
+      profile: teslaProfile,
+      facts: {
+        hasFsd: false,
+        hasEap: true
+      },
+      option: "EAP",
+      limit: 37000000
+    },
+    {
+      name: "Tesla FSD",
+      profile: teslaProfile,
+      facts: {
+        hasFsd: true,
+        hasEap: false
+      },
+      option: "FSD",
+      limit: 40000000
+    },
+    {
+      name: "Tesla FSD 우선",
+      profile: teslaProfile,
+      facts: {
         hasFsd: true,
         hasEap: true
-      }),
-      {
-        profileNames: ["일반 조건"],
-        showTeslaOption: false
-      }
-    );
+      },
+      option: "FSD",
+      limit: 40000000
+    }
+  ];
 
-    assert.match(
-      message,
-      /검색 조건: 일반 조건/
-    );
-    assert.doesNotMatch(
-      message,
-      /FSD|EAP|옵션: 미확인/
-    );
+  for (const entry of cases) {
+    await t.test(entry.name, () => {
+      const atLimit = evaluateListing(
+        listing({
+          ...entry.facts,
+          priceKrw: entry.limit
+        }),
+        entry.profile
+      );
+      const aboveLimit = evaluateListing(
+        listing({
+          ...entry.facts,
+          priceKrw: entry.limit + 1
+        }),
+        entry.profile
+      );
+
+      assert.equal(
+        atLimit.conditionStatus,
+        "조건 충족"
+      );
+      assert.deepEqual(
+        atLimit.conditionReasons,
+        []
+      );
+      assert.equal(
+        aboveLimit.conditionStatus,
+        "조건 미충족"
+      );
+      assert.deepEqual(
+        aboveLimit.conditionReasons,
+        ["가격 초과"]
+      );
+      assert.equal(
+        atLimit.option,
+        entry.option
+      );
+    });
   }
 });
 
-test("tesla 메시지는 프로필 이름과 기존 EAP 옵션 표시를 함께 유지한다", () => {
-  const message = formatTelegramMessage(
-    "신규",
-    listing({
-      option: "EAP",
-      hasFsd: false,
-      hasEap: true
-    }),
-    {
-      profileNames: ["Tesla 조건"],
-      showTeslaOption: true
-    }
-  );
-
-  assert.match(
-    message,
-    /검색 조건: Tesla 조건/
-  );
-  assert.match(
-    message,
-    /옵션: EAP 확인/
-  );
-});
-
-test("generic 상세 실패 send_current 판정에는 옵션 미확인 사유가 없다", () => {
-  const prepared = prepareSendCurrentListing(
-    listing({ priceKrw: 36000000 }),
-    genericConfig,
-    {
-      detailSucceeded: false,
-      errorMessage: "anonymous failure"
-    }
-  );
-
-  assert.equal(prepared.limitKrw, 35000000);
-  assert.equal(
-    prepared.conditionStatus,
-    "조건 미충족"
-  );
-  assert.match(
-    prepared.conditionReasons.join(", "),
-    /가격 초과/
-  );
-  assert.match(
-    prepared.conditionReasons.join(", "),
-    /상세 확인 실패/
-  );
-  assert.doesNotMatch(
-    prepared.conditionReasons.join(", "),
-    /옵션|FSD|EAP/
-  );
-  assertHasNoTeslaStateFields(prepared);
-});
-
-test("Tesla에서 generic으로 바뀐 상태는 모든 저장 경로에서 옵션 필드만 제거한다", () => {
-  const firstSeenAt =
-    "2026-01-01T00:00:00.000Z";
-  const previous = {
-    ...listing({
-      priceKrw: 34000000,
-      vehicleNo: "00가0000",
-      saleType: "RENT",
-      rentalUsageHistory: true,
-      totalLossHistory: false
-    }),
-    optionMode: "tesla",
-    option: "FSD",
-    hasFsd: true,
-    hasEap: false,
-    optionSource: "anonymous source",
-    optionEvidence:
-      "anonymous evidence",
-    firstSeenAt,
-    lastEvaluatedAt:
-      firstSeenAt,
-    eligible: true
-  };
-  const samePrice = listing({
-    priceKrw: 34000000,
-    vehicleNo: null,
-    saleType: "NORMAL"
-  });
-  const changedPrice = listing({
-    priceKrw: 33000000,
-    vehicleNo: "00가0000",
-    saleType: "RENT",
-    rentalUsageHistory: true,
-    totalLossHistory: false
-  });
-
-  const sanitized =
-    sanitizeListingStateForOptionMode(
-      previous,
-      "generic"
-    );
-  const observed = recordListObservation(
-    previous,
-    samePrice,
-    "2026-01-02T00:00:00.000Z",
-    "generic"
-  );
-  const failed = recordDetailFailure(
-    previous,
-    changedPrice,
-    "2026-01-03T00:00:00.000Z",
-    "anonymous failure",
-    "generic"
-  );
-  const evaluated = evaluateListing(
-    changedPrice,
-    genericConfig
-  );
-  const succeeded = recordDetailSuccess(
-    previous,
-    changedPrice,
-    evaluated,
-    "2026-01-04T00:00:00.000Z"
-  );
-
-  for (const record of [
-    sanitized,
-    observed,
-    failed,
-    succeeded
-  ]) {
-    assert.equal(
-      record.optionMode,
-      "generic"
-    );
-    assert.equal(
-      record.vehicleNo,
-      "00가0000"
-    );
-    assert.equal(
-      record.saleType,
-      "RENT"
-    );
-    assert.equal(
-      record.rentalUsageHistory,
-      true
-    );
-    assert.equal(
-      record.totalLossHistory,
-      false
-    );
-    assert.equal(
-      record.firstSeenAt,
-      firstSeenAt
-    );
-    assertHasNoTeslaStateFields(
-      record
-    );
-  }
-
-  assert.notEqual(sanitized, previous);
-  assert.equal(previous.option, "FSD");
-  assert.equal(observed.priceKrw, 34000000);
-  assert.equal(failed.priceKrw, 34000000);
-  assert.equal(
-    failed.lastObservedPriceKrw,
-    33000000
-  );
-  assert.equal(succeeded.priceKrw, 33000000);
-});
-
-test("tesla 새 가격 설정은 기본 EAP FSD 상한을 각각 적용한다", () => {
-  const base = evaluateListing(
+test("Tesla 옵션 미확인과 상세 실패는 기본 가격을 사용한다", () => {
+  const unknown = evaluateListing(
     listing({
       priceKrw: 35000001,
       hasFsd: false,
       hasEap: false
     }),
-    teslaConfig
+    teslaProfile
   );
-  const eap = evaluateListing(
-    listing({
-      priceKrw: 37000000,
-      hasFsd: false,
-      hasEap: true
-    }),
-    teslaConfig
+  const failedAtLimit =
+    prepareSendCurrentListing(
+      listing({
+        priceKrw: 35000000
+      }),
+      teslaProfile,
+      {
+        detailSucceeded: false
+      }
+    );
+  const failedAbove =
+    prepareSendCurrentListing(
+      listing({
+        priceKrw: 35000001
+      }),
+      teslaProfile,
+      {
+        detailSucceeded: false
+      }
+    );
+
+  assert.equal(unknown.option, "미확인");
+  assert.deepEqual(
+    unknown.conditionReasons,
+    ["가격 초과"]
   );
-  const fsd = evaluateListing(
-    listing({
-      priceKrw: 40000000,
-      hasFsd: true,
-      hasEap: true
-    }),
-    teslaConfig
+  assert.equal(
+    failedAtLimit.conditionStatus,
+    "조건 충족"
   );
-
-  assert.equal(base.option, "미확인");
-  assert.equal(base.limitKrw, 35000000);
-  assert.equal(base.eligible, false);
-
-  assert.equal(eap.option, "EAP");
-  assert.equal(eap.limitKrw, 37000000);
-  assert.equal(eap.eligible, true);
-
-  assert.equal(fsd.option, "FSD");
-  assert.equal(fsd.limitKrw, 40000000);
-  assert.equal(fsd.eligible, true);
+  assert.deepEqual(
+    failedAtLimit.conditionReasons,
+    []
+  );
+  assert.equal(
+    failedAbove.conditionStatus,
+    "조건 미충족"
+  );
+  assert.deepEqual(
+    failedAbove.conditionReasons,
+    ["가격 초과"]
+  );
+  assert.equal(failedAbove.detailFailed, true);
+  assert.equal(failedAbove.option, "미확인");
 });
 
-test("tesla 상세 실패 send_current는 unknownOptionHardMax를 사용한다", () => {
-  const prepared = prepareSendCurrentListing(
-    listing({ priceKrw: 36000001 }),
-    teslaConfig,
-    {
-      detailSucceeded: false,
-      errorMessage: "anonymous failure"
-    }
-  );
-
-  assert.equal(prepared.limitKrw, 36000000);
-  assert.match(
-    prepared.conditionReasons.join(", "),
-    /가격 초과/
-  );
-  assert.match(
-    prepared.conditionReasons.join(", "),
-    /옵션 미확인/
-  );
-});
-
-test("tesla FSD Lite 가능 문구는 FSD가 아니며 기본 상한을 사용한다", () => {
+test("FSD Lite 가능 문구는 FSD 보유로 인정하지 않는다", () => {
   const analyzed = analyzeDetail(
     detailHtml({
-      vehicleNo: null,
+      vehicleNo: "12가3456",
       spec: {
-        colorName: "무채색"
+        colorName: "검정색"
       },
       options: {
         etc: []
       },
       advertisement: {
-        price: 3600,
         oneLineText: null
       },
       photos: [
@@ -519,108 +234,217 @@ test("tesla FSD Lite 가능 문구는 FSD가 아니며 기본 상한을 사용�
         }
       ]
     }),
-    listing({ priceKrw: 36000000 }),
-    teslaConfig
-  );
-  const evaluated = evaluateListing(
-    analyzed,
-    teslaConfig
+    listing(),
+    teslaProfile
   );
 
-  assert.equal(evaluated.hasFsd, false);
-  assert.equal(evaluated.hasEap, false);
-  assert.equal(evaluated.option, "미확인");
-  assert.equal(evaluated.limitKrw, 35000000);
-  assert.equal(evaluated.eligible, false);
+  assert.equal(analyzed.hasFsd, false);
+  assert.equal(analyzed.hasEap, false);
+  assert.equal(analyzed.option, "미확인");
 });
 
-test("titleFilter는 all any excluded와 대소문자 및 공백 정규화를 적용한다", () => {
-  const config = {
-    ...genericConfig,
-    titleFilter: {
-      requiredAll: [
-        " alpha   one ",
-        " PREMIUM "
-      ],
-      requiredAny: [
-        "ELECTRIC",
-        "hybrid"
-      ],
-      excludedAny: [
-        " demo ",
-        "salvage"
-      ]
-    }
-  };
-
-  const matching = listing({
-    title:
-      "  ALPHA    ONE Premium electric package  "
-  });
-
-  assert.equal(
-    matchesBasicCriteria(matching, config),
-    true
-  );
-  assert.deepEqual(
-    getBasicCriteriaFailureReasons(
-      matching,
-      config
-    ),
-    []
+test("generic 상세 흐름은 Tesla 옵션 사실을 결과에 만들지 않는다", () => {
+  const analyzed = analyzeDetail(
+    detailHtml({
+      vehicleNo: "12가3456",
+      spec: {
+        colorName: "검정색"
+      },
+      options: {
+        etc: [
+          "향상된 오토파일럿 (EAP)"
+        ]
+      },
+      advertisement: {
+        oneLineText: "FSD 구매완료"
+      },
+      photos: []
+    }),
+    listing(),
+    genericProfile
   );
 
-  for (const title of [
-    "Alpha Two premium electric package",
-    "Alpha One premium diesel package",
-    "Alpha One premium electric demo"
+  for (const key of [
+    "option",
+    "hasFsd",
+    "hasEap",
+    "optionSource",
+    "optionEvidence"
   ]) {
-    const candidate = listing({ title });
-
     assert.equal(
-      matchesBasicCriteria(
-        candidate,
-        config
-      ),
-      false
-    );
-    assert.match(
-      getBasicCriteriaFailureReasons(
-        candidate,
-        config
-      ).join(", "),
-      /차종|트림|제목|필수|선택|제외/
+      Object.hasOwn(analyzed, key),
+      false,
+      key
     );
   }
 });
 
-test("기존 requiredTitleTerms는 대소문자 무관 AND 조건을 유지한다", () => {
-  const legacyConfig = {
-    requiredTitleTerms: [
-      "alpha",
-      "ONE"
-    ],
-    yearMonthMin: "2020-01",
-    yearMonthMax: "2030-12",
-    maxMileageKm: 200000
-  };
+test("titleFilter의 세 배열만 제목 포함과 제외를 결정한다", () => {
+  for (const [label, baseProfile] of [
+    ["generic", genericProfile],
+    ["Tesla", teslaProfile]
+  ]) {
+    const profile = {
+      ...baseProfile,
+      titleFilter: {
+        requiredAll: ["Alpha", "Touring"],
+        requiredAny: ["AWD", "4WD"],
+        excludedAny: ["Damaged"]
+      }
+    };
 
-  assert.equal(
-    matchesBasicCriteria(
+    assert.equal(
+      matchesTitleFilter(
+        "alpha one touring AWD",
+        profile
+      ),
+      true,
+      `${label} include`
+    );
+    assert.equal(
+      matchesTitleFilter(
+        "alpha one touring",
+        profile
+      ),
+      false,
+      `${label} requiredAny`
+    );
+    assert.equal(
+      matchesTitleFilter(
+        "alpha one touring 4WD damaged",
+        profile
+      ),
+      false,
+      `${label} excludedAny`
+    );
+  }
+});
+
+test("generic 상태는 Tesla 옵션 필드를 저장하지 않고 판정 캐시도 만들지 않는다", () => {
+  const genericRecord =
+    recordDetailSuccess(
+      undefined,
+      listing(),
+      evaluateListing(
+        listing({
+          hasFsd: true,
+          hasEap: true,
+          option: "FSD",
+          optionSource: "구조화 옵션",
+          optionEvidence: "FSD"
+        }),
+        genericProfile
+      ),
+      "2026-07-25T00:00:00.000Z",
+      false
+    );
+  const teslaRecord =
+    recordDetailSuccess(
+      undefined,
       listing({
-        title: "Alpha One package"
+        hasFsd: true,
+        hasEap: true,
+        option: "FSD",
+        optionSource: "구조화 옵션",
+        optionEvidence: "FSD"
       }),
-      legacyConfig
-    ),
-    true
-  );
-  assert.equal(
-    matchesBasicCriteria(
-      listing({
-        title: "Alpha Two package"
-      }),
-      legacyConfig
-    ),
-    false
-  );
+      evaluateListing(
+        listing({
+          hasFsd: true,
+          hasEap: true,
+          option: "FSD",
+          optionSource: "구조화 옵션",
+          optionEvidence: "FSD"
+        }),
+        teslaProfile
+      ),
+      "2026-07-25T00:00:00.000Z",
+      true
+    );
+
+  for (const key of [
+    "option",
+    "hasFsd",
+    "hasEap",
+    "optionSource",
+    "optionEvidence"
+  ]) {
+    assert.equal(
+      Object.hasOwn(genericRecord, key),
+      false,
+      key
+    );
+  }
+
+  assert.equal(teslaRecord.option, "FSD");
+  assert.equal(teslaRecord.hasFsd, true);
+  assert.equal(teslaRecord.hasEap, true);
+});
+
+test("상세 실패는 generic에서 Tesla 상태 필드만 제거하고 Tesla에서는 보존한다", () => {
+  const optionFields = [
+    "option",
+    "hasFsd",
+    "hasEap",
+    "optionSource",
+    "optionEvidence"
+  ];
+  const previous = {
+    ...listing(),
+    option: "FSD",
+    hasFsd: true,
+    hasEap: false,
+    optionSource: "구조화 옵션",
+    optionEvidence: "FSD",
+    firstSeenAt:
+      "2026-07-24T00:00:00.000Z"
+  };
+  const now =
+    "2026-07-25T00:00:00.000Z";
+  const genericRecords = [
+    recordDetailFailure(
+      previous,
+      listing(),
+      now,
+      "HTTP 503",
+      false
+    )
+  ];
+  const teslaRecords = [
+    recordDetailFailure(
+      previous,
+      listing(),
+      now,
+      "HTTP 503",
+      true
+    )
+  ];
+
+  for (const record of genericRecords) {
+    for (const field of optionFields) {
+      assert.equal(
+        Object.hasOwn(record, field),
+        false,
+        field
+      );
+    }
+    assert.equal(
+      record.firstSeenAt,
+      previous.firstSeenAt
+    );
+  }
+
+  for (const record of teslaRecords) {
+    assert.equal(record.option, "FSD");
+    assert.equal(record.hasFsd, true);
+    assert.equal(record.hasEap, false);
+    assert.equal(
+      record.optionSource,
+      "구조화 옵션"
+    );
+    assert.equal(
+      record.optionEvidence,
+      "FSD"
+    );
+  }
 });
