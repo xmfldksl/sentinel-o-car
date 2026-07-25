@@ -47,17 +47,51 @@ Add each search to the `profiles` array in `config.json`. Every profile has its 
 
 Keep each profile `id` stable. Changing it can make the watcher treat the profile as a new state namespace.
 
-## Five Profile Slots
+## Profile Configuration Example
 
-The current configuration provides five profile slots: `Model 3 AWD` and `Toyota Sienna` are enabled, and three disabled slots are reserved for future searches. Each `config.json` profile connects its `searchUrlEnv` to the Repository Variable with the same name:
+The following illustrates the shape of a generic profile and a Tesla profile. The IDs, names, environment variable names, and amounts below are placeholders:
 
-- `tesla-model3-long-range` → `ENCAR_SEARCH_URL_TESLA_MODEL3`
-- `toyota-sienna` → `ENCAR_SEARCH_URL_TOYOTA_SIENNA`
-- `slot-3` → `ENCAR_SEARCH_URL_3`
-- `slot-4` → `ENCAR_SEARCH_URL_4`
-- `slot-5` → `ENCAR_SEARCH_URL_5`
+```json
+{
+  "configVersion": 2,
+  "profiles": [
+    {
+      "id": "example-profile",
+      "name": "Example vehicle",
+      "enabled": true,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_EXAMPLE",
+      "isTesla": false,
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "price": { "maxPriceKrw": 30000000 }
+    },
+    {
+      "id": "example-tesla",
+      "name": "Example Tesla profile",
+      "enabled": false,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_EXAMPLE_TESLA",
+      "isTesla": true,
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "price": {
+        "maxPriceKrw": 30000000,
+        "eapMaxPriceKrw": 32000000,
+        "fsdMaxPriceKrw": 34000000
+      }
+    }
+  ]
+}
+```
 
-A disabled slot may keep its `searchUrlEnv` name without creating the corresponding Repository Variable. To add a sixth or later profile, add the profile and `searchUrlEnv` to `config.json`, expose the same environment variable in `.github/workflows/sentinel-o-car.yml`, and create the matching Repository Variable.
+Actual operating profiles and search conditions are managed in `config.json` and GitHub Repository Variables. The values shown in this README exist only to explain the structure.
+
+Each profile connects its `searchUrlEnv` value to a Repository Variable of the same name, for example `example-profile` → `ENCAR_SEARCH_URL_EXAMPLE`. Enabled profiles are collected on every run, while disabled profiles are skipped and may keep a `searchUrlEnv` name without a corresponding Repository Variable. To add another profile, add the profile and its `searchUrlEnv` to `config.json`, expose the same environment variable in `.github/workflows/sentinel-o-car.yml`, and create the matching Repository Variable.
 
 Vehicle, registration period, mileage, color, seller category, and sale method are selected as Encar search URL conditions.
 
@@ -81,6 +115,82 @@ Rental usage history does not trigger automatic depreciation or a separate messa
 - Scheduled and manually dispatched GitHub Actions runs.
 
 `매물삭제` means that the advertisement disappeared from the applicable profile's monitored search result. It does not confirm that the vehicle was sold; the advertisement may remain in another profile or may have expired or been removed.
+
+## Run Modes
+
+`RUN_MODE` selects what a run does. The workflow passes the value chosen for a manual dispatch and falls back to `normal` for scheduled runs.
+
+- `normal`: collects every enabled profile, compares the result with the stored state, sends new-listing, price-change, and `매물삭제` notifications, and saves the updated state.
+- `send_current`: sends the current search results of every enabled profile with their condition status, without depending on newly detected events.
+- `telegram_test`: only verifies Telegram delivery. It performs no Encar collection and does not modify the state file.
+
+An unsupported `RUN_MODE` value stops the run before collection starts.
+
+## Configuration Values
+
+Store credentials as GitHub Secrets at `Settings → Secrets and variables → Actions → Secrets`:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+Store search URLs and run options as Repository Variables at `Settings → Secrets and variables → Actions → Variables`:
+
+- One variable per profile, named after that profile's `searchUrlEnv` value.
+- `MAX_PAGES` (optional) overrides `config.json`'s `maxPages` for every profile.
+
+## State File
+
+`data/state.json` uses schema version 2 and stores listings under one namespace per profile ID:
+
+```json
+{
+  "schemaVersion": 2,
+  "profiles": {
+    "example-profile": {
+      "listings": {
+        "<listing id>": {
+          "id": "<listing id>",
+          "title": "<title>",
+          "url": "<listing url>",
+          "priceKrw": 0,
+          "vehicleNo": "<vehicle number>",
+          "firstSeenAt": "<timestamp>",
+          "lastSeenAt": "<timestamp>"
+        }
+      },
+      "initializedAt": "<timestamp>",
+      "updatedAt": "<timestamp>"
+    }
+  }
+}
+```
+
+Each listing entry also carries the observed attributes used for comparison and notification, such as registration month, mileage, color, region, contract status, sale type, and Tesla option evidence when applicable. Flat legacy state and a legacy `default` namespace are not migrated.
+
+## Partial Collection and Deletion Protection
+
+Deletion is only inferred from a search result that was collected completely.
+
+- If a list page fails after its retries, the run keeps the listings already collected and continues, but deletion reconciliation is suppressed for that profile in that run. Listings missing from a partial result stay in the state.
+- If a profile parses zero listings, the run stops instead of treating every tracked listing as deleted.
+- If a detail-page request fails, the previously confirmed values for that listing are preserved.
+
+## Telegram Message Format
+
+Every message begins with the event type and the matching profile name, followed by the listing facts that were confirmed:
+
+```
+[신규]
+검색 조건: Example vehicle
+2020/03 Example listing title
+차량번호: 00가0000
+판정: 조건 충족
+색상 미확인 | 00,000km | 0,000만원 | 지역
+판매방식: 일반
+https://…
+```
+
+Unconfirmed values are shown explicitly rather than guessed: an unknown color is printed as `색상 미확인`, an unknown vehicle number as `미확인`, and a failed detail request adds a `상세: 상세 확인 실패` line. Tesla profiles add an option line, and a lease listing shows the sale price and the monthly payment separately.
 
 ## Version
 
@@ -151,17 +261,51 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 
 프로필 `id`는 안정적으로 유지하십시오. 값을 바꾸면 새로운 상태 영역으로 인식될 수 있습니다.
 
-## 5개 프로필 자리
+## 프로필 설정 예시
 
-현재 `config.json`은 총 5개 프로필 슬롯을 지원합니다. `Model 3 AWD`와 `도요타 시에나` 2개는 활성 프로필이고, `slot-3`, `slot-4`, `slot-5` 3개는 비활성 슬롯입니다. 각 프로필의 `searchUrlEnv`는 다음과 같이 같은 이름의 Repository Variable 및 워크플로 환경변수와 연결됩니다.
+다음은 일반 프로필과 Tesla 프로필의 구조를 보여주는 예시입니다. 아래의 ID, 이름, 환경변수 이름, 금액은 모두 가상의 값입니다.
 
-- `tesla-model3-long-range` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TESLA_MODEL3"`
-- `toyota-sienna` → `"searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA"`
-- `slot-3` → `"searchUrlEnv": "ENCAR_SEARCH_URL_3"`
-- `slot-4` → `"searchUrlEnv": "ENCAR_SEARCH_URL_4"`
-- `slot-5` → `"searchUrlEnv": "ENCAR_SEARCH_URL_5"`
+```json
+{
+  "configVersion": 2,
+  "profiles": [
+    {
+      "id": "example-profile",
+      "name": "Example vehicle",
+      "enabled": true,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_EXAMPLE",
+      "isTesla": false,
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "price": { "maxPriceKrw": 30000000 }
+    },
+    {
+      "id": "example-tesla",
+      "name": "Example Tesla profile",
+      "enabled": false,
+      "searchUrlEnv": "ENCAR_SEARCH_URL_EXAMPLE_TESLA",
+      "isTesla": true,
+      "titleFilter": {
+        "requiredAll": [],
+        "requiredAny": [],
+        "excludedAny": []
+      },
+      "price": {
+        "maxPriceKrw": 30000000,
+        "eapMaxPriceKrw": 32000000,
+        "fsdMaxPriceKrw": 34000000
+      }
+    }
+  ]
+}
+```
 
-비활성 프로필은 `searchUrlEnv` 이름만 유지하고 대응하는 Repository Variable을 만들지 않아도 됩니다. 6번째 이후 프로필을 추가할 때는 `config.json`의 프로필과 `searchUrlEnv`, `.github/workflows/sentinel-o-car.yml`의 환경변수, 같은 이름의 Repository Variable을 함께 추가해야 합니다.
+실제 운영 프로필과 검색 조건은 `config.json` 및 GitHub Repository Variables에서 관리하며, README의 값은 구조 설명을 위한 예시입니다.
+
+각 프로필의 `searchUrlEnv`는 같은 이름의 Repository Variable 및 워크플로 환경변수와 연결됩니다. 예를 들어 `example-profile`은 `ENCAR_SEARCH_URL_EXAMPLE`과 연결됩니다. 활성 프로필은 매 실행에서 수집하고 비활성 프로필은 건너뛰며, 비활성 프로필은 `searchUrlEnv` 이름만 유지하고 대응하는 Repository Variable을 만들지 않아도 됩니다. 프로필을 추가할 때는 `config.json`의 프로필과 `searchUrlEnv`, `.github/workflows/sentinel-o-car.yml`의 환경변수, 같은 이름의 Repository Variable을 함께 추가해야 합니다.
 
 차종, 연식, 주행거리, 제외색상과 다음 구분은 엔카 검색 URL 조건으로 선택합니다.
 
@@ -190,6 +334,82 @@ Sentinel-o-car는 개인이 독립적으로 만든 프로젝트이며 엔카 공
 - GitHub Actions 예약 실행 및 수동 실행.
 
 `매물삭제`는 해당 프로필의 감시 검색 결과에서 광고가 사라졌다는 뜻입니다. 실제 판매 완료를 확정하지 않으며, 다른 프로필에는 남아 있거나 광고가 종료·삭제됐을 수도 있습니다.
+
+## 실행 방식
+
+`RUN_MODE`가 실행 동작을 결정합니다. 워크플로는 수동 실행에서 선택한 값을 전달하고, 예약 실행에서는 `normal`을 사용합니다.
+
+- `normal`: 활성 프로필을 모두 수집하고 저장된 상태와 비교해 신규·가격변동·`매물삭제` 알림을 보낸 뒤 상태를 갱신합니다.
+- `send_current`: 신규 이벤트 발생 여부와 관계없이 활성 프로필의 현재 검색 결과를 조건 판정과 함께 전송합니다.
+- `telegram_test`: 텔레그램 전송만 확인합니다. 엔카 수집을 하지 않고 상태 파일도 변경하지 않습니다.
+
+지원하지 않는 `RUN_MODE` 값은 수집을 시작하기 전에 오류로 중단합니다.
+
+## 설정 값 관리
+
+인증 정보는 `Settings → Secrets and variables → Actions → Secrets`에 GitHub Secrets로 등록합니다.
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+검색 URL과 실행 옵션은 `Settings → Secrets and variables → Actions → Variables`에 Repository Variables로 등록합니다.
+
+- 프로필마다 해당 프로필의 `searchUrlEnv` 값과 같은 이름의 변수를 하나씩 등록합니다.
+- 선택 항목인 `MAX_PAGES`는 모든 프로필에서 `config.json`의 `maxPages` 값을 재정의합니다.
+
+## 상태 파일 구조
+
+`data/state.json`은 schema version 2를 사용하며 프로필 ID별 네임스페이스에 매물을 저장합니다.
+
+```json
+{
+  "schemaVersion": 2,
+  "profiles": {
+    "example-profile": {
+      "listings": {
+        "<매물번호>": {
+          "id": "<매물번호>",
+          "title": "<제목>",
+          "url": "<매물 URL>",
+          "priceKrw": 0,
+          "vehicleNo": "<차량번호>",
+          "firstSeenAt": "<시각>",
+          "lastSeenAt": "<시각>"
+        }
+      },
+      "initializedAt": "<시각>",
+      "updatedAt": "<시각>"
+    }
+  }
+}
+```
+
+각 매물 항목에는 비교와 알림에 사용하는 관측 값도 함께 저장됩니다. 연식, 주행거리, 색상, 지역, 계약 상태, 판매방식, 해당하는 경우 Tesla 옵션 판정 근거가 포함됩니다. 구형 flat state와 구형 `default` 네임스페이스는 마이그레이션하지 않습니다.
+
+## 부분 수집과 삭제 보호
+
+삭제 판정은 검색 결과를 완전히 수집한 경우에만 수행합니다.
+
+- 목록 페이지가 재시도 후에도 실패하면 이미 수집한 매물을 유지한 채 실행을 계속하지만, 해당 실행의 해당 프로필에서는 삭제 판정을 수행하지 않습니다. 부분 수집 결과에 없는 매물도 상태에 그대로 남습니다.
+- 프로필에서 매물을 0건 파싱하면 모든 추적 매물의 삭제로 판단하지 않고 실행을 중단합니다.
+- 상세 페이지 요청이 실패하면 해당 매물의 기존 확정 값을 보존합니다.
+
+## 텔레그램 메시지 형식
+
+모든 메시지는 이벤트 종류와 일치한 프로필 이름으로 시작하고, 확인된 매물 정보를 이어서 표시합니다.
+
+```
+[신규]
+검색 조건: Example vehicle
+2020/03 Example listing title
+차량번호: 00가0000
+판정: 조건 충족
+색상 미확인 | 00,000km | 0,000만원 | 지역
+판매방식: 일반
+https://…
+```
+
+확인하지 못한 값은 추정하지 않고 그대로 표시합니다. 색상을 확인하지 못하면 `색상 미확인`, 차량번호를 확인하지 못하면 `미확인`으로 표시하고, 상세 요청이 실패하면 `상세: 상세 확인 실패` 줄을 추가합니다. Tesla 프로필은 옵션 줄을 추가하며, 리스 매물은 매매가격과 월 납입금을 분리해 표시합니다.
 
 ## 버전
 
