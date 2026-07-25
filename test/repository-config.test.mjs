@@ -119,6 +119,7 @@ const COMMON_STATE_RECORD_KEYS = [
   "telegramMessageId",
   "telegramSentAt",
   "title",
+  "titleSource",
   "totalLossHistory",
   "url",
   "vehicleNo",
@@ -131,6 +132,14 @@ const TESLA_STATE_RECORD_KEYS = [
   "optionEvidence",
   "optionSource"
 ];
+const ALLOWED_TITLE_SOURCES = new Set([
+  "detail-structured",
+  "structured-list",
+  "title-element",
+  "previous-trusted",
+  "detail-unresolved",
+  "untrusted-card-text"
+]);
 const DISABLED_SLOTS = [
   {
     id: "slot-3",
@@ -856,6 +865,18 @@ test("data/state.json은 config profile별 current v2 state invariant를 따른�
         ),
         true,
         `${recordLabel} current field set`
+      );
+
+      assert.equal(
+        !Object.hasOwn(
+          record,
+          "titleSource"
+        ) ||
+          ALLOWED_TITLE_SOURCES.has(
+            record.titleSource
+          ),
+        true,
+        `${recordLabel} optional titleSource`
       );
 
       for (const field of [
