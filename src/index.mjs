@@ -8,8 +8,10 @@ import {
   formatDuplicateListingLog,
   formatTelegramMessage,
   getListingInspection,
+  isTrustedTitleSource,
   loadJson,
   matchesTitleFilter,
+  needsTitleResolution,
   needsVehicleIdentityResolution,
   normalizeVehicleNo,
   parseListHtml,
@@ -19,8 +21,8 @@ import {
   recordListObservation,
   reconcileListingDeletions,
   recordTelegramDelivery,
+  resolveListingTitle,
   saveJson,
-  selectListingTitle,
   selectRepresentativeCandidates,
   setPage,
   sleep
@@ -215,15 +217,7 @@ async function processProfile({
         requestDelayMs
       }
     );
-  const listingsById = new Map(
-    [...collectedListingsById].filter(
-      ([, listing]) =>
-        matchesTitleFilter(
-          listing.title,
-          profile
-        )
-    )
-  );
+  const listingsById = new Map();
   const now = nowIso();
   const wasInitialized = Boolean(
     state.initializedAt
@@ -237,7 +231,7 @@ async function processProfile({
   const candidates = [];
   let listingOrder = 0;
 
-  for (const listing of listingsById.values()) {
+  for (const listing of collectedListingsById.values()) {
     const order = listingOrder;
     listingOrder += 1;
 
@@ -245,19 +239,49 @@ async function processProfile({
       previousListings,
       listing
     );
+    const listTitle = resolveListingTitle(
+      previous,
+      listing
+    );
+
+    if (
+      isTrustedTitleSource(
+        listTitle.titleSource
+      ) &&
+      !matchesTitleFilter(
+        listTitle.title,
+        profile
+      )
+    ) {
+      continue;
+    }
+
+    const mustResolveTitle =
+      needsTitleResolution(
+        previous,
+        listing
+      );
     let inspection = getListingInspection(
       previous,
       listing,
       runMode
     );
 
-    if (!inspection.shouldInspect) {
+    if (
+      !inspection.shouldInspect &&
+      !mustResolveTitle
+    ) {
       const observedListing = {
         ...listing,
+        ...listTitle,
         vehicleNo:
           previous?.vehicleNo ?? null
       };
 
+      listingsById.set(
+        listing.id,
+        observedListing
+      );
       candidates.push({
         order,
         listing: observedListing,
@@ -291,15 +315,27 @@ async function processProfile({
 
       const failedListing = {
         ...listing,
-        title: selectListingTitle(
-          previous?.title,
-          listing.title
-        ),
+        ...listTitle,
         vehicleNo:
           previous?.vehicleNo ?? null,
         colorName:
           previous?.colorName ?? null
       };
+
+      if (
+        !matchesTitleFilter(
+          failedListing.title,
+          profile
+        )
+      ) {
+        continue;
+      }
+
+      listingsById.set(
+        listing.id,
+        failedListing
+      );
+
       const eventListing = isSendCurrent
         ? prepareSendCurrentListing(
             failedListing,
@@ -349,11 +385,25 @@ async function processProfile({
 
     const enriched = {
       ...analyzed,
-      title: selectListingTitle(
-        previous?.title,
-        analyzed.title
+      ...resolveListingTitle(
+        previous,
+        analyzed
       )
     };
+
+    if (
+      !matchesTitleFilter(
+        enriched.title,
+        profile
+      )
+    ) {
+      continue;
+    }
+
+    listingsById.set(
+      listing.id,
+      enriched
+    );
 
     inspection = getListingInspection(
       previous,

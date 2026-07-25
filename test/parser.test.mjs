@@ -117,7 +117,7 @@ ${
 </body></html>`;
 }
 
-test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포함하지 않는다", async (t) => {
+test("목록 제목은 신뢰 가능한 출처에서만 확정한다", async (t) => {
   const sellerDescription =
     "완무/1인소유/키2/24시간출고/비대면거래가능/신차급/도색없음";
   const vehicleTitle =
@@ -127,6 +127,8 @@ test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포�
   const cases = [
     {
       name: "구조화 차량명",
+      expectedTitle: vehicleTitle,
+      expectedSource: "structured-list",
       html: listCardHtml(
         `찜하기 ${sellerDescription} 광고문구 ${listMetadata}`,
         {
@@ -151,14 +153,28 @@ test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포�
     },
     {
       name: "차량명 전용 DOM 요소",
+      expectedTitle: vehicleTitle,
+      expectedSource: "title-element",
       html: listCardHtml(
         `찜하기 <span class="hotmark">${sellerDescription}</span> <span class="car_name">${vehicleTitle}</span> ${listMetadata}`
       )
     },
     {
-      name: "카드 문장 fallback",
+      name: "카드 문장은 신뢰하지 않는다",
+      expectedTitle: null,
+      expectedSource:
+        "untrusted-card-text",
       html: listCardHtml(
         `찜하기 ${sellerDescription} ${vehicleTitle} ${listMetadata}`
+      )
+    },
+    {
+      name: "@ 강조 판매자 설명도 신뢰하지 않는다",
+      expectedTitle: null,
+      expectedSource:
+        "untrusted-card-text",
+      html: listCardHtml(
+        "찜하기 2022/05 @1인신조@비흡연@라이젠CPU@EAP@19인치휠@V14라이트가능@ 모델 3 롱 레인지 AWD 22/05식 31,761 km 전기 경기 5,450 만원"
       )
     }
   ];
@@ -171,11 +187,26 @@ test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포�
 
       assert.equal(
         parsed.title,
-        vehicleTitle
+        entry.expectedTitle
       );
-      assert.doesNotMatch(
-        parsed.title,
-        /완무|1인소유|키2|24시간출고|비대면거래가능|신차급|도색없음|찜하기/
+      assert.equal(
+        parsed.titleSource,
+        entry.expectedSource
+      );
+      assert.equal(
+        matchesTitleFilter(
+          parsed.title,
+          {
+            titleFilter: {
+              requiredAll: [
+                "절대 일치하지 않는 제목"
+              ],
+              requiredAny: [],
+              excludedAny: []
+            }
+          }
+        ),
+        false
       );
       assert.equal(
         parsed.mileageKm,
@@ -189,14 +220,15 @@ test("판매자 설명이 차량명과 같은 영역에 있어도 제목에 포�
   }
 });
 
-test("상세 분석은 판매자 설명으로 정상 목록 제목을 덮어쓰지 않는다", () => {
+test("상세 구조화 차량명이 판매자 설명이 섞인 제목을 대체한다", () => {
   const analyzed = analyzeDetail(
     detailHtml(
       detailBase({
         category: {
           manufacturerName: "테슬라",
-          modelName: "모델 S",
-          gradeName: "롱 레인지"
+          modelName: "모델 3",
+          gradeName: "롱 레인지",
+          gradeDetailName: "AWD"
         },
         advertisement: {
           oneLineText:
@@ -206,7 +238,12 @@ test("상세 분석은 판매자 설명으로 정상 목록 제목을 덮어쓰�
           "무사고 도색없음 24시간출고"
       })
     ),
-    listing(),
+    listing({
+      title:
+        "2022/05 @1인신조@비흡연@라이젠CPU@EAP@19인치휠@V14라이트가능@ 모델 3 롱 레인지 AWD",
+      titleSource:
+        "untrusted-card-text"
+    }),
     teslaProfile
   );
   const recovered = analyzeDetail(
@@ -225,7 +262,18 @@ test("상세 분석은 판매자 설명으로 정상 목록 제목을 덮어쓰�
     ),
     listing({
       title:
-        "완무/1인소유/키2/24시간출고/비대면거래가능/신차급/도색없음 시에나"
+        "완무/1인소유/키2/24시간출고/비대면거래가능/신차급/도색없음 시에나",
+      titleSource: "structured-list"
+    }),
+    teslaProfile
+  );
+  const unresolved = analyzeDetail(
+    detailHtml(detailBase()),
+    listing({
+      title:
+        "2022/05 @1인신조@비흡연@라이젠CPU@EAP@19인치휠@V14라이트가능@ 모델 3 롱 레인지 AWD",
+      titleSource:
+        "untrusted-card-text"
     }),
     teslaProfile
   );
@@ -235,8 +283,24 @@ test("상세 분석은 판매자 설명으로 정상 목록 제목을 덮어쓰�
     "모델 3 롱 레인지 AWD"
   );
   assert.equal(
+    analyzed.titleSource,
+    "detail-structured"
+  );
+  assert.doesNotMatch(
+    analyzed.title,
+    /@|1인신조|비흡연|라이젠CPU|19인치휠/
+  );
+  assert.equal(
     recovered.title,
     "시에나 4세대 2.5 하이브리드 AWD"
+  );
+  assert.equal(
+    recovered.titleSource,
+    "detail-structured"
+  );
+  assert.equal(
+    unresolved.titleSource,
+    "detail-unresolved"
   );
 });
 

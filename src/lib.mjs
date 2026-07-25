@@ -16,7 +16,10 @@ function singleLine(value) {
 }
 
 function normalizeFilterText(value) {
-  return singleLine(value).toLowerCase();
+  return value === null ||
+    value === undefined
+    ? ""
+    : singleLine(value).toLowerCase();
 }
 
 function normalizeFilterTerms(
@@ -623,49 +626,114 @@ function normalizeColorName(value) {
   return normalized || null;
 }
 
-const VEHICLE_TITLE_MAX_LENGTH = 60;
+export const TITLE_SOURCE = {
+  detailStructured: "detail-structured",
+  structuredList: "structured-list",
+  titleElement: "title-element",
+  previousTrusted: "previous-trusted",
+  detailUnresolved: "detail-unresolved",
+  untrustedCardText:
+    "untrusted-card-text"
+};
 
-const PROMOTIONAL_TITLE_PATTERN =
-  /[#★☆•●▶♥]|\S*\/\S+\/\S*/u;
+const TRUSTED_TITLE_SOURCES = new Set([
+  TITLE_SOURCE.detailStructured,
+  TITLE_SOURCE.structuredList,
+  TITLE_SOURCE.titleElement,
+  TITLE_SOURCE.previousTrusted
+]);
 
-function isVehicleTitleLike(value) {
+const KNOWN_TITLE_SOURCES = new Set([
+  ...TRUSTED_TITLE_SOURCES,
+  TITLE_SOURCE.detailUnresolved,
+  TITLE_SOURCE.untrustedCardText
+]);
+
+export function isTrustedTitleSource(
+  source
+) {
+  return TRUSTED_TITLE_SOURCES.has(
+    source
+  );
+}
+
+function normalizeVehicleTitle(value) {
   const normalized =
     typeof value === "string"
       ? singleLine(value)
       : "";
 
-  if (!normalized) {
-    return false;
+  return normalized || null;
+}
+
+function trustedTitleOf(record) {
+  return isTrustedTitleSource(
+    record?.titleSource
+  )
+    ? normalizeVehicleTitle(
+        record.title
+      )
+    : null;
+}
+
+export function resolveListingTitle(
+  previous,
+  next
+) {
+  const nextTitle =
+    trustedTitleOf(next);
+
+  if (nextTitle) {
+    return {
+      title: nextTitle,
+      titleSource: next.titleSource
+    };
   }
 
+  const previousTitle =
+    trustedTitleOf(previous);
+
+  if (previousTitle) {
+    return {
+      title: previousTitle,
+      titleSource:
+        TITLE_SOURCE.previousTrusted
+    };
+  }
+
+  return {
+    title:
+      normalizeVehicleTitle(
+        next?.title
+      ) ??
+      normalizeVehicleTitle(
+        previous?.title
+      ),
+    titleSource:
+      next?.titleSource ??
+      previous?.titleSource ??
+      TITLE_SOURCE.untrustedCardText
+  };
+}
+
+export function needsTitleResolution(
+  previous,
+  listing
+) {
   if (
-    normalized.length >
-    VEHICLE_TITLE_MAX_LENGTH
+    isTrustedTitleSource(
+      listing?.titleSource
+    ) ||
+    isTrustedTitleSource(
+      previous?.titleSource
+    )
   ) {
     return false;
   }
 
-  return !PROMOTIONAL_TITLE_PATTERN.test(
-    normalized
-  );
-}
-
-function asVehicleTitle(value) {
-  return isVehicleTitleLike(value)
-    ? singleLine(value)
-    : null;
-}
-
-export function selectListingTitle(
-  previousTitle,
-  nextTitle
-) {
   return (
-    asVehicleTitle(nextTitle) ??
-    asVehicleTitle(previousTitle) ??
-    (typeof nextTitle === "string"
-      ? nextTitle
-      : previousTitle)
+    previous?.titleSource !==
+    TITLE_SOURCE.detailUnresolved
   );
 }
 
@@ -724,7 +792,9 @@ function resolveStructuredVehicleTitle(
     );
 
   if (fullName) {
-    return asVehicleTitle(fullName);
+    return normalizeVehicleTitle(
+      fullName
+    );
   }
 
   const parts = [];
@@ -751,7 +821,7 @@ function resolveStructuredVehicleTitle(
     parts.push(value);
   }
 
-  return asVehicleTitle(
+  return normalizeVehicleTitle(
     parts.join(" ")
   );
 }
@@ -884,9 +954,10 @@ function extractVehicleTitleElement(
       continue;
     }
 
-    const title = asVehicleTitle(
-      stripHtml(match[3])
-    );
+    const title =
+      normalizeVehicleTitle(
+        stripHtml(match[3])
+      );
 
     if (title) {
       return title;
@@ -896,44 +967,41 @@ function extractVehicleTitleElement(
   return null;
 }
 
-function isPromotionalToken(token) {
-  return (
-    token.startsWith("#") ||
-    /[★☆•●▶♥]/u.test(token) ||
-    (token.match(/\//g)?.length ??
-      0) >= 2
-  );
-}
-
-function extractListTextTitle(value) {
-  const chromeStripped = value
-    .replace(/^찜하기\s*/, "")
-    .replace(
-      /^'엔카믿고'는[^]*?제공합니다\s*/,
-      ""
-    )
-    .trim();
-
-  const tokens = chromeStripped
-    .split(/\s+/)
-    .filter(Boolean);
-
-  const lastPromotionalIndex =
-    tokens.findLastIndex(
-      isPromotionalToken
+function resolveTrustedListTitle(
+  structuredTitle,
+  elementTitle
+) {
+  const structured =
+    normalizeVehicleTitle(
+      structuredTitle
     );
 
-  const remaining = tokens.slice(
-    lastPromotionalIndex + 1
-  );
+  if (structured) {
+    return {
+      title: structured,
+      titleSource:
+        TITLE_SOURCE.structuredList
+    };
+  }
 
-  return (
-    remaining.length > 0
-      ? remaining
-      : tokens
-  )
-    .join(" ")
-    .trim();
+  const element =
+    normalizeVehicleTitle(
+      elementTitle
+    );
+
+  if (element) {
+    return {
+      title: element,
+      titleSource:
+        TITLE_SOURCE.titleElement
+    };
+  }
+
+  return {
+    title: null,
+    titleSource:
+      TITLE_SOURCE.untrustedCardText
+  };
 }
 
 const LISTING_REGION_LABELS = new Set([
@@ -991,17 +1059,13 @@ export function parseListingText({
     return null;
   }
 
-  const dateIndex =
-    dateMatch.index ?? 0;
-
-  const title =
-    asVehicleTitle(structuredTitle) ??
-    asVehicleTitle(elementTitle) ??
-    extractListTextTitle(
-      normalized
-        .slice(0, dateIndex)
-        .trim()
-    );
+  const {
+    title,
+    titleSource
+  } = resolveTrustedListTitle(
+    structuredTitle,
+    elementTitle
+  );
 
   const year =
     2000 + Number(dateMatch[1]);
@@ -1056,6 +1120,7 @@ export function parseListingText({
       "https://fem.encar.com"
     ).toString(),
     title,
+    titleSource,
     year,
     month,
     yearMonth: `${year}-${String(
@@ -1069,6 +1134,32 @@ export function parseListingText({
     contracted,
     listText: normalized
   };
+}
+
+function isPreferredListParse(
+  parsed,
+  existing
+) {
+  const parsedTrusted =
+    isTrustedTitleSource(
+      parsed.titleSource
+    );
+
+  const existingTrusted =
+    isTrustedTitleSource(
+      existing.titleSource
+    );
+
+  if (
+    parsedTrusted !== existingTrusted
+  ) {
+    return parsedTrusted;
+  }
+
+  return (
+    parsed.listText.length <
+    existing.listText.length
+  );
 }
 
 export function parseListHtml(html) {
@@ -1124,8 +1215,10 @@ export function parseListHtml(html) {
 
     if (
       !existing ||
-      parsed.listText.length <
-        existing.listText.length
+      isPreferredListParse(
+        parsed,
+        existing
+      )
     ) {
       results.set(
         parsed.id,
@@ -1169,12 +1262,25 @@ export function analyzeDetail(
       base?.spec?.colorName
     );
 
+  const detailTitle =
+    resolveDetailVehicleTitle(base);
+
+  const trustedListTitle =
+    trustedTitleOf(listing);
+
   return {
     ...listing,
     title:
-      asVehicleTitle(listing.title) ??
-      resolveDetailVehicleTitle(base) ??
-      listing.title,
+      detailTitle ??
+      trustedListTitle ??
+      normalizeVehicleTitle(
+        listing.title
+      ),
+    titleSource: detailTitle
+      ? TITLE_SOURCE.detailStructured
+      : trustedListTitle
+        ? listing.titleSource
+        : TITLE_SOURCE.detailUnresolved,
     listPriceKrw:
       listing.priceKrw,
     ...vehicleData,
@@ -2290,6 +2396,14 @@ function sanitizeListingStateForProfile(
     }
   }
 
+  if (
+    !KNOWN_TITLE_SOURCES.has(
+      sanitized.titleSource
+    )
+  ) {
+    delete sanitized.titleSource;
+  }
+
   return sanitized;
 }
 
@@ -2302,9 +2416,9 @@ export function recordListObservation(
   const observedRecord = {
     ...previous,
     id: listing.id,
-    title: selectListingTitle(
-      previous?.title,
-      listing.title
+    ...resolveListingTitle(
+      previous,
+      listing
     ),
     url: listing.url,
     yearMonth:
@@ -2374,6 +2488,10 @@ export function recordDetailFailure(
       normalizeVehicleNo(
         previous?.vehicleNo
       ),
+    ...resolveListingTitle(
+      previous,
+      listing
+    ),
     lastSeenAt: now,
     lastObservedPriceKrw:
       observedPriceKrw,
@@ -2418,9 +2536,9 @@ export function recordDetailSuccess(
   const record = {
     ...(previous ?? {}),
     id: listing.id,
-    title: selectListingTitle(
-      previous?.title,
-      listing.title
+    ...resolveListingTitle(
+      previous,
+      listing
     ),
     url: listing.url,
     yearMonth:

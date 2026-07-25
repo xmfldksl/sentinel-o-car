@@ -511,6 +511,181 @@ test("상태 정리 직후 실행은 기존 매물을 신규 알림으로 만들
   }
 });
 
+test("신뢰할 수 없는 목록 제목은 상세 구조화 제목으로 교체된다", async (t) => {
+  const pollutedTitle =
+    "2022/05 @1인신조@비흡연@라이젠CPU@EAP@19인치휠@V14라이트가능@ 모델 3 롱 레인지 AWD";
+  const untrustedListHtml = `<!doctype html>
+<html><body>
+<a href="https://fem.encar.com/cars/detail/42380687">
+  찜하기 ${pollutedTitle} 22/05식 77,657 km 전기 경기 4,680 만원
+</a>
+</body></html>`;
+  const structuredDetailHtml = `<!doctype html>
+<html lang="ko">
+  <body>
+    <script>
+      __PRELOADED_STATE__ = ${JSON.stringify({
+        cars: {
+          base: {
+            vehicleNo: "36러2232",
+            category: {
+              manufacturerName: "테슬라",
+              modelName: "모델 3",
+              gradeName: "롱 레인지",
+              gradeDetailName: "AWD"
+            },
+            spec: {
+              colorName: "흰색"
+            },
+            options: { etc: [] },
+            advertisement: {
+              oneLineText: pollutedTitle
+            },
+            photos: []
+          }
+        }
+      })};
+    </script>
+  </body>
+</html>`;
+  const pollutedState = {
+    initializedAt:
+      "2026-07-24T00:00:00.000Z",
+    listings: {
+      "42380687": {
+        id: "42380687",
+        title: pollutedTitle,
+        url:
+          "https://fem.encar.com/cars/detail/42380687",
+        yearMonth: "2022-05",
+        mileageKm: 77657,
+        priceKrw: 46800000,
+        listPriceKrw: 46800000,
+        region: "경기",
+        contracted: false,
+        firstSeenAt:
+          "2026-07-20T00:00:00.000Z",
+        lastSeenAt:
+          "2026-07-24T00:00:00.000Z"
+      }
+    }
+  };
+
+  for (const runMode of [
+    "send_current",
+    "normal"
+  ]) {
+    await t.test(runMode, async () => {
+      const trace = [];
+      const result = await processProfile({
+        profile:
+          normalizedGenericProfile,
+        profileState:
+          structuredClone(
+            pollutedState
+          ),
+        runMode,
+        maxPages: 1,
+        requestDelayMs: 0,
+        notifyPriceIncrease: true,
+        requestPacer: {
+          async wait() {}
+        },
+        fetchTextImpl: async (url) => {
+          trace.push(url);
+
+          return url.includes(
+            "car.encar.com/list/car"
+          )
+            ? untrustedListHtml
+            : structuredDetailHtml;
+        },
+        nowIso: () =>
+          "2026-07-25T00:00:00.000Z"
+      });
+      const record =
+        result.state.listings[
+          "42380687"
+        ];
+
+      assert.equal(
+        trace.some((url) =>
+          url.includes(
+            "/cars/detail/42380687"
+          )
+        ),
+        true,
+        "목록 제목을 신뢰할 수 없으면 상세 조회로 제목을 확정한다"
+      );
+      assert.equal(
+        record.title,
+        "모델 3 롱 레인지 AWD"
+      );
+      assert.equal(
+        record.titleSource,
+        "detail-structured"
+      );
+      assert.doesNotMatch(
+        record.title,
+        /@|1인신조|비흡연|라이젠CPU|19인치휠/
+      );
+      assert.equal(
+        record.colorName,
+        "흰색"
+      );
+      assert.equal(
+        record.deletedAt,
+        undefined
+      );
+    });
+  }
+
+  await t.test(
+    "send_current 이벤트도 정상 제목을 사용한다",
+    async () => {
+      const result = await processProfile({
+        profile:
+          normalizedGenericProfile,
+        profileState:
+          structuredClone(
+            pollutedState
+          ),
+        runMode: "send_current",
+        maxPages: 1,
+        requestDelayMs: 0,
+        notifyPriceIncrease: true,
+        requestPacer: {
+          async wait() {}
+        },
+        fetchTextImpl: async (url) =>
+          url.includes(
+            "car.encar.com/list/car"
+          )
+            ? untrustedListHtml
+            : structuredDetailHtml,
+        nowIso: () =>
+          "2026-07-25T00:00:00.000Z"
+      });
+
+      assert.deepEqual(
+        result.events.map(
+          (event) =>
+            event.listing.title
+        ),
+        ["모델 3 롱 레인지 AWD"]
+      );
+      assert.deepEqual(
+        result.events.map(
+          (event) =>
+            event.listing
+              .conditionReasons
+        ),
+        [["가격 초과"]]
+      );
+    }
+  );
+});
+
 test("raw 목록에 남아 있는 titleFilter 제외 매물은 삭제로 오판하지 않는다", async () => {
   const trace = [];
   const excludedPrevious = {
