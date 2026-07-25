@@ -24,7 +24,7 @@
     {
       "id": "toyota-sienna",
       "name": "도요타 시에나",
-      "enabled": true,
+      "enabled": false,
       "searchUrlEnv": "ENCAR_SEARCH_URL_TOYOTA_SIENNA",
       "isTesla": false,
       "titleFilter": {
