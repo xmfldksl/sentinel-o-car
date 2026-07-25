@@ -3,10 +3,10 @@
   "profiles": {
     "tesla-model3-long-range": {
       "listings": {
-        "40490326": {
-          "id": "40490326",
+        "40502228": {
+          "id": "40502228",
           "title": "모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/40490326?advClickPosition=mweb_mhightlight_g15_t34&listAdvType=mhighlight&type=detail&view_type=checked",
+          "url": "https://fem.encar.com/cars/detail/40502228?advClickPosition=mweb_mhightlight_g14_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-06",
           "mileageKm": 38030,
           "priceKrw": 41990000,
@@ -15,7 +15,7 @@
           "contracted": true,
           "vehicleNo": "13조4594",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -27,14 +27,15 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "40502228"
+          "previousListingId": "40490326",
+          "titleSource": "detail-structured"
         },
-        "42287101": {
-          "id": "42287101",
+        "42298226": {
+          "id": "42298226",
           "title": "모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42287101?advClickPosition=mweb_mhightlight_g7_t34&listAdvType=mhighlight&type=detail&view_type=checked",
+          "url": "https://fem.encar.com/cars/detail/42298226?advClickPosition=mweb_mhightlight_g5_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-06",
           "mileageKm": 35654,
           "priceKrw": 99990000,
@@ -43,7 +44,7 @@
           "contracted": true,
           "vehicleNo": "54무6830",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -55,9 +56,10 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "42298226"
+          "previousListingId": "42287101",
+          "titleSource": "detail-structured"
         },
         "42315123": {
           "id": "42315123",
@@ -71,7 +73,7 @@
           "contracted": true,
           "vehicleNo": "25도4917",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -83,13 +85,14 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
-        "42333303": {
-          "id": "42333303",
+        "42334170": {
+          "id": "42334170",
           "title": "모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42333303?advClickPosition=mweb_mhightlight_g24_t34&listAdvType=mhighlight&type=detail&view_type=checked",
+          "url": "https://fem.encar.com/cars/detail/42334170?advClickPosition=mweb_mhightlight_g23_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-08",
           "mileageKm": 70203,
           "priceKrw": 39990000,
@@ -98,7 +101,7 @@
           "contracted": false,
           "vehicleNo": "19루0921",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -110,9 +113,10 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "42334170"
+          "previousListingId": "42333303",
+          "titleSource": "detail-structured"
         },
         "42353308": {
           "id": "42353308",
@@ -126,7 +130,7 @@
           "contracted": false,
           "vehicleNo": "49다8086",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -138,10 +142,11 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T08:26:25.399Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
           "telegramMessageId": 366,
-          "telegramSentAt": "2026-07-25T08:27:39.676Z"
+          "telegramSentAt": "2026-07-25T08:27:39.676Z",
+          "titleSource": "detail-structured"
         },
         "42354882": {
           "id": "42354882",
@@ -155,7 +160,7 @@
           "contracted": false,
           "vehicleNo": "25거4708",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -167,8 +172,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42358899": {
           "id": "42358899",
@@ -182,7 +188,7 @@
           "contracted": false,
           "vehicleNo": "21수3113",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -194,8 +200,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42365162": {
           "id": "42365162",
@@ -209,7 +216,7 @@
           "contracted": false,
           "vehicleNo": "13부4562",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -221,8 +228,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42371690": {
           "id": "42371690",
@@ -236,7 +244,7 @@
           "contracted": false,
           "vehicleNo": "42우8531",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -248,12 +256,13 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42380687": {
           "id": "42380687",
-          "title": "@1인신조@비흡연@라이젠CPU@EAP@19인치휠@V14라이트가능@ 모델 3 롱 레인지 AWD",
+          "title": "모델 3 롱 레인지 AWD",
           "url": "https://fem.encar.com/cars/detail/42380687?advClickPosition=mweb_mopre_g16_t34&listAdvType=mpremium&type=detail&view_type=checked",
           "yearMonth": "2022-05",
           "mileageKm": 77657,
@@ -263,7 +272,7 @@
           "contracted": false,
           "vehicleNo": "36러2232",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -275,8 +284,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42381493": {
           "id": "42381493",
@@ -290,7 +300,7 @@
           "contracted": false,
           "vehicleNo": "16버3414",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -302,8 +312,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42382611": {
           "id": "42382611",
@@ -317,7 +328,7 @@
           "contracted": false,
           "vehicleNo": "29노1998",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -329,8 +340,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42383037": {
           "id": "42383037",
@@ -344,7 +356,7 @@
           "contracted": false,
           "vehicleNo": "29주9327",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -356,8 +368,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42384042": {
           "id": "42384042",
@@ -371,7 +384,7 @@
           "contracted": false,
           "vehicleNo": "52부6159",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -383,44 +396,17 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
           "telegramMessageId": 363,
           "telegramSentAt": "2026-07-25T06:07:31.564Z",
-          "previousListingId": "42378674"
+          "previousListingId": "42378674",
+          "titleSource": "detail-structured"
         },
-        "42384839": {
-          "id": "42384839",
-          "title": "라이젠/ FSD lite, Grok Ai 사용가능 / 리스, 할부 가능합니다. 모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42384839?advClickPosition=mweb_mopre_g18_t34&listAdvType=mpremium&type=detail&view_type=checked",
-          "yearMonth": "2022-05",
-          "mileageKm": 83025,
-          "priceKrw": 41900000,
-          "listPriceKrw": 41900000,
-          "region": "부산",
-          "contracted": false,
-          "vehicleNo": "37머0144",
-          "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
-          "option": "미확인",
-          "hasFsd": false,
-          "hasEap": false,
-          "optionSource": "미확인",
-          "optionEvidence": null,
-          "colorName": "검정색",
-          "colorStatus": "확인",
-          "saleType": "NORMAL",
-          "monthlyFeeKrw": null,
-          "rentalUsageHistory": null,
-          "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
-          "deletionTracked": true,
-          "previousListingId": "42393065"
-        },
-        "42386376": {
-          "id": "42386376",
+        "42386837": {
+          "id": "42386837",
           "title": "모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42386376?advClickPosition=mweb_mhightlight_g6_t34&listAdvType=mhighlight&type=detail&view_type=checked",
+          "url": "https://fem.encar.com/cars/detail/42386837?advClickPosition=mweb_mhightlight_g4_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-06",
           "mileageKm": 73704,
           "priceKrw": 39990000,
@@ -429,7 +415,7 @@
           "contracted": false,
           "vehicleNo": "26가0545",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -441,11 +427,12 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "42386837",
+          "previousListingId": "42386376",
           "telegramMessageId": 365,
-          "telegramSentAt": "2026-07-25T08:27:38.250Z"
+          "telegramSentAt": "2026-07-25T08:27:38.250Z",
+          "titleSource": "detail-structured"
         },
         "42387993": {
           "id": "42387993",
@@ -459,7 +446,7 @@
           "contracted": false,
           "vehicleNo": "51루9371",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -471,8 +458,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42389558": {
           "id": "42389558",
@@ -486,7 +474,7 @@
           "contracted": false,
           "vehicleNo": "39너2022",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -498,13 +486,43 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
-        "42396097": {
-          "id": "42396097",
-          "title": "\"진단2.0\"FSD라이트바로적용~미국생산HW3.0~화이트시트커버렌트X 모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42396097?advClickPosition=mweb_mopre_g9_t34&listAdvType=mpremium&type=detail&view_type=checked",
+        "42393065": {
+          "id": "42393065",
+          "title": "모델 3 롱 레인지 AWD",
+          "url": "https://fem.encar.com/cars/detail/42393065?advClickPosition=mweb_mhightlight_g17_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
+          "yearMonth": "2022-05",
+          "mileageKm": 83025,
+          "priceKrw": 41900000,
+          "listPriceKrw": 41900000,
+          "region": "부산",
+          "contracted": false,
+          "vehicleNo": "37머0144",
+          "firstSeenAt": "2026-07-24T22:45:03.824Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
+          "option": "미확인",
+          "hasFsd": false,
+          "hasEap": false,
+          "optionSource": "미확인",
+          "optionEvidence": null,
+          "colorName": "검정색",
+          "colorStatus": "확인",
+          "saleType": "NORMAL",
+          "monthlyFeeKrw": null,
+          "rentalUsageHistory": null,
+          "totalLossHistory": null,
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "previousListingId": "42384839",
+          "titleSource": "detail-structured"
+        },
+        "42398223": {
+          "id": "42398223",
+          "title": "모델 3 롱 레인지 AWD",
+          "url": "https://fem.encar.com/cars/detail/42398223?advClickPosition=mweb_mhightlight_g8_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-05",
           "mileageKm": 40305,
           "priceKrw": 46900000,
@@ -513,7 +531,7 @@
           "contracted": false,
           "vehicleNo": "16주3998",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -525,9 +543,10 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "42398223"
+          "previousListingId": "42396097",
+          "titleSource": "detail-structured"
         },
         "42399440": {
           "id": "42399440",
@@ -541,7 +560,7 @@
           "contracted": true,
           "vehicleNo": "69가5207",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -553,8 +572,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42400420": {
           "id": "42400420",
@@ -568,7 +588,7 @@
           "contracted": false,
           "vehicleNo": "01조3751",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -580,8 +600,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42405280": {
           "id": "42405280",
@@ -595,7 +616,7 @@
           "contracted": false,
           "vehicleNo": "60루4668",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -607,8 +628,9 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42412370": {
           "id": "42412370",
@@ -622,7 +644,7 @@
           "contracted": false,
           "vehicleNo": "45노2653",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -634,13 +656,14 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
-        "42413023": {
-          "id": "42413023",
+        "42413386": {
+          "id": "42413386",
           "title": "모델 3 롱 레인지 AWD",
-          "url": "https://fem.encar.com/cars/detail/42413023?advClickPosition=mweb_mhightlight_g22_t34&listAdvType=mhighlight&type=detail&view_type=checked",
+          "url": "https://fem.encar.com/cars/detail/42413386?advClickPosition=mweb_mhightlight_g21_t34&listAdvType=mhighlight&type=detail&view_type=hs_ad",
           "yearMonth": "2022-12",
           "mileageKm": 32975,
           "priceKrw": 49990000,
@@ -649,7 +672,7 @@
           "contracted": true,
           "vehicleNo": "53보8865",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -661,9 +684,10 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T15:31:26.811Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
-          "previousListingId": "42413386"
+          "previousListingId": "42413023",
+          "titleSource": "detail-structured"
         },
         "42419092": {
           "id": "42419092",
@@ -677,7 +701,7 @@
           "contracted": true,
           "vehicleNo": "54다3881",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -689,12 +713,13 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-24T22:45:03.824Z",
-          "deletionTracked": true
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
+          "deletionTracked": true,
+          "titleSource": "detail-structured"
         },
         "42421350": {
           "id": "42421350",
-          "title": "가능 모델 3 롱 레인지 AWD",
+          "title": "모델 3 롱 레인지 AWD",
           "url": "https://fem.encar.com/cars/detail/42421350?advClickPosition=mweb_mopre_g1_t34&listAdvType=mpremium&type=detail&view_type=checked",
           "yearMonth": "2022-06",
           "mileageKm": 9059,
@@ -704,7 +729,7 @@
           "contracted": true,
           "vehicleNo": "39너4592",
           "firstSeenAt": "2026-07-24T22:45:03.824Z",
-          "lastSeenAt": "2026-07-25T15:31:26.811Z",
+          "lastSeenAt": "2026-07-25T16:37:54.206Z",
           "option": "미확인",
           "hasFsd": false,
           "hasEap": false,
@@ -716,14 +741,15 @@
           "monthlyFeeKrw": null,
           "rentalUsageHistory": null,
           "totalLossHistory": null,
-          "lastEvaluatedAt": "2026-07-25T08:26:25.399Z",
+          "lastEvaluatedAt": "2026-07-25T16:37:54.206Z",
           "deletionTracked": true,
           "telegramMessageId": 364,
-          "telegramSentAt": "2026-07-25T08:27:36.823Z"
+          "telegramSentAt": "2026-07-25T08:27:36.823Z",
+          "titleSource": "detail-structured"
         }
       },
       "initializedAt": "2026-07-24T22:45:03.824Z",
-      "updatedAt": "2026-07-25T15:31:26.811Z"
+      "updatedAt": "2026-07-25T16:37:54.206Z"
     },
     "toyota-sienna": {
       "listings": {
