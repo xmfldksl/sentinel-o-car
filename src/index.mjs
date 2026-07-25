@@ -48,6 +48,8 @@ const SUPPORTED_RUN_MODES = new Set([
   "telegram_test"
 ]);
 
+const LIST_PAGE_MAX_ATTEMPTS = 3;
+
 function profileLabel(profile) {
   return `[${profile.id} | ${profile.name}]`;
 }
@@ -80,10 +82,88 @@ async function fetchText(url) {
   }
 }
 
-function logProfileSearch(profile) {
+function isRetryableListPageError(
+  error
+) {
+  const status = Number(
+    /\bHTTP (\d{3})\b/.exec(
+      error?.message ?? ""
+    )?.[1]
+  );
+
+  if (!Number.isFinite(status)) {
+    return true;
+  }
+
+  if (status >= 500) {
+    return true;
+  }
+
+  return (
+    status === 408 || status === 429
+  );
+}
+
+async function fetchListPageWithRetry({
+  profile,
+  page,
+  pageUrl,
+  fetchTextImpl,
+  requestPacer,
+  requestDelayMs,
+  maxAttempts = LIST_PAGE_MAX_ATTEMPTS,
+  logger
+}) {
+  let attempts = 0;
+  let lastError = null;
+
+  while (attempts < maxAttempts) {
+    attempts += 1;
+
+    await requestPacer.wait(
+      requestDelayMs
+    );
+
+    try {
+      return {
+        ok: true,
+        attempts,
+        html: await fetchTextImpl(
+          pageUrl
+        )
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (
+        !isRetryableListPageError(
+          error
+        ) ||
+        attempts >= maxAttempts
+      ) {
+        break;
+      }
+
+      logger.warn(
+        `${profileLabel(profile)} List page ${page} fetch failed (attempt ${attempts}/${maxAttempts}): ${error.message}. Retrying.`
+      );
+    }
+  }
+
+  return {
+    ok: false,
+    attempts,
+    error: lastError
+  };
+}
+
+function logProfileSearch(
+  profile,
+  logger = console
+) {
   const url = new URL(profile.searchUrl);
 
-  console.log(
+  logger.log(
     [
       `${profileLabel(profile)} 검색 URL 출처: ${profile.searchUrlSource}`,
       `${profileLabel(profile)} 검색 URL 호스트: ${url.host}`,
@@ -101,7 +181,9 @@ async function collectProfileListings(
     fetchTextImpl = fetchText,
     requestPacer: providedRequestPacer,
     sleepImpl = sleep,
-    nowMs = Date.now
+    nowMs = Date.now,
+    maxPageAttempts = LIST_PAGE_MAX_ATTEMPTS,
+    logger = console
   } = {}
 ) {
   const listingsById = new Map();
@@ -111,8 +193,11 @@ async function collectProfileListings(
       sleepImpl,
       nowMs
     });
+  let partial = false;
+  let failedPage = null;
+  let failedPageAttempts = 0;
 
-  logProfileSearch(profile);
+  logProfileSearch(profile, logger);
 
   for (
     let page = 1;
@@ -124,19 +209,43 @@ async function collectProfileListings(
       page
     );
 
-    console.log(
+    logger.log(
       `${profileLabel(profile)} Fetching list page ${page}.`
     );
 
-    await requestPacer.wait(
-      requestDelayMs
-    );
-    const html = await fetchTextImpl(
-      pageUrl
-    );
-    const parsed = parseListHtml(html);
+    const pageResult =
+      await fetchListPageWithRetry({
+        profile,
+        page,
+        pageUrl,
+        fetchTextImpl,
+        requestPacer,
+        requestDelayMs,
+        maxAttempts: maxPageAttempts,
+        logger
+      });
 
-    console.log(
+    if (!pageResult.ok) {
+      if (page === 1) {
+        throw pageResult.error;
+      }
+
+      partial = true;
+      failedPage = page;
+      failedPageAttempts =
+        pageResult.attempts;
+
+      logger.warn(
+        `${profileLabel(profile)} List page ${page} failed after ${pageResult.attempts} attempt(s): ${pageResult.error.message}. Continuing with ${listingsById.size} collected listing(s); deletion reconciliation is suppressed for this partial crawl.`
+      );
+      break;
+    }
+
+    const parsed = parseListHtml(
+      pageResult.html
+    );
+
+    logger.log(
       `${profileLabel(profile)} Parsed ${parsed.length} unique listings from page ${page}.`
     );
 
@@ -151,7 +260,12 @@ async function collectProfileListings(
     );
   }
 
-  return listingsById;
+  return {
+    listingsById,
+    partial,
+    failedPage,
+    failedPageAttempts
+  };
 }
 
 function createProfileEventEnvelope(
@@ -195,6 +309,8 @@ async function processProfile({
   sleepImpl = sleep,
   requestPacer: providedRequestPacer,
   nowMs = Date.now,
+  maxPageAttempts = LIST_PAGE_MAX_ATTEMPTS,
+  logger = console,
   nowIso = () =>
     new Date().toISOString()
 }) {
@@ -207,16 +323,23 @@ async function processProfile({
   const state =
     structuredClone(profileState);
 
-  const collectedListingsById =
-    await collectProfileListings(
-      profile,
-      {
-        fetchTextImpl,
-        requestPacer,
-        maxPages,
-        requestDelayMs
-      }
-    );
+  const {
+    listingsById: collectedListingsById,
+    partial: partialCrawl,
+    failedPage: failedListPage,
+    failedPageAttempts:
+      failedListPageAttempts
+  } = await collectProfileListings(
+    profile,
+    {
+      fetchTextImpl,
+      requestPacer,
+      maxPages,
+      requestDelayMs,
+      maxPageAttempts,
+      logger
+    }
+  );
   const listingsById = new Map();
   const now = nowIso();
   const wasInitialized = Boolean(
@@ -308,9 +431,8 @@ async function processProfile({
         listing.url
       );
     } catch (error) {
-      console.warn(
-        `${profileLabel(profile)} Detail fetch failed for ${listing.id}:`,
-        error.message
+      logger.warn(
+        `${profileLabel(profile)} Detail fetch failed for ${listing.id}: ${error.message}`
       );
 
       const failedListing = {
@@ -462,7 +584,7 @@ async function processProfile({
       duplicate
     } of duplicates
   ) {
-    console.log(
+    logger.log(
       `${profileLabel(profile)} ${formatDuplicateListingLog(
         representative,
         duplicate
@@ -525,6 +647,7 @@ async function processProfile({
         collectedListingsById,
       representatives,
       identityResolutionComplete,
+      deletionSuppressed: partialCrawl,
       now,
       runMode,
       wasInitialized
@@ -545,6 +668,9 @@ async function processProfile({
     profile,
     state,
     initializedNow,
+    partialCrawl,
+    failedListPage,
+    failedListPageAttempts,
     listingCount:
       Object.keys(state.listings).length,
     events: events.map((event) =>

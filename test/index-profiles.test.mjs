@@ -773,6 +773,333 @@ test("raw 목록에 남아 있는 titleFilter 제외 매물은 삭제로 오판�
   );
 });
 
+const secondPageListHtml = `<!doctype html>
+<html><body>
+<a href="https://fem.encar.com/cars/detail/42999999">
+  찜하기 모델 3 롱 레인지 AWD 23/01식 12,000 km 전기 서울 3,300 만원
+</a>
+<a href="https://fem.encar.com/cars/detail/42023180">
+  찜하기 모델 3 롱 레인지 AWD 22/09식 67,235 km 전기 경기 3,270 만원
+</a>
+<script>
+  __PRELOADED_STATE__ = {"cars":{"list":[
+    {"id":42999999,"modelName":"모델 3","gradeName":"롱 레인지","gradeDetailName":"AWD"},
+    {"id":42023180,"modelName":"모델 3","gradeName":"롱 레인지","gradeDetailName":"AWD"}
+  ]}};
+</script>
+</body></html>`;
+
+function trackedListing(overrides = {}) {
+  const id = overrides.id ?? "99999999";
+
+  return {
+    id,
+    title: "모델 3 롱 레인지 AWD",
+    url: `https://fem.encar.com/cars/detail/${id}`,
+    yearMonth: "2021-11",
+    mileageKm: 51000,
+    priceKrw: 31000000,
+    listPriceKrw: 31000000,
+    region: "부산",
+    contracted: false,
+    vehicleNo: null,
+    firstSeenAt:
+      "2026-07-20T00:00:00.000Z",
+    lastSeenAt:
+      "2026-07-24T00:00:00.000Z",
+    deletionTracked: true,
+    ...overrides
+  };
+}
+
+function profileStateWith(records) {
+  return {
+    initializedAt:
+      "2026-07-24T00:00:00.000Z",
+    listings: Object.fromEntries(
+      records.map((record) => [
+        record.id,
+        record
+      ])
+    )
+  };
+}
+
+function listPageRun({
+  runMode,
+  profileState,
+  pageOutcome
+}) {
+  const attemptsByPage = new Map();
+  const warnings = [];
+
+  return {
+    attemptsByPage,
+    warnings,
+    result: processProfile({
+      profile: normalizedGenericProfile,
+      profileState,
+      runMode,
+      maxPages: 2,
+      requestDelayMs: 0,
+      notifyPriceIncrease: true,
+      requestPacer: {
+        async wait() {}
+      },
+      logger: {
+        log() {},
+        warn(message) {
+          warnings.push(message);
+        }
+      },
+      fetchTextImpl: async (url) => {
+        if (
+          !url.includes(
+            "car.encar.com/list/car"
+          )
+        ) {
+          return detailHtml();
+        }
+
+        const page = Number(
+          new URL(
+            url
+          ).searchParams.get("page")
+        );
+        const attempt =
+          (attemptsByPage.get(page) ??
+            0) + 1;
+
+        attemptsByPage.set(
+          page,
+          attempt
+        );
+
+        return pageOutcome(
+          page,
+          attempt
+        );
+      },
+      nowIso: () =>
+        "2026-07-25T00:00:00.000Z"
+    })
+  };
+}
+
+function fetchFailed() {
+  throw new Error("fetch failed");
+}
+
+function firstPageThenFailure(page) {
+  return page === 1
+    ? listHtml
+    : fetchFailed();
+}
+
+function eventKindsById(result) {
+  return Object.fromEntries(
+    result.events.map((event) => [
+      event.listing.id,
+      event.kind
+    ])
+  );
+}
+
+test("목록 후속 페이지 fetch 실패는 이미 수집한 페이지 결과를 폐기하지 않는다", async (t) => {
+  await t.test(
+    "A. 첫 페이지가 최대 재시도 후 실패하면 프로필이 실패하고 상태는 그대로 남는다",
+    async () => {
+      const profileState =
+        profileStateWith([
+          trackedListing()
+        ]);
+      const run = listPageRun({
+        runMode: "normal",
+        profileState,
+        pageOutcome: fetchFailed
+      });
+
+      await assert.rejects(
+        run.result,
+        /fetch failed/
+      );
+
+      assert.equal(
+        run.attemptsByPage.get(1),
+        3
+      );
+      assert.equal(
+        run.attemptsByPage.has(2),
+        false,
+        "첫 페이지 실패 이후 다음 페이지를 요청하지 않는다"
+      );
+      assert.deepEqual(
+        profileState,
+        profileStateWith([
+          trackedListing()
+        ]),
+        "실패한 프로필의 입력 상태는 변경되지 않는다"
+      );
+    }
+  );
+
+  const partialCrawlCases = [
+    {
+      name: "B. send_current는 1페이지 매물을 계속 current 이벤트로 전송한다",
+      runMode: "send_current",
+      tracked: [trackedListing()],
+      expectedKinds: {
+        "42023180": "current",
+        "42383037": "current"
+      }
+    },
+    {
+      name: "C. normal은 1페이지의 신규·가격변동 이벤트를 유지한다",
+      runMode: "normal",
+      tracked: [
+        trackedListing(),
+        trackedListing({
+          id: "42023180",
+          yearMonth: "2022-09",
+          mileageKm: 67235,
+          priceKrw: 34000000,
+          listPriceKrw: 34000000,
+          region: "경기"
+        })
+      ],
+      expectedKinds: {
+        "42023180": "price_decrease",
+        "42383037": "new"
+      }
+    }
+  ];
+
+  for (const testCase of partialCrawlCases) {
+    await t.test(
+      testCase.name,
+      async () => {
+        const run = listPageRun({
+          runMode: testCase.runMode,
+          profileState:
+            profileStateWith(
+              testCase.tracked
+            ),
+          pageOutcome:
+            firstPageThenFailure
+        });
+        const result =
+          await run.result;
+
+        assert.equal(
+          result.partialCrawl,
+          true
+        );
+        assert.equal(
+          result.failedListPage,
+          2
+        );
+        assert.equal(
+          result.failedListPageAttempts,
+          3
+        );
+        assert.equal(
+          run.attemptsByPage.get(2),
+          3
+        );
+        assert.deepEqual(
+          eventKindsById(result),
+          testCase.expectedKinds,
+          "수집된 페이지의 이벤트는 그대로 만들어진다"
+        );
+        assert.deepEqual(
+          result.state.listings[
+            "99999999"
+          ],
+          trackedListing(),
+          "수집되지 않은 기존 매물은 삭제되지 않고 상태가 보존된다"
+        );
+
+        const partialWarning =
+          run.warnings.find(
+            (message) =>
+              message.includes(
+                "List page 2 failed"
+              )
+          );
+
+        assert.ok(partialWarning);
+        assert.match(
+          partialWarning,
+          /after 3 attempt/
+        );
+        assert.match(
+          partialWarning,
+          /3 collected listing/
+        );
+        assert.match(
+          partialWarning,
+          /Continuing/
+        );
+        assert.match(
+          partialWarning,
+          /deletion reconciliation is suppressed/
+        );
+        assert.match(
+          partialWarning,
+          /partial crawl/
+        );
+      }
+    );
+  }
+
+  await t.test(
+    "D. 재시도로 성공한 후속 페이지는 중복 없이 병합되고 삭제 판정이 살아 있다",
+    async () => {
+      const run = listPageRun({
+        runMode: "normal",
+        profileState: profileStateWith([
+          trackedListing()
+        ]),
+        pageOutcome: (page, attempt) => {
+          if (page === 1) {
+            return listHtml;
+          }
+
+          return attempt === 1
+            ? fetchFailed()
+            : secondPageListHtml;
+        }
+      });
+      const result = await run.result;
+
+      assert.equal(
+        run.attemptsByPage.get(2),
+        2
+      );
+      assert.equal(
+        result.partialCrawl,
+        false
+      );
+      assert.deepEqual(
+        eventKindsById(result),
+        {
+          "42023180": "new",
+          "42383037": "new",
+          "42999999": "new",
+          "99999999": "deleted"
+        },
+        "두 페이지에 중복된 매물은 한 번만 처리하고 완전한 수집에서는 삭제 판정이 동작한다"
+      );
+      assert.equal(
+        result.state.listings[
+          "99999999"
+        ].deletedAt,
+        "2026-07-25T00:00:00.000Z"
+      );
+    }
+  );
+});
+
 test("한 프로필 실패는 그 상태를 보존하고 다음 프로필의 성공 상태는 저장한다", async () => {
   const profiles = [
     rawProfile("failed"),

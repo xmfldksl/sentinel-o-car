@@ -1923,6 +1923,7 @@ export function reconcileListingDeletions({
   currentListings,
   representatives,
   identityResolutionComplete = true,
+  deletionSuppressed = false,
   now,
   runMode,
   wasInitialized
@@ -2080,6 +2081,10 @@ export function reconcileListingDeletions({
     result.restoredListingIds.push(
       restoredListingId
     );
+  }
+
+  if (deletionSuppressed) {
+    return result;
   }
 
   const previousGroups =
