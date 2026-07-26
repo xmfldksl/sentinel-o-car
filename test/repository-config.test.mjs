@@ -43,19 +43,6 @@ const exampleConfig = JSON.parse(
   exampleConfigText
 );
 
-const TESLA_PROFILE_ID =
-  "tesla-model3-long-range";
-const TOYOTA_PROFILE_ID =
-  "toyota-sienna";
-const TESLA_URL_ENV =
-  "ENCAR_SEARCH_URL_TESLA_MODEL3";
-const TOYOTA_URL_ENV =
-  "ENCAR_SEARCH_URL_TOYOTA_SIENNA";
-const EMPTY_TITLE_FILTER = {
-  requiredAll: [],
-  requiredAny: [],
-  excludedAny: []
-};
 const ROOT_CONFIG_KEYS = [
   "configVersion",
   "maxPages",
@@ -140,33 +127,9 @@ const ALLOWED_TITLE_SOURCES = new Set([
   "detail-unresolved",
   "untrusted-card-text"
 ]);
-const DISABLED_SLOTS = [
-  {
-    id: "slot-3",
-    name: "검색 조건 3",
-    searchUrlEnv:
-      "ENCAR_SEARCH_URL_3"
-  },
-  {
-    id: "slot-4",
-    name: "검색 조건 4",
-    searchUrlEnv:
-      "ENCAR_SEARCH_URL_4"
-  },
-  {
-    id: "slot-5",
-    name: "검색 조건 5",
-    searchUrlEnv:
-      "ENCAR_SEARCH_URL_5"
-  }
-];
-const EXPECTED_PROFILE_IDS = [
-  TESLA_PROFILE_ID,
-  TOYOTA_PROFILE_ID,
-  ...DISABLED_SLOTS.map(
-    (slot) => slot.id
-  )
-];
+const SUPPORTED_CONFIG_VERSION = 2;
+const ENVIRONMENT_NAME_PATTERN =
+  /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function sortedKeys(value) {
   return Object.keys(value).sort();
@@ -207,19 +170,38 @@ function createSyntheticSearchUrl(
   return url.toString();
 }
 
-function normalizeRepositoryConfig() {
+// 활성 프로필의 searchUrlEnv 이름을 config에서 읽어
+// 가상 environment를 만든다. 실제 변수 이름은 고정하지 않는다.
+function createEnabledProfileEnvironment() {
+  const environment = {};
+
+  for (const profile of rawConfig.profiles) {
+    if (
+      !profile.enabled ||
+      !Object.hasOwn(
+        profile,
+        "searchUrlEnv"
+      )
+    ) {
+      continue;
+    }
+
+    environment[profile.searchUrlEnv] =
+      createSyntheticSearchUrl(
+        profile.searchUrlEnv
+      );
+  }
+
+  return environment;
+}
+
+function normalizeRepositoryConfig(
+  environment =
+    createEnabledProfileEnvironment()
+) {
   return normalizeWatcherConfig(
     rawConfig,
-    {
-      [TESLA_URL_ENV]:
-        createSyntheticSearchUrl(
-          "tesla"
-        ),
-      [TOYOTA_URL_ENV]:
-        createSyntheticSearchUrl(
-          "toyota"
-        )
-    }
+    environment
   );
 }
 
@@ -236,28 +218,45 @@ function isIsoTimestamp(value) {
   );
 }
 
-test("config.json은 정확한 root와 profile 계약 및 5개 운영 슬롯을 사용한다", () => {
+// 운영 설정(enabled, name, titleFilter, price, 프로필 개수)은
+// config.json에서만 관리한다. 여기서는 계약만 검증한다.
+test("config.json은 root와 profile 계약을 따른다", () => {
   assertExactKeys(
     rawConfig,
     ROOT_CONFIG_KEYS,
     "config root keys"
   );
-  assert.equal(rawConfig.configVersion, 2);
   assert.equal(
-    rawConfig.notifyPriceIncrease,
-    true
+    rawConfig.configVersion,
+    SUPPORTED_CONFIG_VERSION
   );
-  assert.equal(rawConfig.maxPages, 2);
   assert.equal(
-    rawConfig.requestDelayMs,
-    1500
+    typeof rawConfig.notifyPriceIncrease,
+    "boolean"
   );
-  assert.deepEqual(
-    rawConfig.profiles.map(
-      (profile) => profile.id
-    ),
-    EXPECTED_PROFILE_IDS
+  assert.equal(
+    Number.isSafeInteger(
+      rawConfig.maxPages
+    ) && rawConfig.maxPages > 0,
+    true,
+    "maxPages"
   );
+  assert.equal(
+    Number.isSafeInteger(
+      rawConfig.requestDelayMs
+    ) && rawConfig.requestDelayMs >= 0,
+    true,
+    "requestDelayMs"
+  );
+  assert.equal(
+    Array.isArray(rawConfig.profiles) &&
+      rawConfig.profiles.length > 0,
+    true,
+    "profiles shape"
+  );
+
+  const seenIds = new Set();
+  const seenEnvironmentNames = new Set();
 
   for (const profile of rawConfig.profiles) {
     assertExactKeys(
@@ -265,84 +264,120 @@ test("config.json은 정확한 root와 profile 계약 및 5개 운영 슬롯을 
       RAW_PROFILE_KEYS,
       `${profile.id} raw keys`
     );
-    assertExactKeys(
-      profile.titleFilter,
-      TITLE_FILTER_KEYS,
-      `${profile.id} titleFilter keys`
+
+    const id = profile.id;
+
+    assert.equal(
+      typeof id === "string" &&
+        id.trim() === id &&
+        id.length > 0,
+      true,
+      `${id} id format`
     );
-    assert.deepEqual(
-      profile.titleFilter,
-      EMPTY_TITLE_FILTER
+    assert.notEqual(
+      id,
+      "default",
+      "id must not be default"
+    );
+    assert.equal(
+      seenIds.has(id),
+      false,
+      `${id} id uniqueness`
+    );
+    seenIds.add(id);
+
+    assert.equal(
+      typeof profile.name === "string" &&
+        profile.name.trim().length > 0,
+      true,
+      `${id} name`
+    );
+    assert.equal(
+      typeof profile.enabled,
+      "boolean",
+      `${id} enabled`
     );
     assert.equal(
       typeof profile.isTesla,
-      "boolean"
+      "boolean",
+      `${id} isTesla`
     );
+
     assert.equal(
       Object.hasOwn(
         profile,
         "searchUrl"
       ),
-      false
+      false,
+      `${id} must not inline searchUrl`
     );
-  }
-
-  assert.deepEqual(
-    findProfile(
-      rawConfig,
-      TESLA_PROFILE_ID
-    ),
-    {
-      id: TESLA_PROFILE_ID,
-      name: "Model 3 AWD",
-      enabled: true,
-      searchUrlEnv: TESLA_URL_ENV,
-      isTesla: true,
-      titleFilter: EMPTY_TITLE_FILTER,
-      price: {
-        maxPriceKrw: 35000000,
-        eapMaxPriceKrw: 37000000,
-        fsdMaxPriceKrw: 40000000
-      }
-    }
-  );
-  assert.deepEqual(
-    findProfile(
-      rawConfig,
-      TOYOTA_PROFILE_ID
-    ),
-    {
-      id: TOYOTA_PROFILE_ID,
-      name: "도요타 시에나",
-      enabled: true,
-      searchUrlEnv: TOYOTA_URL_ENV,
-      isTesla: false,
-      titleFilter: EMPTY_TITLE_FILTER,
-      price: {
-        maxPriceKrw: 46000000
-      }
-    }
-  );
-
-  for (const slot of DISABLED_SLOTS) {
-    assert.deepEqual(
-      findProfile(
-        rawConfig,
-        slot.id
+    assert.match(
+      profile.searchUrlEnv,
+      ENVIRONMENT_NAME_PATTERN,
+      `${id} searchUrlEnv format`
+    );
+    assert.equal(
+      seenEnvironmentNames.has(
+        profile.searchUrlEnv
       ),
-      {
-        ...slot,
-        enabled: false,
-        isTesla: false,
-        titleFilter:
-          EMPTY_TITLE_FILTER,
-        price: {
-          maxPriceKrw: 0
-        }
-      }
+      false,
+      `${id} searchUrlEnv uniqueness`
+    );
+    seenEnvironmentNames.add(
+      profile.searchUrlEnv
+    );
+
+    assertExactKeys(
+      profile.titleFilter,
+      TITLE_FILTER_KEYS,
+      `${id} titleFilter keys`
+    );
+
+    for (const field of TITLE_FILTER_KEYS) {
+      const entries =
+        profile.titleFilter[field];
+
+      assert.equal(
+        Array.isArray(entries),
+        true,
+        `${id} titleFilter.${field} shape`
+      );
+      assert.equal(
+        entries.every(
+          (entry) =>
+            typeof entry === "string" &&
+            entry.trim().length > 0
+        ),
+        true,
+        `${id} titleFilter.${field} entries`
+      );
+    }
+
+    assertExactKeys(
+      profile.price,
+      profile.isTesla
+        ? TESLA_PRICE_KEYS
+        : GENERIC_PRICE_KEYS,
+      `${id} price keys`
+    );
+    assert.equal(
+      Object.values(profile.price).every(
+        (amount) =>
+          Number.isSafeInteger(amount) &&
+          amount >= 0
+      ),
+      true,
+      `${id} price amounts`
     );
   }
 
+  assert.equal(
+    rawConfig.profiles.some(
+      (profile) => profile.enabled
+    ),
+    true,
+    "at least one enabled profile"
+  );
   assert.doesNotMatch(
     configText,
     /https?:\/\//
@@ -393,72 +428,59 @@ test("정규화 결과는 runtime URL 필드 외에 profile 계약을 확장하�
         : GENERIC_PRICE_KEYS,
       `${profile.id} normalized price keys`
     );
-  }
 
-  const tesla = findProfile(
-    normalized,
-    TESLA_PROFILE_ID
-  );
-  const toyota = findProfile(
-    normalized,
-    TOYOTA_PROFILE_ID
-  );
-
-  assert.equal(
-    tesla.searchUrl,
-    createSyntheticSearchUrl("tesla")
-  );
-  assert.equal(
-    tesla.searchUrlSource,
-    `environment:${TESLA_URL_ENV}`
-  );
-  assert.equal(tesla.isTesla, true);
-  assert.deepEqual(tesla.price, {
-    maxPriceKrw: 35000000,
-    eapMaxPriceKrw: 37000000,
-    fsdMaxPriceKrw: 40000000
-  });
-
-  assert.equal(
-    toyota.searchUrl,
-    createSyntheticSearchUrl("toyota")
-  );
-  assert.equal(
-    toyota.searchUrlSource,
-    `environment:${TOYOTA_URL_ENV}`
-  );
-  assert.equal(toyota.isTesla, false);
-  assert.deepEqual(toyota.price, {
-    maxPriceKrw: 46000000
-  });
-
-  for (const slot of DISABLED_SLOTS) {
-    const profile = findProfile(
-      normalized,
-      slot.id
+    const source = findProfile(
+      rawConfig,
+      profile.id
     );
 
-    assert.equal(profile.enabled, false);
-    assert.equal(profile.isTesla, false);
-    assert.equal(profile.searchUrl, null);
+    assert.equal(
+      profile.enabled,
+      source.enabled,
+      `${profile.id} enabled passthrough`
+    );
+    assert.deepEqual(
+      profile.price,
+      source.price,
+      `${profile.id} price passthrough`
+    );
     assert.equal(
       profile.searchUrlSource,
-      `environment:${slot.searchUrlEnv}`
+      `environment:${source.searchUrlEnv}`,
+      `${profile.id} searchUrlSource`
     );
-    assert.deepEqual(profile.price, {
-      maxPriceKrw: 0
-    });
+
+    // 활성 프로필만 URL 변수를 요구한다.
+    // 비활성 프로필은 변수 없이도 정상 처리된다.
+    assert.equal(
+      profile.searchUrl,
+      profile.enabled
+        ? createSyntheticSearchUrl(
+            source.searchUrlEnv
+          )
+        : null,
+      `${profile.id} searchUrl`
+    );
   }
 });
 
-test("워크플로는 5개 searchUrlEnv를 Repository Variables로 연결한다", () => {
+// 새 searchUrlEnv를 추가할 때만 워크플로 매핑 수정이 필요하다.
+// 이름 목록은 config.json에서 동적으로 읽는다.
+test("워크플로는 config의 searchUrlEnv를 Repository Variables로 연결한다", () => {
   const urlEnvironmentNames = [
-    TESLA_URL_ENV,
-    TOYOTA_URL_ENV,
-    ...DISABLED_SLOTS.map(
-      (slot) => slot.searchUrlEnv
+    ...new Set(
+      rawConfig.profiles.map(
+        (profile) =>
+          profile.searchUrlEnv
+      )
     )
   ];
+
+  assert.equal(
+    urlEnvironmentNames.length > 0,
+    true,
+    "searchUrlEnv names"
+  );
 
   for (
     const environmentName
