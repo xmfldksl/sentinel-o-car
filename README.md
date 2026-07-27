@@ -155,7 +155,9 @@ A `listing deleted` notification means that the advertisement disappeared from t
 
 ## 개요
 
-Sentinel-o-car는 엔카의 여러 중고차 검색 조건을 감시하는 개인용 도구입니다. GitHub Actions에서 실행되며 모든 알림을 하나의 텔레그램 채널 또는 채팅으로 전송합니다. 엔카 공식 서비스나 공식 API 클라이언트가 아닙니다.
+Sentinel-o-car는 엔카의 여러 중고차 검색 조건을 감시하는 개인용 도구입니다. 
+GitHub Actions에서 실행되며 모든 알림을 하나의 텔레그램 채널 또는 채팅으로 전송합니다. 
+엔카 공식 서비스나 공식 API 클라이언트가 아닙니다.
 
 ## 배포 및 사용
 
@@ -255,10 +257,9 @@ TELEGRAM_BOT_TOKEN=<BOT_TOKEN> npm run chat-id
 경로: Repository → Actions → Sentinel-o-car → Run workflow
 
 1. `telegram_test`: 텔레그램 설정 확인 메시지 전송.
-2. `send_current`: 현재 검색된 모든 매물을 메시지로 전송. 
-   단, 해당 결과는 매물 상태의 기준점으로 저장되지 않음
-3. `normal`: 저장된 기준점과 현재 검색된 매물 상태를 비교해 신규·가격변동·삭제·재등록 메시지를 전송 (정기 실행값)
-   첫 `normal` 실행 시 현재 검색된 모든 매물을 기준점으로 저장하지만, 신규 매물로 인식하여 메시지를 전송하지는 않음
+2. `send_current`: 현재 검색된 모든 매물을 메시지로 전송. 단, 해당 결과는 매물 상태의 기준점으로 저장되지 않음
+4. `normal`: 저장된 기준점과 현재 검색된 매물 상태를 비교해 신규·가격변동·삭제·재등록 메시지를 전송. (정기 실행값)
+    첫 `normal` 실행 시 현재 검색된 모든 매물을 기준점으로 저장하지만, 신규 매물로 인식하여 메시지를 전송하지는 않음
 
 ### 6. 일반 운영
 
