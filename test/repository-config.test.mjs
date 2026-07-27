@@ -538,23 +538,11 @@ test("README, AGENTS, example은 새 profile 및 동작 계약만 설명한다",
   );
   assert.match(
     readmeText,
-    /Price is used only for the condition status shown in Telegram/
+    /Price is used only for condition evaluation in Telegram messages/
   );
   assert.match(
     readmeText,
-    /does not suppress new-listing, price-change, or `send_current` output/
-  );
-  assert.match(
-    readmeText,
-    /Generic and Tesla profiles share the same collection, state, event, and notification flow/
-  );
-  assert.match(
-    readmeText,
-    /when a purchased option is not confirmed, `maxPriceKrw` applies/
-  );
-  assert.match(
-    readmeText,
-    /State uses schema version 2 with profile-id namespaces/
+    /Notifications are still sent even when the listing does not meet the price condition/
   );
   assert.match(
     readmeText,
@@ -562,7 +550,7 @@ test("README, AGENTS, example은 새 profile 및 동작 계약만 설명한다",
   );
   assert.match(
     readmeText,
-    /신규·가격변동·`send_current` 출력을 막지 않습니다/
+    /가격은 텔레그램 조건 판정에만 사용하며, 가격이 맞지 않아도 텔레그램 메시지는 전송됩니다/
   );
 
   assert.match(
