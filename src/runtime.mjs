@@ -546,7 +546,7 @@ export function normalizeWatcherConfig(
       rawConfig.notifyPriceIncrease,
       "config.notifyPriceIncrease"
     );
-  const configuredMaxPages =
+  const maxPages =
     requirePositiveInteger(
       rawConfig.maxPages,
       "config.maxPages"
@@ -556,20 +556,6 @@ export function normalizeWatcherConfig(
       rawConfig.requestDelayMs,
       "config.requestDelayMs"
     );
-  const maxPagesOverride =
-    environment?.MAX_PAGES;
-  const maxPages =
-    typeof maxPagesOverride ===
-        "string" &&
-      maxPagesOverride.trim()
-      ? requirePositiveInteger(
-          Number(
-            maxPagesOverride
-          ),
-          "environment.MAX_PAGES"
-        )
-      : configuredMaxPages;
-
   if (
     !Array.isArray(rawConfig.profiles) ||
     rawConfig.profiles.length === 0

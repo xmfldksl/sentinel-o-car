@@ -517,9 +517,13 @@ test("워크플로는 config의 searchUrlEnv를 Repository Variables로 연결�
     workflowText,
     /TELEGRAM_CHAT_ID:\s*\$\{\{\s*secrets\.TELEGRAM_CHAT_ID\s*\}\}/
   );
-  assert.match(
-    workflowText,
-    /MAX_PAGES:\s*\$\{\{\s*vars\.MAX_PAGES\s*\}\}/
+  assert.deepEqual(
+    [
+      ...workflowText.matchAll(
+        /\bvars\.([A-Z0-9_]+)\b/g
+      )
+    ].map((match) => match[1]).sort(),
+    [...urlEnvironmentNames].sort()
   );
   assert.doesNotMatch(
     workflowText,

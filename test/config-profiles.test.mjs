@@ -116,8 +116,7 @@ test("generic과 Tesla 프로필을 정확한 v2 계약으로 정규화한다", 
       rawConfig,
       {
         SYNTHETIC_TESLA_URL:
-          teslaUrl,
-        MAX_PAGES: "3"
+          teslaUrl
       }
     );
 
@@ -139,7 +138,7 @@ test("generic과 Tesla 프로필을 정확한 v2 계약으로 정규화한다", 
     {
       configVersion: 2,
       notifyPriceIncrease: true,
-      maxPages: 3,
+      maxPages: 2,
       requestDelayMs: 1500,
       profiles: undefined
     }

@@ -50,7 +50,6 @@ jobs:
           ENCAR_SEARCH_URL_3: ${{ vars.ENCAR_SEARCH_URL_3 }}
           ENCAR_SEARCH_URL_4: ${{ vars.ENCAR_SEARCH_URL_4 }}
           ENCAR_SEARCH_URL_5: ${{ vars.ENCAR_SEARCH_URL_5 }}
-          MAX_PAGES: ${{ vars.MAX_PAGES }}
           RUN_MODE: ${{ github.event.inputs.run_mode || 'normal' }}
         run: npm run scrape
 
