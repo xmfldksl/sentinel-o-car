@@ -1025,6 +1025,104 @@ test("Tesla 프로필이 하나라도 병합되면 옵션 표시를 유지한다
   );
 });
 
+test("generic과 Tesla 삭제 이벤트가 병합돼도 Tesla 옵션은 한 기여자에서 유지한다", () => {
+  const merged = mergeProfileEvents([
+    event({
+      kind: "deleted",
+      listingId: "listing-deleted-option",
+      observedAt:
+        "2026-01-02T00:00:00.000Z",
+      profile: profile(
+        "profile-generic-deleted",
+        "일반 삭제 조건",
+        false
+      ),
+      listingFields: {
+        representative: "generic"
+      }
+    }),
+    event({
+      kind: "deleted",
+      listingId: "listing-deleted-option",
+      observedAt:
+        "2026-01-01T00:00:00.000Z",
+      profile: profile(
+        "profile-tesla-deleted",
+        "Tesla 삭제 조건",
+        true
+      ),
+      listingFields: {
+        representative: "tesla",
+        option: "EAP",
+        hasFsd: false,
+        hasEap: true
+      }
+    })
+  ]);
+
+  assert.equal(merged.length, 1);
+  assert.equal(
+    merged[0].showTeslaOption,
+    true
+  );
+  assert.equal(
+    merged[0].listing.representative,
+    "generic"
+  );
+  assert.equal(
+    merged[0].listing.option,
+    "EAP"
+  );
+  assert.equal(
+    merged[0].listing.hasEap,
+    true
+  );
+});
+
+test("분류나 가격이 다른 재등록 이벤트는 병합하지 않는다", () => {
+  function relisted(fields) {
+    return {
+      ...event({
+        kind: "relisted",
+        listingId: "listing-relisted",
+        profile: profile(
+          `profile-${fields.relistedPriceChange}`,
+          `조건 ${fields.relistedPriceChange}`
+        )
+      }),
+      ...fields
+    };
+  }
+
+  const same = mergeProfileEvents([
+    relisted({
+      relistedPriceChange: "decrease",
+      previousPriceKrw: 33000000,
+      currentPriceKrw: 32500000
+    }),
+    relisted({
+      relistedPriceChange: "decrease",
+      previousPriceKrw: 33000000,
+      currentPriceKrw: 32500000
+    })
+  ]);
+  const different = mergeProfileEvents([
+    relisted({
+      relistedPriceChange: "decrease",
+      previousPriceKrw: 33000000,
+      currentPriceKrw: 32500000
+    }),
+    relisted({
+      relistedPriceChange: "unknown",
+      previousPriceKrw: 33000000,
+      currentPriceKrw: null
+    })
+  ]);
+
+  assert.equal(same.length, 1);
+  assert.equal(different.length, 2);
+});
+
 test("Tesla 옵션 충돌은 대표 이벤트 우선순위로 한 기여자를 선택해 원자적으로 병합한다", () => {
   const warnings = [];
   const sensitiveListingId =

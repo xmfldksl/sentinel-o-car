@@ -845,7 +845,13 @@ async function main({
         profileNames:
           event.profileNames,
         showTeslaOption:
-          event.showTeslaOption
+          event.showTeslaOption,
+        relistedPriceChange:
+          event.relistedPriceChange,
+        previousPriceKrw:
+          event.previousPriceKrw,
+        currentPriceKrw:
+          event.currentPriceKrw
       }
     );
     const message = await telegram.send(text);

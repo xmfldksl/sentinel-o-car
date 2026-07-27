@@ -1204,3 +1204,296 @@ test("telegram_test는 상태를 읽거나 저장하지 않고 한 건만 전송
   assert.equal(stateLoaded, false);
   assert.equal(stateSaved, false);
 });
+
+const relistedListingId = "42023180";
+
+// 목록 fixture에서 42023180은 3,270만원으로 다시 나타난다.
+function deletedRecord(overrides = {}) {
+  return {
+    id: relistedListingId,
+    title: "모델 3 롱 레인지 AWD",
+    url:
+      "https://fem.encar.com/cars/detail/42023180",
+    yearMonth: "2022-09",
+    mileageKm: 67235,
+    priceKrw: 32000000,
+    listPriceKrw: 32000000,
+    region: "경기",
+    firstSeenAt:
+      "2026-07-20T00:00:00.000Z",
+    lastSeenAt:
+      "2026-07-23T00:00:00.000Z",
+    deletionTracked: true,
+    deletedAt:
+      "2026-07-24T12:00:00.000Z",
+    ...overrides
+  };
+}
+
+function relistedState(
+  record = deletedRecord(),
+  { initialized = true } = {}
+) {
+  return {
+    ...(initialized
+      ? {
+          initializedAt:
+            "2026-07-24T00:00:00.000Z"
+        }
+      : {}),
+    listings: {
+      [record.id]: record
+    }
+  };
+}
+
+async function runRelist({
+  profileState = relistedState(),
+  runMode = "normal",
+  detailFails = false,
+  listPageHtml = listHtml,
+  detailImpl = () => detailHtml(),
+  now = "2026-07-25T00:00:00.000Z"
+} = {}) {
+  return processProfile({
+    profile: normalizedGenericProfile,
+    profileState,
+    runMode,
+    maxPages: 1,
+    requestDelayMs: 0,
+    notifyPriceIncrease: true,
+    requestPacer: {
+      async wait() {}
+    },
+    fetchTextImpl: async (url) => {
+      if (
+        url.includes(
+          "car.encar.com/list/car"
+        )
+      ) {
+        return listPageHtml;
+      }
+
+      if (detailFails) {
+        throw new Error(
+          "detail unavailable"
+        );
+      }
+
+      return detailImpl(url);
+    },
+    logger: quietLogger(),
+    nowIso: () => now
+  });
+}
+
+function eventsFor(result, listingId) {
+  return result.events.filter(
+    (event) =>
+      String(event.listing.id) ===
+      listingId
+  );
+}
+
+test("재등록은 가격 비교로 분류하고 신규·가격변동 이벤트를 대신한다", async (t) => {
+  for (const [
+    label,
+    priceKrw,
+    expectedType,
+    expectedChange,
+    expectedCurrentPriceKrw,
+    detailFails
+  ] of [
+    [
+      "가격인상",
+      32000000,
+      "재등록(가격인상)",
+      "increase",
+      32700000,
+      false
+    ],
+    [
+      "가격인하",
+      33000000,
+      "재등록(가격인하)",
+      "decrease",
+      32700000,
+      false
+    ],
+    [
+      "가격유지",
+      32700000,
+      "재등록(가격유지)",
+      "unchanged",
+      32700000,
+      false
+    ],
+    [
+      "가격확인불가(상세 실패)",
+      32000000,
+      "재등록(가격확인불가)",
+      "unknown",
+      null,
+      true
+    ]
+  ]) {
+    await t.test(label, async () => {
+      const result = await runRelist({
+        profileState: relistedState(
+          deletedRecord({
+            priceKrw,
+            listPriceKrw: priceKrw
+          })
+        ),
+        detailFails
+      });
+      const [event, ...rest] =
+        eventsFor(
+          result,
+          relistedListingId
+        );
+
+      assert.deepEqual(rest, []);
+      assert.equal(
+        event.kind,
+        "relisted"
+      );
+      assert.equal(
+        event.type,
+        expectedType
+      );
+      assert.equal(
+        event.relistedPriceChange,
+        expectedChange
+      );
+      assert.equal(
+        event.previousPriceKrw,
+        priceKrw
+      );
+      assert.equal(
+        event.currentPriceKrw,
+        expectedCurrentPriceKrw
+      );
+      assert.equal(
+        result.state.listings[
+          relistedListingId
+        ].deletedAt,
+        undefined
+      );
+    });
+  }
+
+  await t.test(
+    "다음 실행은 재등록을 반복하지 않는다",
+    async () => {
+      const first = await runRelist();
+      const second = await runRelist({
+        profileState: first.state,
+        now: "2026-07-26T00:00:00.000Z"
+      });
+
+      assert.deepEqual(
+        eventsFor(
+          second,
+          relistedListingId
+        ),
+        []
+      );
+    }
+  );
+});
+
+test("새 listing ID라도 같은 차량번호의 삭제 상태는 재등록으로 승계한다", async () => {
+  const deletedListingId = "41000000";
+  const currentListingId = "42999999";
+  const result = await runRelist({
+    profileState: relistedState(
+      deletedRecord({
+        id: deletedListingId,
+        url:
+          "https://fem.encar.com/cars/detail/41000000",
+        priceKrw: 34000000,
+        listPriceKrw: 34000000,
+        vehicleNo: "12가3456"
+      })
+    ),
+    listPageHtml: secondPageListHtml,
+    detailImpl: (url) =>
+      detailHtml(
+        url.includes(currentListingId)
+          ? "12가3456"
+          : null
+      )
+  });
+  const [event, ...rest] = eventsFor(
+    result,
+    currentListingId
+  );
+  const record =
+    result.state.listings[
+      currentListingId
+    ];
+
+  assert.deepEqual(rest, []);
+  assert.equal(event.kind, "relisted");
+  assert.equal(
+    event.type,
+    "재등록(가격인하)"
+  );
+  assert.equal(
+    event.previousPriceKrw,
+    34000000
+  );
+  assert.equal(
+    event.currentPriceKrw,
+    33000000
+  );
+  assert.equal(
+    result.state.listings[
+      deletedListingId
+    ],
+    undefined
+  );
+  assert.equal(
+    record.deletedAt,
+    undefined
+  );
+  assert.equal(
+    record.previousListingId,
+    deletedListingId
+  );
+  assert.equal(
+    record.firstSeenAt,
+    "2026-07-20T00:00:00.000Z"
+  );
+});
+
+test("send_current와 최초 기준점은 재등록 이벤트를 만들지 않는다", async () => {
+  const current = await runRelist({
+    runMode: "send_current"
+  });
+  const baseline = await runRelist({
+    profileState: relistedState(
+      deletedRecord(),
+      { initialized: false }
+    )
+  });
+
+  assert.equal(
+    current.events.some(
+      (event) =>
+        event.kind === "relisted"
+    ),
+    false
+  );
+  assert.equal(
+    current.state.listings[
+      relistedListingId
+    ].deletedAt,
+    "2026-07-24T12:00:00.000Z"
+  );
+  assert.deepEqual(
+    baseline.events,
+    []
+  );
+});

@@ -286,6 +286,110 @@ test("리스와 렌트 판매방식은 사실 정보로 표시한다", () => {
   assert.match(rent, /판매방식: 렌트/);
 });
 
+test("재등록 알림은 분류별 머리말과 재등록가격 행을 표시한다", () => {
+  for (const [
+    type,
+    relistedPriceChange,
+    previousPriceKrw,
+    currentPriceKrw,
+    expectedPriceLine
+  ] of [
+    [
+      "재등록(가격인상)",
+      "increase",
+      32000000,
+      33000000,
+      "재등록가격: 3,200만원 → 3,300만원"
+    ],
+    [
+      "재등록(가격인하)",
+      "decrease",
+      33000000,
+      32500000,
+      "재등록가격: 3,300만원 → 3,250만원"
+    ],
+    [
+      "재등록(가격유지)",
+      "unchanged",
+      33000000,
+      33000000,
+      "재등록가격: 3,300만원 → 3,300만원"
+    ],
+    [
+      "재등록(가격확인불가)",
+      "unknown",
+      33000000,
+      null,
+      "재등록가격: 확인 불가"
+    ]
+  ]) {
+    const lines = formatTelegramMessage(
+      type,
+      listing(),
+      {
+        relistedPriceChange,
+        previousPriceKrw,
+        currentPriceKrw
+      }
+    ).split("\n");
+
+    assert.equal(
+      lines[0],
+      `[${type}]`
+    );
+    assert.equal(
+      lines.includes(
+        expectedPriceLine
+      ),
+      true,
+      `${type} → ${expectedPriceLine}`
+    );
+  }
+
+  assert.doesNotMatch(
+    formatTelegramMessage(
+      "신규",
+      listing()
+    ),
+    /재등록가격/
+  );
+});
+
+test("매물삭제 알림은 저장된 Tesla 옵션 행을 그대로 표시한다", () => {
+  for (const [option, expected] of [
+    ["FSD", "옵션: FSD 확인"],
+    ["EAP", "옵션: EAP 확인"],
+    ["미확인", "옵션: 미확인"],
+    [undefined, "옵션: 미확인"]
+  ]) {
+    const deleted = listing({
+      option,
+      deletedAt:
+        "2026-07-24T00:00:00.000Z"
+    });
+
+    assert.equal(
+      formatTelegramMessage(
+        "deleted",
+        deleted,
+        { showTeslaOption: true }
+      )
+        .split("\n")
+        .includes(expected),
+      true,
+      `${String(option)} → ${expected}`
+    );
+    assert.doesNotMatch(
+      formatTelegramMessage(
+        "deleted",
+        deleted,
+        { showTeslaOption: false }
+      ),
+      /옵션:/
+    );
+  }
+});
+
 test("상세 실패는 가격 판정과 별도로 표시한다", () => {
   const message = formatTelegramMessage(
     "현재 검색 결과",

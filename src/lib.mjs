@@ -1475,6 +1475,9 @@ export function getListingInspection(
   const isNew =
     !hasConfirmedState;
 
+  const isRelisted =
+    hasDeletedAt(previous);
+
   const previousListPriceKrw =
     Number.isFinite(
       previous?.listPriceKrw
@@ -1516,6 +1519,7 @@ export function getListingInspection(
 
   return {
     isNew,
+    isRelisted,
     priceDropped:
       priceChanged &&
       currentComparisonPriceKrw <
@@ -1527,6 +1531,7 @@ export function getListingInspection(
     shouldInspect:
       runMode === "send_current" ||
       isNew ||
+      isRelisted ||
       listPriceChanged ||
       Boolean(
         previous
@@ -2624,6 +2629,88 @@ export function recordDetailSuccess(
   );
 }
 
+export const RELISTED_PRICE_CHANGE_LABELS =
+  {
+    increase: "가격인상",
+    decrease: "가격인하",
+    unchanged: "가격유지",
+    unknown: "가격확인불가"
+  };
+
+function resolveRelistedPriceChange(
+  previousPriceKrw,
+  currentPriceKrw
+) {
+  if (
+    !Number.isFinite(
+      previousPriceKrw
+    ) ||
+    !Number.isFinite(
+      currentPriceKrw
+    )
+  ) {
+    return "unknown";
+  }
+
+  if (
+    currentPriceKrw >
+    previousPriceKrw
+  ) {
+    return "increase";
+  }
+
+  if (
+    currentPriceKrw <
+    previousPriceKrw
+  ) {
+    return "decrease";
+  }
+
+  return "unchanged";
+}
+
+function createRelistedListingEvent({
+  previous,
+  listing,
+  detailSucceeded
+}) {
+  const previousPriceKrw =
+    Number.isFinite(
+      previous?.priceKrw
+    )
+      ? previous.priceKrw
+      : null;
+
+  const currentPriceKrw =
+    detailSucceeded &&
+    Number.isFinite(
+      listing?.priceKrw
+    )
+      ? listing.priceKrw
+      : null;
+
+  const relistedPriceChange =
+    resolveRelistedPriceChange(
+      previousPriceKrw,
+      currentPriceKrw
+    );
+
+  return {
+    kind: "relisted",
+    type: `재등록(${RELISTED_PRICE_CHANGE_LABELS[relistedPriceChange]})`,
+    listing: detailSucceeded
+      ? listing
+      : {
+          ...listing,
+          detailFailed: true
+        },
+    relistedPriceChange,
+    previousPriceKrw,
+    currentPriceKrw,
+    detailSucceeded
+  };
+}
+
 export function createListingEvent({
   runMode,
   wasInitialized,
@@ -2643,6 +2730,19 @@ export function createListingEvent({
       listing,
       detailSucceeded
     };
+  }
+
+  if (
+    wasInitialized &&
+    inspection.isRelisted
+  ) {
+    return createRelistedListingEvent(
+      {
+        previous,
+        listing,
+        detailSucceeded
+      }
+    );
   }
 
   if (
@@ -2713,6 +2813,36 @@ function formatKrw(value) {
   ).toLocaleString(
     "ko-KR"
   )}원`;
+}
+
+function formatManwon(value) {
+  return `${Math.round(
+    value / 10000
+  ).toLocaleString(
+    "ko-KR"
+  )}만원`;
+}
+
+function formatRelistedPriceLine(
+  previousPriceKrw,
+  currentPriceKrw
+) {
+  if (
+    !Number.isFinite(
+      previousPriceKrw
+    ) ||
+    !Number.isFinite(
+      currentPriceKrw
+    )
+  ) {
+    return "재등록가격: 확인 불가";
+  }
+
+  return `재등록가격: ${formatManwon(
+    previousPriceKrw
+  )} → ${formatManwon(
+    currentPriceKrw
+  )}`;
 }
 
 function formatKm(value) {
@@ -2827,7 +2957,10 @@ export function formatTelegramMessage(
   {
     profileNames =
       listing?.profileNames ?? [],
-    showTeslaOption = false
+    showTeslaOption = false,
+    relistedPriceChange = null,
+    previousPriceKrw = null,
+    currentPriceKrw = null
   } = {}
 ) {
   const displayEventType =
@@ -2941,6 +3074,28 @@ export function formatTelegramMessage(
   if (listingFacts.length > 0) {
     lines.push(
       listingFacts.join(" | ")
+    );
+  }
+
+  if (
+    Object.hasOwn(
+      RELISTED_PRICE_CHANGE_LABELS,
+      relistedPriceChange
+    )
+  ) {
+    const comparable =
+      relistedPriceChange !==
+      "unknown";
+
+    lines.push(
+      formatRelistedPriceLine(
+        comparable
+          ? previousPriceKrw
+          : null,
+        comparable
+          ? currentPriceKrw
+          : null
+      )
     );
   }
 

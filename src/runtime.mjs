@@ -1039,6 +1039,53 @@ function eventShowsTeslaOption(event) {
   return event?.profile?.isTesla === true;
 }
 
+const MERGE_KEY_SEPARATOR =
+  "\u0000";
+
+const RELISTED_PRICE_CHANGES = new Set([
+  "increase",
+  "decrease",
+  "unchanged",
+  "unknown"
+]);
+
+function normalizeMergePrice(value) {
+  return Number.isFinite(value)
+    ? value
+    : null;
+}
+
+function getRelistedMergeSignature(
+  event
+) {
+  if (
+    normalizeEventKind(event) !==
+    "relisted"
+  ) {
+    return null;
+  }
+
+  const relistedPriceChange =
+    event?.relistedPriceChange;
+
+  return JSON.stringify({
+    relistedPriceChange:
+      RELISTED_PRICE_CHANGES.has(
+        relistedPriceChange
+      )
+        ? relistedPriceChange
+        : "unknown",
+    previousPriceKrw:
+      normalizeMergePrice(
+        event?.previousPriceKrw
+      ),
+    currentPriceKrw:
+      normalizeMergePrice(
+        event?.currentPriceKrw
+      )
+  });
+}
+
 function getConditionMergeSignature(
   event
 ) {
@@ -1483,6 +1530,15 @@ export function mergeProfileEvents(
         signatures
       );
       key = `${baseKey}\u0000${signature}`;
+    }
+
+    const relistedSignature =
+      getRelistedMergeSignature(
+        rawEvent
+      );
+
+    if (relistedSignature !== null) {
+      key = `${key}${MERGE_KEY_SEPARATOR}relisted:${relistedSignature}`;
     }
 
     const conditionSignature =
