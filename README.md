@@ -48,7 +48,7 @@ Path: Repository → Settings → Secrets and variables → Actions → Variable
 - Do not shorten or manually edit the URL.
 - Enter only the URL, without quotation marks.
 
-The maximum number of pages to collect is configured with the root-level `maxPages` value in `config.json`. A separately registered GitHub Repository Variable named `MAX_PAGES` takes precedence when it is set.
+The maximum number of pages to collect is configured with maxPages in config.json.
 
 ### 4. Configure `config.json`
 
@@ -195,7 +195,7 @@ TELEGRAM_BOT_TOKEN=<BOT_TOKEN> npm run chat-id
 - URL을 자르거나 직접 편집하지 않음
 - 따옴표 없이 URL만 입력
 
-최대 수집 페이지 수는 `config.json` 최상위의 `maxPages`에서 설정합니다. GitHub Repository Variable에 `MAX_PAGES`를 별도로 등록한 경우에만 해당 값이 우선 적용됩니다.
+매물의 최대 수집 페이지 수는 config.json의 maxPages에서 설정합니다.
 
 ### 4. config.json 설정
 
