@@ -84,7 +84,7 @@ TELEGRAM_BOT_TOKEN=<BOT_TOKEN> npm run chat-id
 - URL을 자르거나 직접 편집하지 않음
 - 따옴표 없이 URL만 입력
 
-선택 항목 `MAX_PAGES`는 모든 프로필에서 `config.json`의 `maxPages`를 대신합니다.
+`MAX_PAGES`는 선택 항목입니다. 값을 설정하면 실행 시 `config.json`의 `maxPages` 대신 사용되며, 모든 프로필에 동일하게 적용됩니다.
 
 ### 4. config.json 설정
 
