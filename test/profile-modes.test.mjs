@@ -215,34 +215,6 @@ test("Tesla 옵션 미확인과 상세 실패는 기본 가격을 사용한다",
   assert.equal(failedAbove.option, "미확인");
 });
 
-test("FSD Lite 가능 문구는 FSD 보유로 인정하지 않는다", () => {
-  const analyzed = analyzeDetail(
-    detailHtml({
-      vehicleNo: "12가3456",
-      spec: {
-        colorName: "검정색"
-      },
-      options: {
-        etc: []
-      },
-      advertisement: {
-        oneLineText: null
-      },
-      photos: [
-        {
-          desc: "FSD Lite 가능"
-        }
-      ]
-    }),
-    listing(),
-    teslaProfile
-  );
-
-  assert.equal(analyzed.hasFsd, false);
-  assert.equal(analyzed.hasEap, false);
-  assert.equal(analyzed.option, "미확인");
-});
-
 test("generic 상세 흐름은 Tesla 옵션 사실을 결과에 만들지 않는다", () => {
   const analyzed = analyzeDetail(
     detailHtml({

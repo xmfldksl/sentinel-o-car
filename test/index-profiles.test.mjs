@@ -637,53 +637,26 @@ test("신뢰할 수 없는 목록 제목은 상세 구조화 제목으로 교체
         record.deletedAt,
         undefined
       );
+
+      if (runMode === "send_current") {
+        assert.deepEqual(
+          result.events.map(
+            (event) =>
+              event.listing.title
+          ),
+          ["모델 3 롱 레인지 AWD"]
+        );
+        assert.deepEqual(
+          result.events.map(
+            (event) =>
+              event.listing
+                .conditionReasons
+          ),
+          [["가격 초과"]]
+        );
+      }
     });
   }
-
-  await t.test(
-    "send_current 이벤트도 정상 제목을 사용한다",
-    async () => {
-      const result = await processProfile({
-        profile:
-          normalizedGenericProfile,
-        profileState:
-          structuredClone(
-            pollutedState
-          ),
-        runMode: "send_current",
-        maxPages: 1,
-        requestDelayMs: 0,
-        notifyPriceIncrease: true,
-        requestPacer: {
-          async wait() {}
-        },
-        fetchTextImpl: async (url) =>
-          url.includes(
-            "car.encar.com/list/car"
-          )
-            ? untrustedListHtml
-            : structuredDetailHtml,
-        nowIso: () =>
-          "2026-07-25T00:00:00.000Z"
-      });
-
-      assert.deepEqual(
-        result.events.map(
-          (event) =>
-            event.listing.title
-        ),
-        ["모델 3 롱 레인지 AWD"]
-      );
-      assert.deepEqual(
-        result.events.map(
-          (event) =>
-            event.listing
-              .conditionReasons
-        ),
-        [["가격 초과"]]
-      );
-    }
-  );
 });
 
 test("raw 목록에 남아 있는 titleFilter 제외 매물은 삭제로 오판하지 않는다", async () => {

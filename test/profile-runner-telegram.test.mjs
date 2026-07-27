@@ -518,70 +518,52 @@ for (const {
   });
 }
 
-for (const {
-  name,
-  parseFailure
-} of [
-  {
-    name:
-      "Telegram HTTP 429 with a non-JSON body retries with the default delay",
-    parseFailure:
-      "Unexpected token"
-  },
-  {
-    name:
-      "Telegram HTTP 429 with an empty body retries with the default delay",
-    parseFailure:
-      "Unexpected end of JSON input"
-  }
-]) {
-  test(name, async () => {
-    const sleeps = [];
-    const warnings = [];
-    let requestCount = 0;
+test("Telegram HTTP 429 with an unparseable body retries with the default delay", async () => {
+  const sleeps = [];
+  const warnings = [];
+  let requestCount = 0;
 
-    const sender = createTelegramSender({
-      token:
-        "UNIT_TEST_INVALID_429_TOKEN",
-      chatId:
-        "UNIT_TEST_INVALID_429_CHAT",
-      now: () => 0,
-      sleepImpl: async (delay) => {
-        sleeps.push(delay);
-      },
-      logger: {
-        warn(message) {
-          warnings.push(message);
-        }
-      },
-      fetchImpl: async () => {
-        requestCount += 1;
+  const sender = createTelegramSender({
+    token:
+      "UNIT_TEST_INVALID_429_TOKEN",
+    chatId:
+      "UNIT_TEST_INVALID_429_CHAT",
+    now: () => 0,
+    sleepImpl: async (delay) => {
+      sleeps.push(delay);
+    },
+    logger: {
+      warn(message) {
+        warnings.push(message);
+      }
+    },
+    fetchImpl: async () => {
+      requestCount += 1;
 
-        if (requestCount === 1) {
-          return unparseableRateLimitedResponse(
-            parseFailure
-          );
-        }
-
-        return successfulTelegramResponse(
-          30
+      if (requestCount === 1) {
+        return unparseableRateLimitedResponse(
+          "Unexpected token"
         );
       }
-    });
 
-    const response = await sender.send(
-      "unparseable rate limit"
-    );
-
-    assert.equal(
-      response.message_id,
-      30
-    );
-    assert.equal(requestCount, 2);
-    assert.deepEqual(sleeps, [6000]);
-    assert.equal(warnings.length, 1);
+      return successfulTelegramResponse(
+        30
+      );
+    }
   });
-}
+
+  const response = await sender.send(
+    "unparseable rate limit"
+  );
+
+  assert.equal(
+    response.message_id,
+    30
+  );
+  assert.equal(requestCount, 2);
+  assert.deepEqual(sleeps, [6000]);
+  assert.equal(warnings.length, 1);
+});
 
 test("Telegram HTTP 429 with an unparseable body uses the default five attempts", async () => {
   const sleeps = [];

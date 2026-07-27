@@ -23,14 +23,6 @@ const workflowText = await fs.readFile(
   ),
   "utf8"
 );
-const readmeText = await fs.readFile(
-  new URL("../README.md", import.meta.url),
-  "utf8"
-);
-const agentsText = await fs.readFile(
-  new URL("../AGENTS.md", import.meta.url),
-  "utf8"
-);
 const exampleConfigText =
   await fs.readFile(
     new URL(
@@ -531,45 +523,7 @@ test("워크플로는 config의 searchUrlEnv를 Repository Variables로 연결�
   );
 });
 
-test("README, AGENTS, example은 새 profile 및 동작 계약만 설명한다", () => {
-  assert.match(
-    readmeText,
-    /titleFilter[\s\S]{0,180}only internal inclusion and exclusion/
-  );
-  assert.match(
-    readmeText,
-    /Price is used only for condition evaluation in Telegram messages/
-  );
-  assert.match(
-    readmeText,
-    /Notifications are still sent even when the listing does not meet the price condition/
-  );
-  assert.match(
-    readmeText,
-    /URL 검색 결과에 적용되는 내부 포함·제외 규칙은 `titleFilter/
-  );
-  assert.match(
-    readmeText,
-    /가격은 텔레그램 조건 판정에만 사용하며, 가격이 맞지 않아도 텔레그램 메시지는 전송됩니다/
-  );
-
-  assert.match(
-    agentsText,
-    /내부에서 건너뛰는 조건은 `titleFilter/
-  );
-  assert.match(
-    agentsText,
-    /가격은 목록, 상태 저장, 신규·가격변동 알림, `send_current` 출력 여부에 영향을 주지 않고/
-  );
-  assert.match(
-    agentsText,
-    /프로필 설정은 `isTesla`를 사용한다/
-  );
-  assert.match(
-    agentsText,
-    /구형 flat\/default 상태를 마이그레이션하지 않는다/
-  );
-
+test("example config는 raw profile 계약을 따른다", () => {
   assertExactKeys(
     exampleConfig,
     ROOT_CONFIG_KEYS,

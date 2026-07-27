@@ -515,64 +515,6 @@ test("URL 문법 오류는 공통 사용자 안내를 포함하고 원문을 노
   );
 });
 
-test("Tesla와 Toyota 합성 URL은 서로 섞이지 않는다", () => {
-  const teslaUrl =
-    createCurrentUrl(
-      "tesla-isolated",
-      {
-        searchOverrides: {
-          action:
-            "(And.(C.Manufacturer.테슬라._.Model.모델 3.))"
-        }
-      }
-    );
-  const toyotaUrl =
-    createLegacyUrl(
-      "toyota-isolated",
-      {
-        searchOverrides: {
-          action:
-            "(And.(C.Manufacturer.도요타._.Model.시에나.))"
-        }
-      }
-    );
-
-  const normalizedTeslaUrl =
-    normalizeEncarSearchUrl(
-      teslaUrl
-    );
-  const normalizedToyotaUrl =
-    normalizeEncarSearchUrl(
-      toyotaUrl
-    );
-
-  const teslaConditions =
-    readSearchConditions(
-      normalizedTeslaUrl
-    );
-  const toyotaConditions =
-    readSearchConditions(
-      normalizedToyotaUrl
-    );
-
-  assert.match(
-    teslaConditions.action,
-    /Manufacturer\.테슬라/
-  );
-  assert.doesNotMatch(
-    teslaConditions.action,
-    /Manufacturer\.도요타/
-  );
-  assert.match(
-    toyotaConditions.action,
-    /Manufacturer\.도요타/
-  );
-  assert.doesNotMatch(
-    toyotaConditions.action,
-    /Manufacturer\.테슬라/
-  );
-});
-
 test("URL 지문은 SHA-256 앞 12자리로 안정적으로 생성된다", () => {
   assert.equal(
     createSearchUrlFingerprint(

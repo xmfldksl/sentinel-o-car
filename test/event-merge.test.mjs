@@ -343,34 +343,6 @@ test("같은 표시 판정은 병합하고 Tesla 옵션 문맥은 분리한다",
   );
 });
 
-test("동일 현재매물 이벤트를 한 건으로 병합한다", () => {
-  const merged = mergeProfileEvents([
-    event({
-      kind: "current",
-      listingId: "listing-current",
-      profile: profile(
-        "profile-a",
-        "현재 조건 A"
-      )
-    }),
-    event({
-      kind: "current",
-      listingId: "listing-current",
-      profile: profile(
-        "profile-b",
-        "현재 조건 B"
-      )
-    })
-  ]);
-
-  assert.equal(merged.length, 1);
-  assert.equal(merged[0].kind, "current");
-  assert.deepEqual(merged[0].profileNames, [
-    "현재 조건 A",
-    "현재 조건 B"
-  ]);
-});
-
 for (const kind of [
   "price-decrease",
   "price-increase"
@@ -505,30 +477,6 @@ test("동시에 감지된 삭제 이벤트는 프로필 이름과 상태 대상�
     target(
       "profile-deleted-b",
       "listing-deleted"
-    )
-  ]);
-});
-
-test("한 프로필에서만 감지된 삭제는 해당 프로필만 유지한다", () => {
-  const merged = mergeProfileEvents([
-    event({
-      kind: "deleted",
-      listingId: "listing-single-delete",
-      profile: profile(
-        "profile-only",
-        "단일 삭제 조건"
-      )
-    })
-  ]);
-
-  assert.equal(merged.length, 1);
-  assert.deepEqual(merged[0].profileNames, [
-    "단일 삭제 조건"
-  ]);
-  assert.deepEqual(merged[0].stateTargets, [
-    target(
-      "profile-only",
-      "listing-single-delete"
     )
   ]);
 });

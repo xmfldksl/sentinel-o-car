@@ -379,7 +379,9 @@ test("Tesla 옵션은 구조화 값과 제한된 판매자 문구에서만 확�
       }),
       body: "렌터카 사용 이력",
       expectedOption: "FSD",
-      expectedSource: "판매자 설명"
+      expectedSource: "판매자 설명",
+      expectedHasFsd: true,
+      expectedHasEap: false
     },
     {
       name: "구조화 EAP",
@@ -391,7 +393,9 @@ test("Tesla 옵션은 구조화 값과 제한된 판매자 문구에서만 확�
         }
       }),
       expectedOption: "EAP",
-      expectedSource: "구조화 옵션"
+      expectedSource: "구조화 옵션",
+      expectedHasFsd: false,
+      expectedHasEap: true
     },
     {
       name: "FSD Lite",
@@ -403,7 +407,9 @@ test("Tesla 옵션은 구조화 값과 제한된 판매자 문구에서만 확�
         ]
       }),
       expectedOption: "미확인",
-      expectedSource: "미확인"
+      expectedSource: "미확인",
+      expectedHasFsd: false,
+      expectedHasEap: false
     }
   ];
 
@@ -425,6 +431,14 @@ test("Tesla 옵션은 구조화 값과 제한된 판매자 문구에서만 확�
       assert.equal(
         analyzed.optionSource,
         entry.expectedSource
+      );
+      assert.equal(
+        analyzed.hasFsd,
+        entry.expectedHasFsd
+      );
+      assert.equal(
+        analyzed.hasEap,
+        entry.expectedHasEap
       );
       assert.equal(
         analyzed.rentalUsageHistory,
