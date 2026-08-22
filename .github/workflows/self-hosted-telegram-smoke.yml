@@ -1,0 +1,26 @@
+name: Self-hosted Telegram smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telegram-smoke:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 3
+
+    steps:
+      - name: Check Telegram with Node
+        run: |
+          node --input-type=module - <<'NODE'
+          try {
+            const response = await fetch("https://api.telegram.org");
+            console.log(`status=${response.status}`);
+            console.log(`ok=${response.ok}`);
+          } catch (error) {
+            console.error(error);
+            process.exit(1);
+          }
+          NODE
