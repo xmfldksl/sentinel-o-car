@@ -1,0 +1,77 @@
+name: Self-hosted smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Environment check
+        run: |
+          echo "node=$(node --version)"
+          echo "arch=$(uname -m)"
+          echo "os=$(uname -s)"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check Encar list access
+        env:
+          ENCAR_SEARCH_URL_TESLA_MODEL3: ${{ vars.ENCAR_SEARCH_URL_TESLA_MODEL3 }}
+        run: |
+          set -euo pipefail
+
+          BODY="$(mktemp)"
+
+          RESULT="$(
+            curl \
+              --silent \
+              --show-error \
+              --location \
+              --output "$BODY" \
+              --write-out '%{http_code}|%{url_effective}' \
+              "$ENCAR_SEARCH_URL_TESLA_MODEL3"
+          )"
+
+          STATUS="${RESULT%%|*}"
+          FINAL_URL="${RESULT#*|}"
+          BYTES="$(wc -c < "$BODY" | tr -d ' ')"
+
+          echo "status=$STATUS"
+          echo "bodyBytes=$BYTES"
+
+          if [[ "$FINAL_URL" == https://fem.encar.com/client-verification/blocked* ]]; then
+            echo "blocked=true"
+            exit 1
+          fi
+
+          echo "blocked=false"
+
+          if grep -q '/cars/detail/' "$BODY"; then
+            echo "carsDetail=true"
+          else
+            echo "carsDetail=false"
+            exit 1
+          fi
+
+          if grep -q 'ryvussApi' "$BODY"; then
+            echo "ryvussApi=true"
+          else
+            echo "ryvussApi=false"
+          fi
+
+          rm -f "$BODY"
