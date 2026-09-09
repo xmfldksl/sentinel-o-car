@@ -1648,6 +1648,80 @@ export function mergeProfileEvents(
   return [...groups.values()];
 }
 
+const RETRYABLE_TELEGRAM_CONNECT_CODES = new Set([
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ECONNREFUSED"
+]);
+const TELEGRAM_NETWORK_RETRY_DELAY_MS = 2000;
+
+function findRetryableTelegramConnectionCode(
+  error,
+  seen = new Set()
+) {
+  if (
+    !error ||
+    (
+      typeof error !== "object" &&
+      typeof error !== "function"
+    ) ||
+    seen.has(error)
+  ) {
+    return null;
+  }
+
+  seen.add(error);
+
+  const code =
+    typeof error.code === "string"
+      ? error.code
+      : null;
+  const syscall =
+    typeof error.syscall === "string"
+      ? error.syscall
+      : null;
+
+  if (
+    code === "EAI_AGAIN" ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    (
+      syscall === "connect" &&
+      RETRYABLE_TELEGRAM_CONNECT_CODES.has(
+        code
+      )
+    )
+  ) {
+    return code;
+  }
+
+  const causeCode =
+    findRetryableTelegramConnectionCode(
+      error.cause,
+      seen
+    );
+
+  if (causeCode) {
+    return causeCode;
+  }
+
+  if (Array.isArray(error.errors)) {
+    for (const nestedError of error.errors) {
+      const nestedCode =
+        findRetryableTelegramConnectionCode(
+          nestedError,
+          seen
+        );
+
+      if (nestedCode) {
+        return nestedCode;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function createTelegramSender({
   token,
   chatId,
@@ -1731,22 +1805,50 @@ export function createTelegramSender({
     ) {
       await waitForPacing();
 
-      const response = await fetchImpl(
-        `https://api.telegram.org/bot${token}/sendMessage`,
-        {
-          method: "POST",
-          headers: {
-            "content-type":
-              "application/json"
-          },
-          body: JSON.stringify(
-            createTelegramMessageRequest(
-              chatId,
-              text
+      let response;
+
+      try {
+        response = await fetchImpl(
+          `https://api.telegram.org/bot${token}/sendMessage`,
+          {
+            method: "POST",
+            headers: {
+              "content-type":
+                "application/json"
+            },
+            body: JSON.stringify(
+              createTelegramMessageRequest(
+                chatId,
+                text
+              )
             )
-          )
+          }
+        );
+      } catch (error) {
+        const connectionErrorCode =
+          findRetryableTelegramConnectionCode(
+            error
+          );
+
+        if (
+          connectionErrorCode &&
+          attempt < maxAttempts
+        ) {
+          logger?.warn?.(
+            "Telegram connection failed. " +
+              `${TELEGRAM_NETWORK_RETRY_DELAY_MS / 1000}초 후 재시도합니다. ` +
+              `오류 ${connectionErrorCode}, ` +
+              `시도 ${attempt}/${maxAttempts}`
+          );
+
+          await sleepImpl(
+            TELEGRAM_NETWORK_RETRY_DELAY_MS
+          );
+          continue;
         }
-      );
+
+        throw error;
+      }
 
       let result;
       let responseJsonFailed = false;
