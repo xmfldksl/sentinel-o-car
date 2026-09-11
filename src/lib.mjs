@@ -2477,6 +2477,8 @@ export function recordDetailFailure(
     priceKrw:
       observedPriceKrw,
     listText: _listText,
+    year: _year,
+    month: _month,
     ...observation
   } = listing;
 

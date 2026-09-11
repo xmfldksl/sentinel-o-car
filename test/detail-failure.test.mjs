@@ -10,16 +10,20 @@ import {
 const firstSeenAt = "2026-07-18T00:00:00.000Z";
 const failedAt = "2026-07-19T00:00:00.000Z";
 const recoveredAt = "2026-07-19T00:30:00.000Z";
+
 const listing = {
   id: "42023180",
   title: "모델 3 롱 레인지 AWD",
   url: "https://fem.encar.com/cars/detail/42023180",
+  year: 2022,
+  month: 9,
   yearMonth: "2022-09",
   mileageKm: 67235,
   priceKrw: 32700000,
   region: "경기",
   contracted: false,
-  vehicleNo: "12가3456"
+  vehicleNo: "12가3456",
+  listText: "22/09식 67,235 km 경기 3,270만원"
 };
 
 const evaluated = {
@@ -47,12 +51,30 @@ test("처음 발견한 매물의 상세 조회 실패는 신규 알림을 만들
 
   assert.equal(inspection.isNew, true);
   assert.equal(failed.priceKrw, undefined);
+  assert.equal(failed.year, undefined);
+  assert.equal(failed.month, undefined);
+  assert.equal(failed.listText, undefined);
+  assert.equal(failed.yearMonth, listing.yearMonth);
   assert.equal(failed.lastObservedPriceKrw, listing.priceKrw);
-  assert.equal(createListingEvent({ runMode: "normal", wasInitialized: true, inspection, previous: undefined, listing: failed, detailSucceeded: false }), null);
+  assert.equal(
+    createListingEvent({
+      runMode: "normal",
+      wasInitialized: true,
+      inspection,
+      previous: undefined,
+      listing: failed,
+      detailSucceeded: false
+    }),
+    null
+  );
 });
 
 test("가격 인하 후 상세 조회 실패는 알림을 만들지 않는다", () => {
-  const previous = { ...evaluated, priceKrw: 34000000, firstSeenAt };
+  const previous = {
+    ...evaluated,
+    priceKrw: 34000000,
+    firstSeenAt
+  };
   const inspection = getListingInspection(previous, listing);
   const failed = recordDetailFailure(
     previous,
@@ -63,11 +85,26 @@ test("가격 인하 후 상세 조회 실패는 알림을 만들지 않는다", 
   );
 
   assert.equal(inspection.priceDropped, true);
-  assert.equal(createListingEvent({ runMode: "normal", wasInitialized: true, inspection, previous, listing: failed, detailSucceeded: false }), null);
+  assert.equal(
+    createListingEvent({
+      runMode: "normal",
+      wasInitialized: true,
+      inspection,
+      previous,
+      listing: failed,
+      detailSucceeded: false
+    }),
+    null
+  );
 });
 
 test("상세 조회 실패는 기존 정상 가격과 사실 정보를 덮어쓰지 않는다", () => {
-  const previous = { ...evaluated, priceKrw: 34000000, firstSeenAt, lastEvaluatedAt: firstSeenAt };
+  const previous = {
+    ...evaluated,
+    priceKrw: 34000000,
+    firstSeenAt,
+    lastEvaluatedAt: firstSeenAt
+  };
   const failed = recordDetailFailure(
     previous,
     listing,
@@ -98,7 +135,11 @@ test("상세 조회 실패는 기존 정상 가격과 사실 정보를 덮어쓰
 });
 
 test("상세 조회가 이후 성공하면 정상 상태와 가격 인하 알림으로 복귀한다", () => {
-  const previous = { ...evaluated, priceKrw: 34000000, firstSeenAt };
+  const previous = {
+    ...evaluated,
+    priceKrw: 34000000,
+    firstSeenAt
+  };
   const failed = recordDetailFailure(
     previous,
     listing,
