@@ -34,20 +34,20 @@ It periodically collects configured search results, compares them with saved sta
 - Telegram Bot Token
 - Telegram Chat ID
 
-The production workflow uses a self-hosted runner because Encar listing collection is blocked in the GitHub-hosted runner environment.
+Production runs on Mac launchd. The retained manual GitHub Actions workflow uses a self-hosted runner because Encar listing collection is blocked in the GitHub-hosted runner environment.
 
 ## Setup
 
-Create the following GitHub Actions Secrets:
+For current Mac operation, store the following values in `.env.local` at the repository root, following [the local operation guide](local/README.md):
 
 | Name | Description |
 | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Telegram BotFather token |
 | `TELEGRAM_CHAT_ID` | Telegram channel or chat ID |
 
-Store each Encar search-results URL as a GitHub Repository Variable.
+Store each Encar search-results URL in the same environment file.
 
-The Variable name must match the profile's `searchUrlEnv` value in `config.json`.
+The environment variable name must match the profile's `searchUrlEnv` value in `config.json`. For manual GitHub Actions runs, use GitHub Actions Secrets for Telegram credentials and Repository Variables for search URLs.
 
 Use the full Encar search-results URL from the first page. Do not use a vehicle-detail URL.
 
@@ -101,7 +101,7 @@ Example `config.json`:
 Main settings:
 
 - `enabled`: Enables or disables the profile.
-- `searchUrlEnv`: Repository Variable containing the Encar search URL.
+- `searchUrlEnv`: Environment variable containing the Encar search URL (Repository Variable for GitHub Actions).
 - `titleFilter`: Additional title-based inclusion and exclusion rules.
 - `price`: Price threshold used for notification evaluation.
 - `isTesla`: Enables Tesla option-specific evaluation.
@@ -110,9 +110,25 @@ Search conditions such as registration year, mileage, color, fuel type, and sale
 
 ## Usage
 
-The local workflow file has its GitHub Actions schedule commented out; `workflow_dispatch` and the existing execution steps remain. The local launchd runner is prepared for the same schedule, at minutes 17 and 47 of every hour (also in Korea).
+GitHub Actions scheduled runs are stopped; `workflow_dispatch` and the existing execution steps remain. Production now uses the registered Mac launchd runner, scheduled at minutes 17 and 47 of every hour (also in Korea).
 
-The 2026-10-13 review found local launchd unregistered. The runner now stops on stage failure, preserves the exit code in its log, and releases its acquired lock; isolated regression tests pass. Operational setup, registration, and live collection/delivery were not performed in this fix. The remote schedule remains an unresolved issue because these changes have not been pushed. See [the local operation guide](local/README.md) before installation.
+The manual `normal` run on 2026-10-13 exited with code 0, collected 76 Tesla listings, sent 42 Telegram notifications, and saved the external state. The user confirmed actual Telegram receipt at **2026-10-13 03:53 KST**. **Automatic scheduled execution is still unverified.** See [the AI execution report](ai/notes/2026-10-13-codex-report-local-runner-resume-execute.md) for detailed run and registration results.
+
+The local runner uses these default locations; see [the local operation guide](local/README.md) for overrides and operating procedures:
+
+- Environment: `.env.local` at the repository root.
+- State: `$HOME/Library/Application Support/sentinel-o-car/state.json`.
+- Daily log: `~/Library/Logs/sentinel-o-car/YYYY-MM-DD.log`.
+- launchd startup output/errors: `~/Library/Logs/sentinel-o-car/launchd.log`.
+
+Inspect registration and today's log without starting a collection run:
+
+```bash
+launchctl print gui/$(id -u)/com.xmfldksl.sentinel-o-car
+tail -n 80 "$HOME/Library/Logs/sentinel-o-car/$(date +%Y-%m-%d).log"
+```
+
+Check the collection stages, app `Done.` record, exit code, and external state update together. Exit code 0 alone can also mean a run was skipped because of an existing lock. Do not rerun `local/install.sh` merely to check registration.
 
 ### `normal`
 
@@ -166,7 +182,7 @@ npm test
 
 Tests do not perform production scraping or Telegram delivery.
 
-The production workflow runs the test suite before scraping.
+The local runner and the retained GitHub Actions workflow run the test suite before scraping.
 
 ## Notes
 
@@ -232,20 +248,20 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 - Telegram Bot Token
 - Telegram Chat ID
 
-GitHub-hosted runner 환경에서는 엔카 목록 수집이 차단되므로 운영 workflow는 self-hosted runner를 사용합니다.
+현재 운영은 Mac launchd를 사용합니다. 유지된 수동 GitHub Actions workflow는 GitHub-hosted runner 환경에서 엔카 목록 수집이 차단되므로 self-hosted runner를 사용합니다.
 
 ## 설정 준비
 
-GitHub Actions Secrets에 다음 값을 등록합니다.
+현재 Mac 운영에서는 [로컬 운영 안내](local/README.md)에 따라 저장소 루트의 `.env.local`에 다음 값을 설정합니다.
 
 | 이름 | 설명 |
 | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Telegram BotFather에서 발급한 토큰 |
 | `TELEGRAM_CHAT_ID` | Telegram 채널 또는 Chat ID |
 
-엔카 검색 결과 URL은 GitHub Repository Variable에 저장합니다.
+엔카 검색 결과 URL도 같은 환경 파일에 저장합니다.
 
-Variable 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야 합니다.
+환경변수 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야 합니다. GitHub Actions 수동 실행을 사용할 때는 Telegram 인증값을 Actions Secrets에, 검색 URL을 Repository Variables에 등록합니다.
 
 엔카 검색 결과 첫 페이지의 전체 URL을 사용하며 차량 상세 URL은 사용하지 않습니다.
 
@@ -299,7 +315,7 @@ Variable 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야
 주요 설정:
 
 - `enabled`: 프로필 활성 여부
-- `searchUrlEnv`: 엔카 검색 URL이 저장된 Repository Variable
+- `searchUrlEnv`: 엔카 검색 URL이 저장된 환경변수 이름(GitHub Actions에서는 Repository Variable)
 - `titleFilter`: 제목 기반 추가 포함·제외 조건
 - `price`: 알림의 가격 조건 판정 기준
 - `isTesla`: Tesla 옵션별 판정 사용 여부
@@ -308,9 +324,25 @@ Variable 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야
 
 ## 실행
 
-로컬 workflow 파일의 `schedule`은 주석 처리되어 있고, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 로컬 launchd 실행기는 같은 주기인 매시 17분·47분(한국시간도 동일)으로 준비되어 있습니다.
+GitHub Actions 예약은 중지됐으며, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 현재는 등록된 Mac launchd 실행기로 운영하며, 예약은 매시 17분·47분(한국시간도 동일)입니다.
 
-2026-10-13 검증에서 로컬 launchd 미등록을 확인했습니다. 실행기는 단계 실패 시 중단하고 원래 종료 코드를 로그에 기록하며 획득한 잠금을 정리하도록 수정했고, 격리 회귀 테스트를 통과했습니다. 이번 수정에서 운영 준비·등록·실제 수집·전송은 수행하지 않았습니다. 미push 상태로 원격 schedule 활성 문제도 남아 있습니다. 설치 전에 [로컬 운영 안내](local/README.md)를 확인하십시오.
+2026-10-13 수동 `normal` 실행은 종료 코드 0, Tesla 목록 76건 수집, Telegram 42건 전송, 외부 상태 저장까지 완료했습니다. 사용자는 **2026-10-13 03:53 KST에 실제 Telegram 수신을 확인**했습니다. **자동 예약 실행은 아직 미검증입니다.** 상세 실행·등록 결과는 [AI 실행 보고서](ai/notes/2026-10-13-codex-report-local-runner-resume-execute.md)를 참조하십시오.
+
+로컬 실행기의 기본 경로는 다음과 같습니다. 경로 재정의와 운영 절차는 [로컬 운영 안내](local/README.md)를 참조하십시오.
+
+- 환경 파일: 저장소 루트의 `.env.local`
+- 외부 상태: `$HOME/Library/Application Support/sentinel-o-car/state.json`
+- 일별 로그: `~/Library/Logs/sentinel-o-car/YYYY-MM-DD.log`
+- launchd 시작 시 표준 출력·오류: `~/Library/Logs/sentinel-o-car/launchd.log`
+
+수집을 시작하지 않고 등록 상태와 당일 로그를 확인합니다.
+
+```bash
+launchctl print gui/$(id -u)/com.xmfldksl.sentinel-o-car
+tail -n 80 "$HOME/Library/Logs/sentinel-o-car/$(date +%Y-%m-%d).log"
+```
+
+수집 단계, 앱의 `Done.` 기록, 종료 코드, 외부 상태 갱신을 함께 확인하십시오. 기존 잠금 때문에 실행을 건너뛴 경우에도 종료 코드 0일 수 있습니다. 단순 등록 확인을 위해 `local/install.sh`를 재실행하지 마십시오.
 
 ### `normal`
 
@@ -362,7 +394,7 @@ npm test
 
 테스트에서는 실제 운영 스크래핑이나 Telegram 전송을 수행하지 않습니다.
 
-운영 workflow에서도 스크래핑 전에 테스트를 실행합니다.
+로컬 실행기와 유지된 GitHub Actions workflow 모두 스크래핑 전에 테스트를 실행합니다.
 
 ## 참고사항
 
