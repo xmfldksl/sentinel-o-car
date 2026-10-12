@@ -40,6 +40,7 @@
 - GitHub Actions 실행 목록 미조회 상태 유지; 기존 외부 상태 보존
 
 ## 최신 문서
+- 릴리즈 노트 인수인계: ai/notes/2026-10-13-claude-handoff-launchd-release-notes.md
 - 수신·README 보고: ai/notes/2026-10-13-codex-report-receipt-readme-update.md
 - 실행·등록 보고: ai/notes/2026-10-13-codex-report-local-runner-resume-execute.md
 - 실행 인수인계: ai/notes/2026-10-13-codex-handoff-local-runner-resume-execute.md
