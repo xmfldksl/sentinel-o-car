@@ -1,8 +1,10 @@
 name: Sentinel-o-car
 
+# 로컬 launchd로 실행 중 (local/README.md 참고). Actions 복구 시 아래 schedule 주석을 해제하고
+# local/uninstall.sh로 launchd 에이전트를 먼저 해제해 이중 실행을 막는다.
 on:
-  schedule:
-    - cron: "17,47 * * * *"
+  # schedule:
+  #   - cron: "17,47 * * * *"
   workflow_dispatch:
     inputs:
       run_mode:
