@@ -30,8 +30,7 @@ It periodically collects configured search results, compares them with saved sta
 ## Requirements
 
 - Node.js 25
-- GitHub Actions
-- Apple Silicon self-hosted runner
+- macOS launchd, or GitHub Actions with an Apple Silicon self-hosted runner
 - Telegram Bot Token
 - Telegram Chat ID
 
@@ -111,9 +110,9 @@ Search conditions such as registration year, mileage, color, fuel type, and sale
 
 ## Usage
 
-The GitHub Actions workflow supports scheduled runs and manual execution.
+The GitHub Actions schedule is currently commented out; `workflow_dispatch` and the existing execution steps remain. The local launchd runner is prepared for the same schedule, at minutes 17 and 47 of every hour (also in Korea).
 
-While GitHub Actions is disabled for the account (since 2026-09-24), the same schedule runs locally through macOS launchd. See `local/README.md`.
+As of the 2026-10-13 review, local launchd is not registered and operation is on hold because the runner can continue to scraping after a failed test. See [the local operation guide](local/README.md) before installation.
 
 ### `normal`
 
@@ -127,13 +126,13 @@ It compares current listings with saved state and processes:
 - deleted listings
 - relisted listings
 
-State changes are saved to `data/state.json`.
+State changes are saved to `STATE_PATH`, or `data/state.json` when it is unset. The local wrapper defaults to the external path described below.
 
 ### `send_current`
 
 Sends the currently available listings that pass `titleFilter`.
 
-It does not perform deletion detection or commit watcher state.
+It does not initialize a baseline or perform deletion detection. It still saves watcher state to the selected state file, but the workflow does not commit it to Git.
 
 ### `telegram_test`
 
@@ -148,6 +147,8 @@ Watcher state is stored in:
 ```text
 data/state.json
 ```
+
+This is the default when invoking the application directly without `STATE_PATH`. `local/run.sh` defaults to `$HOME/Library/Application Support/sentinel-o-car/state.json`; an explicit `STATE_PATH` overrides that default. Direct `npm run scrape` does not load `.env.local` or select the local state path.
 
 The state is separated by profile and preserves confirmed listing information across runs.
 
@@ -227,8 +228,7 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 ## 요구사항
 
 - Node.js 25
-- GitHub Actions
-- Apple Silicon self-hosted runner
+- macOS launchd 또는 Apple Silicon self-hosted runner를 사용하는 GitHub Actions
 - Telegram Bot Token
 - Telegram Chat ID
 
@@ -308,7 +308,9 @@ Variable 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야
 
 ## 실행
 
-GitHub Actions workflow는 예약 실행과 수동 실행을 지원합니다.
+현재 GitHub Actions의 `schedule`은 주석 처리되어 있고, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 로컬 launchd 실행기는 같은 주기인 매시 17분·47분(한국시간도 동일)으로 준비되어 있습니다.
+
+2026-10-13 검증 시 로컬 launchd는 미등록이며, 회귀 테스트 실패 후에도 수집으로 진행할 수 있는 실행기 결함 때문에 운영 시작을 보류합니다. 설치 전에 [로컬 운영 안내](local/README.md)를 확인하십시오.
 
 ### `normal`
 
@@ -322,13 +324,13 @@ GitHub Actions workflow는 예약 실행과 수동 실행을 지원합니다.
 - 매물삭제
 - 재등록
 
-상태 변경 내용은 `data/state.json`에 저장합니다.
+상태 변경 내용은 `STATE_PATH`에 저장하며, 지정하지 않으면 `data/state.json`을 사용합니다. 로컬 실행기의 기본값은 아래 외부 경로입니다.
 
 ### `send_current`
 
 현재 검색 결과 중 `titleFilter`를 통과한 매물을 전송합니다.
 
-삭제 판정과 상태 commit은 하지 않습니다.
+기준선 초기화와 삭제 판정은 하지 않습니다. 선택된 상태 파일에는 처리 결과를 저장하지만 workflow에서 Git commit은 하지 않습니다.
 
 ### `telegram_test`
 
@@ -343,6 +345,8 @@ Telegram 테스트 메시지 1건을 전송합니다.
 ```text
 data/state.json
 ```
+
+위 경로는 `STATE_PATH` 없이 앱을 직접 실행할 때의 기본값입니다. `local/run.sh`의 기본값은 `$HOME/Library/Application Support/sentinel-o-car/state.json`이며, 별도로 지정한 `STATE_PATH`가 우선합니다. 직접 `npm run scrape`를 실행하면 `.env.local` 로드와 로컬 상태 경로 지정이 생략됩니다.
 
 프로필별로 상태를 관리하며 실행 사이에 확인된 매물 정보를 보존합니다.
 
