@@ -110,25 +110,7 @@ Search conditions such as registration year, mileage, color, fuel type, and sale
 
 ## Usage
 
-GitHub Actions scheduled runs are stopped; `workflow_dispatch` and the existing execution steps remain. Production now uses the registered Mac launchd runner, scheduled at minutes 17 and 47 of every hour (also in Korea).
-
-The manual `normal` run on 2026-10-13 exited with code 0, collected 76 Tesla listings, sent 42 Telegram notifications, and saved the external state. The user confirmed actual Telegram receipt at **2026-10-13 03:53 KST**. **Automatic scheduled execution is still unverified.** See [the AI execution report](ai/notes/2026-10-13-codex-report-local-runner-resume-execute.md) for detailed run and registration results.
-
-The local runner uses these default locations; see [the local operation guide](local/README.md) for overrides and operating procedures:
-
-- Environment: `.env.local` at the repository root.
-- State: `$HOME/Library/Application Support/sentinel-o-car/state.json`.
-- Daily log: `~/Library/Logs/sentinel-o-car/YYYY-MM-DD.log`.
-- launchd startup output/errors: `~/Library/Logs/sentinel-o-car/launchd.log`.
-
-Inspect registration and today's log without starting a collection run:
-
-```bash
-launchctl print gui/$(id -u)/com.xmfldksl.sentinel-o-car
-tail -n 80 "$HOME/Library/Logs/sentinel-o-car/$(date +%Y-%m-%d).log"
-```
-
-Check the collection stages, app `Done.` record, exit code, and external state update together. Exit code 0 alone can also mean a run was skipped because of an existing lock. Do not rerun `local/install.sh` merely to check registration.
+Production runs on the Mac launchd runner, scheduled at minutes 17 and 47 of every hour. See [the local operation guide](local/README.md) for paths and operating procedures.
 
 ### `normal`
 
@@ -195,6 +177,11 @@ The local runner and the retained GitHub Actions workflow run the test suite bef
 - This project is intended for personal use.
 
 ## Release Notes
+
+### 2026-10-13
+
+- Added a Mac launchd runner scheduled at minutes 17 and 47 of every hour.
+- Stopped GitHub Actions scheduled runs; manual `workflow_dispatch` runs remain available.
 
 ### Version 1.1.0
 
@@ -324,25 +311,7 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 
 ## 실행
 
-GitHub Actions 예약은 중지됐으며, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 현재는 등록된 Mac launchd 실행기로 운영하며, 예약은 매시 17분·47분(한국시간도 동일)입니다.
-
-2026-10-13 수동 `normal` 실행은 종료 코드 0, Tesla 목록 76건 수집, Telegram 42건 전송, 외부 상태 저장까지 완료했습니다. 사용자는 **2026-10-13 03:53 KST에 실제 Telegram 수신을 확인**했습니다. **자동 예약 실행은 아직 미검증입니다.** 상세 실행·등록 결과는 [AI 실행 보고서](ai/notes/2026-10-13-codex-report-local-runner-resume-execute.md)를 참조하십시오.
-
-로컬 실행기의 기본 경로는 다음과 같습니다. 경로 재정의와 운영 절차는 [로컬 운영 안내](local/README.md)를 참조하십시오.
-
-- 환경 파일: 저장소 루트의 `.env.local`
-- 외부 상태: `$HOME/Library/Application Support/sentinel-o-car/state.json`
-- 일별 로그: `~/Library/Logs/sentinel-o-car/YYYY-MM-DD.log`
-- launchd 시작 시 표준 출력·오류: `~/Library/Logs/sentinel-o-car/launchd.log`
-
-수집을 시작하지 않고 등록 상태와 당일 로그를 확인합니다.
-
-```bash
-launchctl print gui/$(id -u)/com.xmfldksl.sentinel-o-car
-tail -n 80 "$HOME/Library/Logs/sentinel-o-car/$(date +%Y-%m-%d).log"
-```
-
-수집 단계, 앱의 `Done.` 기록, 종료 코드, 외부 상태 갱신을 함께 확인하십시오. 기존 잠금 때문에 실행을 건너뛴 경우에도 종료 코드 0일 수 있습니다. 단순 등록 확인을 위해 `local/install.sh`를 재실행하지 마십시오.
+Mac launchd 실행기로 운영하며, 매시 17분·47분에 실행됩니다. 경로와 운영 절차는 [로컬 운영 안내](local/README.md)를 참조하십시오.
 
 ### `normal`
 
@@ -407,6 +376,11 @@ npm test
 - 개인 사용 목적의 프로젝트입니다.
 
 ## 릴리즈 노트
+
+### 2026-10-13
+
+- Mac launchd 실행기 추가: 매시 17분·47분에 예약 실행
+- GitHub Actions 예약 중지 (`workflow_dispatch` 수동 실행은 유지)
 
 ### Version 1.1.0
 

@@ -26,6 +26,13 @@ GitHub Actions 계정 비활성화에 대응해 준비한 맥 launchd 실행기�
 
 - `~/Library/Logs/sentinel-o-car/YYYY-MM-DD.log`: 실행 단계와 종료 코드. 로그 연결·잠금 획득 후의 정상 종료와 단계 실패, 환경 파일 누락·로드 실패·상태 누락은 EXIT 처리에서 원래 코드를 한 번 기록한다.
 - `~/Library/Logs/sentinel-o-car/launchd.log`: 실행기 자체 로그 전환 전의 표준 출력·오류.
+- 수집을 시작하지 않고 등록 상태와 당일 로그를 확인하는 명령:
+
+  ```bash
+  launchctl print gui/$(id -u)/com.xmfldksl.sentinel-o-car
+  tail -n 80 "$HOME/Library/Logs/sentinel-o-car/$(date +%Y-%m-%d).log"
+  ```
+
 - 같은 `${TMPDIR:-/tmp}/sentinel-o-car.lock`을 사용하는 실행끼리는 `mkdir` 잠금으로 중복을 막는다. 잠금 획득에 성공한 실행만 `EXIT` trap을 등록해 정상·실패 종료 시 정리한다. 기존 잠금이 있으면 후속 단계를 실행하지 않고 잠금도 삭제하지 않는다. 다른 `TMPDIR`의 수동 실행이나 Actions 실행까지 공통으로 잠그지는 않는다.
 - SIGKILL·전원 종료처럼 EXIT 처리가 불가능한 중단 후 잠금이 남으면 이후 실행은 건너뛰고 0을 반환할 수 있다. 잠금을 제거하기 전 실행 중인 프로세스 유무를 확인해야 한다. 종료 코드 0만으로 실제 수집 성공을 판단하지 말고 실행 단계와 앱 완료 기록도 확인한다.
 
