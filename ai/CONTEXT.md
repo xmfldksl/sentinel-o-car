@@ -21,10 +21,10 @@
 - 수신 확인 보고·CONTEXT commit: 49a0eea
 - README 실행 절(영문·한국어)을 한 문단으로 교체, 릴리즈 노트에 2026-10-13 항목 추가: commit ce2325c
 - README에서 뺀 tail 확인 명령은 local/README.md로 이동; 경로 4종·launchctl print는 이미 있었음
-- 모든 commit은 main 직접; push하지 않음, origin/main = 49a0eea
+- 모든 commit은 main 직접; 사용자 지시로 push 완료 (49a0eea..8b75fb8), 이 갱신도 push
 
 ## 운영 제약
-- 이번 요청은 README·local/README·AI 문서 수정과 분리 commit까지; push 지시 없음
+- 이번 요청은 README·local/README·AI 문서 수정과 분리 commit, 이후 사용자 지시로 push
 - 실제 수집·Telegram 전송·재설치·kickstart·예약 설정 변경 금지
 - 코드·환경·저장소 및 외부 상태·로그·전원·잠자기·기존 자기호스팅 러너 유지
 - 링크·채팅 ID·토큰·인증 URL·API 응답 전문을 로그·AI 문서·Git에 남기지 않음
