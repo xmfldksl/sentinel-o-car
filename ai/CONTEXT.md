@@ -1,28 +1,29 @@
 # CONTEXT
 
-최종 갱신: 2026-10-13 / 작성자: claudecode
+최종 갱신: 2026-10-13 / 작성자: codex
 (덮어쓰는 유일한 파일. 50줄 이내 유지.)
 
 ## 현재 목표
-- GitHub Actions 비활성화 기간 동안 맥 launchd로 예약 실행 유지
+- 맥 launchd 전환 결과를 검증하고 운영 시작 전 남은 문제와 문서 정정 사항 정리
 
 ## 진행 중 작업
-- 로컬 실행 전환: local/ 스크립트와 workflow schedule 중지는 commit 완료. launchd 등록(local/install.sh)과 .env.local 값 입력은 사용자 확인 대기.
+- 검증 인수인계 기록 후 읽기 전용 운영 점검과 안전한 테스트 수행 예정
+- 코드·workflow·운영 설정은 변경하지 않고 확인된 문서 정정만 별도 commit
 
 ## 최근 결정
 - Actions 비활성화로 맥 launchd 내재화, 복구 시 환원 (ai/DECISIONS.md 참조)
 - ai/ 공유 공간 도입 (ai/DECISIONS.md 참조)
 
 ## 미해결 이슈
-- Actions 복구 시 되돌리기: local/uninstall.sh로 launchd 해제 → 로컬 상태를 data/state.json에 복사·commit → workflow schedule 주석 해제 (local/README.md)
-- 맥 잠자기 중에는 예약이 실행되지 않음. 전원 연결 시 잠자기 방지 설정은 사용자가 직접.
+- 이전 보고의 등록·실행 미실시와 테스트 결과는 현재 환경에서 재확인 필요
+- 운영 시작 조건, 잠자기 중 놓친 예약 처리, 상태 경로와 첫 알림 동작 검증 필요
 
 ## 다음 할 일
-- 사용자: .env.local 작성, local/install.sh 실행 허가, 첫 예약 실행 로그 확인
-- Claude 프로젝트 지식에 이 저장소의 ai/ 폴더 추가 후 Sync (사용자)
+- 최신 인수인계 범위에 따라 검증 후 report 작성
+- 실제 수집·Telegram 전송·launchd 조작·상태 변경·push는 승인 범위 밖
 
 ## 최신 문서
-- 인수인계: ai/notes/2026-10-12-claude-handoff-local-launchd.md
+- 인수인계: ai/notes/2026-10-13-gpt-handoff-local-launchd-review.md
 - 리뷰: 없음
-- 보고: ai/notes/2026-10-12-claudecode-report-local-launchd.md
+- 보고: ai/notes/2026-10-12-claudecode-report-local-launchd.md (이전 구현 보고)
 - 아카이브: 없음
