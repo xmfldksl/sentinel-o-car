@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.xmfldksl.sentinel-o-car</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__REPO_DIR__/local/run.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__REPO_DIR__</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_BIN_DIR</key>
+    <string>__NODE_BIN_DIR__</string>
+    <key>HOME</key>
+    <string>__HOME__</string>
+    <key>LANG</key>
+    <string>ko_KR.UTF-8</string>
+  </dict>
+
+  <!-- workflow cron "17,47 * * * *" 과 동일: 매시 17분, 47분 (분 단위는 시간대와 무관) -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Minute</key>
+      <integer>17</integer>
+    </dict>
+    <dict>
+      <key>Minute</key>
+      <integer>47</integer>
+    </dict>
+  </array>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <!-- run.sh가 날짜별 로그(YYYY-MM-DD.log)를 직접 기록한다. 아래는 run.sh 시작 전 오류용. -->
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/sentinel-o-car/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/sentinel-o-car/launchd.log</string>
+</dict>
+</plist>

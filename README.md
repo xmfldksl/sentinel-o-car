@@ -113,6 +113,8 @@ Search conditions such as registration year, mileage, color, fuel type, and sale
 
 The GitHub Actions workflow supports scheduled runs and manual execution.
 
+While GitHub Actions is disabled for the account (since 2026-09-24), the same schedule runs locally through macOS launchd. See `local/README.md`.
+
 ### `normal`
 
 Normal monitoring mode.
