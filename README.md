@@ -110,9 +110,9 @@ Search conditions such as registration year, mileage, color, fuel type, and sale
 
 ## Usage
 
-The GitHub Actions schedule is currently commented out; `workflow_dispatch` and the existing execution steps remain. The local launchd runner is prepared for the same schedule, at minutes 17 and 47 of every hour (also in Korea).
+The local workflow file has its GitHub Actions schedule commented out; `workflow_dispatch` and the existing execution steps remain. The local launchd runner is prepared for the same schedule, at minutes 17 and 47 of every hour (also in Korea).
 
-As of the 2026-10-13 review, local launchd is not registered and operation is on hold because the runner can continue to scraping after a failed test. See [the local operation guide](local/README.md) before installation.
+The 2026-10-13 review found local launchd unregistered. The runner now stops on stage failure, preserves the exit code in its log, and releases its acquired lock; isolated regression tests pass. Operational setup, registration, and live collection/delivery were not performed in this fix. The remote schedule remains an unresolved issue because these changes have not been pushed. See [the local operation guide](local/README.md) before installation.
 
 ### `normal`
 
@@ -308,9 +308,9 @@ Variable 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야
 
 ## 실행
 
-현재 GitHub Actions의 `schedule`은 주석 처리되어 있고, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 로컬 launchd 실행기는 같은 주기인 매시 17분·47분(한국시간도 동일)으로 준비되어 있습니다.
+로컬 workflow 파일의 `schedule`은 주석 처리되어 있고, `workflow_dispatch`와 기존 실행 단계는 유지되어 있습니다. 로컬 launchd 실행기는 같은 주기인 매시 17분·47분(한국시간도 동일)으로 준비되어 있습니다.
 
-2026-10-13 검증 시 로컬 launchd는 미등록이며, 회귀 테스트 실패 후에도 수집으로 진행할 수 있는 실행기 결함 때문에 운영 시작을 보류합니다. 설치 전에 [로컬 운영 안내](local/README.md)를 확인하십시오.
+2026-10-13 검증에서 로컬 launchd 미등록을 확인했습니다. 실행기는 단계 실패 시 중단하고 원래 종료 코드를 로그에 기록하며 획득한 잠금을 정리하도록 수정했고, 격리 회귀 테스트를 통과했습니다. 이번 수정에서 운영 준비·등록·실제 수집·전송은 수행하지 않았습니다. 미push 상태로 원격 schedule 활성 문제도 남아 있습니다. 설치 전에 [로컬 운영 안내](local/README.md)를 확인하십시오.
 
 ### `normal`
 

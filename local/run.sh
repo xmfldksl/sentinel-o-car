@@ -27,7 +27,15 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "이전 실행이 진행 중이어 건너뜁니다 (lock: $LOCK_DIR)"
   exit 0
 fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+# 잠금을 획득한 실행만 정리한다. 정리 중 오류가 원래 종료 코드를 바꾸지 않게 한다.
+finish() {
+  local status=$?
+  trap - EXIT
+  log "종료 코드=$status" || true
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+  exit "$status"
+}
+trap finish EXIT
 
 cd "$REPO_DIR"
 export PATH="$NODE_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
@@ -51,29 +59,24 @@ export STATE_PATH="${STATE_PATH:-$LOCAL_STATE_DEFAULT}"
 
 log "시작 RUN_MODE=$RUN_MODE STATE_PATH=$STATE_PATH node=$(command -v node) $(node --version)"
 
-status=0
-{
-  # 1) 의존성 설치: 현재 외부 의존성이 없어 package-lock.json이 있고 node_modules가 없을 때만 수행
-  if [[ -f package-lock.json && ! -d node_modules ]]; then
-    log "npm ci"
-    npm ci
+# 단계를 조건부 명령 묶음에 넣지 않아 set -e가 실패 즉시 중단하게 한다.
+# 1) 의존성 설치: 현재 외부 의존성이 없어 package-lock.json이 있고 node_modules가 없을 때만 수행
+if [[ -f package-lock.json && ! -d node_modules ]]; then
+  log "npm ci"
+  npm ci
+fi
+
+# 2) 회귀 테스트
+log "npm test"
+npm test
+
+# 3) 본 실행
+if [[ "$RUN_MODE" != "telegram_test" ]]; then
+  mkdir -p "$(dirname "$STATE_PATH")"
+  if [[ ! -f "$STATE_PATH" ]]; then
+    log "상태 파일이 없습니다: $STATE_PATH (install.sh가 data/state.json을 복사합니다)"
+    exit 66
   fi
-
-  # 2) 회귀 테스트
-  log "npm test"
-  npm test
-
-  # 3) 본 실행
-  if [[ "$RUN_MODE" != "telegram_test" ]]; then
-    mkdir -p "$(dirname "$STATE_PATH")"
-    if [[ ! -f "$STATE_PATH" ]]; then
-      log "상태 파일이 없습니다: $STATE_PATH (install.sh가 data/state.json을 복사합니다)"
-      exit 66
-    fi
-  fi
-  log "npm run scrape"
-  npm run scrape
-} || status=$?
-
-log "종료 코드=$status"
-exit "$status"
+fi
+log "npm run scrape"
+npm run scrape
