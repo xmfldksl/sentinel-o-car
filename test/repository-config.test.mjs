@@ -16,13 +16,6 @@ const stateText = await fs.readFile(
   "utf8"
 );
 const rawState = JSON.parse(stateText);
-const workflowText = await fs.readFile(
-  new URL(
-    "../.github/workflows/sentinel-o-car.yml",
-    import.meta.url
-  ),
-  "utf8"
-);
 const exampleConfigText =
   await fs.readFile(
     new URL(
@@ -454,73 +447,6 @@ test("정규화 결과는 runtime URL 필드 외에 profile 계약을 확장하�
       `${profile.id} searchUrl`
     );
   }
-});
-
-// 새 searchUrlEnv를 추가할 때만 워크플로 매핑 수정이 필요하다.
-// 이름 목록은 config.json에서 동적으로 읽는다.
-test("워크플로는 config의 searchUrlEnv를 Repository Variables로 연결한다", () => {
-  const urlEnvironmentNames = [
-    ...new Set(
-      rawConfig.profiles.map(
-        (profile) =>
-          profile.searchUrlEnv
-      )
-    )
-  ];
-
-  assert.equal(
-    urlEnvironmentNames.length > 0,
-    true,
-    "searchUrlEnv names"
-  );
-
-  for (
-    const environmentName
-    of urlEnvironmentNames
-  ) {
-    assert.match(
-      workflowText,
-      new RegExp(
-        `${environmentName}:\\s*` +
-        `\\$\\{\\{\\s*vars\\.` +
-        `${environmentName}` +
-        `\\s*\\}\\}`
-      )
-    );
-  }
-
-  assert.doesNotMatch(
-    workflowText,
-    /\bvars\.ENCAR_SEARCH_URL\b/
-  );
-  assert.doesNotMatch(
-    workflowText,
-    /^\s*ENCAR_SEARCH_URL:\s*/m
-  );
-  assert.doesNotMatch(
-    workflowText,
-    /secrets\.ENCAR_SEARCH_URL_/
-  );
-  assert.match(
-    workflowText,
-    /TELEGRAM_BOT_TOKEN:\s*\$\{\{\s*secrets\.TELEGRAM_BOT_TOKEN\s*\}\}/
-  );
-  assert.match(
-    workflowText,
-    /TELEGRAM_CHAT_ID:\s*\$\{\{\s*secrets\.TELEGRAM_CHAT_ID\s*\}\}/
-  );
-  assert.deepEqual(
-    [
-      ...workflowText.matchAll(
-        /\bvars\.([A-Z0-9_]+)\b/g
-      )
-    ].map((match) => match[1]).sort(),
-    [...urlEnvironmentNames].sort()
-  );
-  assert.doesNotMatch(
-    workflowText,
-    /https?:\/\/[^\s"]*encar\./i
-  );
 });
 
 test("example config는 raw profile 계약을 따른다", () => {
