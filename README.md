@@ -30,11 +30,11 @@ It periodically collects configured search results, compares them with saved sta
 ## Requirements
 
 - Node.js 25
-- macOS launchd, or GitHub Actions with an Apple Silicon self-hosted runner
+- macOS with launchd
 - Telegram Bot Token
 - Telegram Chat ID
 
-Production runs on Mac launchd. The retained manual GitHub Actions workflow uses a self-hosted runner because Encar listing collection is blocked in the GitHub-hosted runner environment.
+Production runs on Mac launchd. The repository no longer ships GitHub Actions workflows; Encar listing collection is blocked in the GitHub-hosted runner environment, so scheduled and manual runs both use the local runner script.
 
 ## Setup
 
@@ -47,7 +47,7 @@ For current Mac operation, store the following values in `.env.local` at the rep
 
 Store each Encar search-results URL in the same environment file.
 
-The environment variable name must match the profile's `searchUrlEnv` value in `config.json`. For manual GitHub Actions runs, use GitHub Actions Secrets for Telegram credentials and Repository Variables for search URLs.
+The environment variable name must match the profile's `searchUrlEnv` value in `config.json`. Manual runs through `local/run.sh` read the same environment file.
 
 Use the full Encar search-results URL from the first page. Do not use a vehicle-detail URL.
 
@@ -101,7 +101,7 @@ Example `config.json`:
 Main settings:
 
 - `enabled`: Enables or disables the profile.
-- `searchUrlEnv`: Environment variable containing the Encar search URL (Repository Variable for GitHub Actions).
+- `searchUrlEnv`: Environment variable containing the Encar search URL (set in `.env.local` for the local runner).
 - `titleFilter`: Additional title-based inclusion and exclusion rules.
 - `price`: Price threshold used for notification evaluation.
 - `isTesla`: Enables Tesla option-specific evaluation.
@@ -130,7 +130,7 @@ State changes are saved to `STATE_PATH`, or `data/state.json` when it is unset. 
 
 Sends the currently available listings that pass `titleFilter`.
 
-It does not initialize a baseline or perform deletion detection. It still saves watcher state to the selected state file, but the workflow does not commit it to Git.
+It does not initialize a baseline or perform deletion detection. It still saves watcher state to the selected state file; the local runner does not commit it to Git.
 
 ### `telegram_test`
 
@@ -164,7 +164,7 @@ npm test
 
 Tests do not perform production scraping or Telegram delivery.
 
-The local runner and the retained GitHub Actions workflow run the test suite before scraping.
+The local runner runs the test suite before scraping.
 
 ## Notes
 
@@ -177,6 +177,10 @@ The local runner and the retained GitHub Actions workflow run the test suite bef
 - This project is intended for personal use.
 
 ## Release Notes
+
+### 2026-10-28
+
+- Removed the GitHub Actions workflows. Production and manual runs use the Mac launchd runner only.
 
 ### 2026-10-13
 
@@ -231,11 +235,11 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 ## 요구사항
 
 - Node.js 25
-- macOS launchd 또는 Apple Silicon self-hosted runner를 사용하는 GitHub Actions
+- macOS와 launchd
 - Telegram Bot Token
 - Telegram Chat ID
 
-현재 운영은 Mac launchd를 사용합니다. 유지된 수동 GitHub Actions workflow는 GitHub-hosted runner 환경에서 엔카 목록 수집이 차단되므로 self-hosted runner를 사용합니다.
+현재 운영은 Mac launchd를 사용합니다. 저장소에는 더 이상 GitHub Actions workflow가 없으며, GitHub-hosted runner 환경에서는 엔카 목록 수집이 차단되므로 예약 실행과 수동 실행 모두 로컬 실행기 스크립트를 사용합니다.
 
 ## 설정 준비
 
@@ -248,7 +252,7 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 
 엔카 검색 결과 URL도 같은 환경 파일에 저장합니다.
 
-환경변수 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야 합니다. GitHub Actions 수동 실행을 사용할 때는 Telegram 인증값을 Actions Secrets에, 검색 URL을 Repository Variables에 등록합니다.
+환경변수 이름은 `config.json` 각 프로필의 `searchUrlEnv`와 일치해야 합니다. `local/run.sh`를 통한 수동 실행도 같은 환경 파일을 읽습니다.
 
 엔카 검색 결과 첫 페이지의 전체 URL을 사용하며 차량 상세 URL은 사용하지 않습니다.
 
@@ -302,7 +306,7 @@ Sentinel-o-car는 엔카 중고차 검색 결과를 감시하는 개인용 도�
 주요 설정:
 
 - `enabled`: 프로필 활성 여부
-- `searchUrlEnv`: 엔카 검색 URL이 저장된 환경변수 이름(GitHub Actions에서는 Repository Variable)
+- `searchUrlEnv`: 엔카 검색 URL이 저장된 환경변수 이름(로컬 실행기에서는 `.env.local`에 설정)
 - `titleFilter`: 제목 기반 추가 포함·제외 조건
 - `price`: 알림의 가격 조건 판정 기준
 - `isTesla`: Tesla 옵션별 판정 사용 여부
@@ -331,7 +335,7 @@ Mac launchd 실행기로 운영하며, 매시 17분·47분에 실행됩니다. �
 
 현재 검색 결과 중 `titleFilter`를 통과한 매물을 전송합니다.
 
-기준선 초기화와 삭제 판정은 하지 않습니다. 선택된 상태 파일에는 처리 결과를 저장하지만 workflow에서 Git commit은 하지 않습니다.
+기준선 초기화와 삭제 판정은 하지 않습니다. 선택된 상태 파일에는 처리 결과를 저장하지만 로컬 실행기는 Git commit을 하지 않습니다.
 
 ### `telegram_test`
 
@@ -363,7 +367,7 @@ npm test
 
 테스트에서는 실제 운영 스크래핑이나 Telegram 전송을 수행하지 않습니다.
 
-로컬 실행기와 유지된 GitHub Actions workflow 모두 스크래핑 전에 테스트를 실행합니다.
+로컬 실행기는 스크래핑 전에 테스트를 실행합니다.
 
 ## 참고사항
 
@@ -376,6 +380,10 @@ npm test
 - 개인 사용 목적의 프로젝트입니다.
 
 ## 릴리즈 노트
+
+### 2026-10-28
+
+- GitHub Actions workflow 삭제. 운영과 수동 실행 모두 Mac launchd 실행기만 사용
 
 ### 2026-10-13
 

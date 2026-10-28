@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # sentinel-o-car 로컬 실행기 (launchd 또는 수동 실행용)
-# GitHub Actions workflow(.github/workflows/sentinel-o-car.yml)의 단계를 같은 순서로 수행한다.
+# 다음 단계를 순서대로 수행하고, 앞 단계가 실패하면 중단한다.
 #   1) 의존성 설치(필요할 때만)  2) npm test  3) npm run scrape
 # 상태 파일은 저장소 밖(STATE_PATH)에 두고, 저장소에는 commit하지 않는다.
 #
@@ -22,7 +22,7 @@ exec >>"$LOG_FILE" 2>&1
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$*"; }
 
-# 중복 실행 방지 (workflow의 concurrency 대체). 비정상 종료로 남은 lock은 수동 삭제.
+# 중복 실행 방지. 비정상 종료로 남은 lock은 수동 삭제.
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "이전 실행이 진행 중이어 건너뜁니다 (lock: $LOCK_DIR)"
   exit 0

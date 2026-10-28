@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Sentinel-o-car personal vehicle listing watcher using GitHub Actions and Telegram",
+  "description": "Sentinel-o-car personal vehicle listing watcher using macOS launchd and Telegram",
   "scripts": {
     "scrape": "node src/index.mjs",
     "test": "node --test",
