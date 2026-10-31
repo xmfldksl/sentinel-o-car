@@ -22,7 +22,7 @@ Mac launchd로 예약 실행되는 로컬 실행기(`local/run.sh`)가 엔카 �
 ## 허용 범위와 금지 사항
 
 - 공개 목록과 공개 상세 페이지에서 확인 가능한 정보만 다룬다.
-- 로그인 우회, 캡차 우회, 접근 제한 우회, 세션 탈취를 구현하지 않는다.
+- 로그인 우회, 칡차 우회, 접근 제한 우회, 세션 탈취를 구현하지 않는다.
 - 확인되지 않은 비공개 API를 사용하거나 역공학해 호출하지 않는다.
 - 요청 빈도를 임의로 높이지 않는다.
 - launchd 예약 주기(`local/com.xmfldksl.sentinel-o-car.plist.template`)를 더 짧게 변경하려면 사용자에게 변경 이유와 위험을 먼저 설명한다.
@@ -81,6 +81,7 @@ npm test
 
 ## AI 공유 공간 (ai/)
 
+- 작업 시작 전에 git pull로 원격의 ai/ 변경을 받는다. Claude 채팅이 MCP로 직접 commit하기 때문이다.
 - 작업 시작 전에 ai/README.md와 ai/CONTEXT.md를 읽고, CONTEXT.md에 링크된 최신 문서를 확인한다.
 - 작업 종료 시 ai/templates/report.md 형식으로 ai/notes/에 보고를 쓰고 ai/CONTEXT.md를 갱신한다. 결정은 ai/DECISIONS.md에 추가한다.
 - 리뷰 요청은 review/YYYY-MM-DD-주제 브랜치에 ai/templates/review-request.md 형식으로 쓴다.

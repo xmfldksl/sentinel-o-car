@@ -1,6 +1,6 @@
 # CONTEXT
 
-최종 갱신: 2026-10-29 / 작성자: claudecode
+최종 갱신: 2026-11-01 / 작성자: claude
 (덮어쓰는 유일한 파일. 50줄 이내 유지.)
 
 ## 현재 목표
@@ -8,6 +8,7 @@
 
 ## 최근 결정
 - GitHub Actions 삭제 (ai/DECISIONS.md 2026-10-28). 이번 문서 정리는 그 결정의 파생 작업이라 새 결정 없음
+- Claude 채팅의 MCP 직접 commit 도입 (ai/DECISIONS.md 2026-11-01). CLI는 작업 전 git pull 필수
 
 ## 진행 결과
 - 시작 HEAD d28ddf2 = origin/main, 작업 트리 clean
@@ -31,7 +32,7 @@
 
 ## 다음 할 일
 - plist 템플릿 주석의 "workflow cron과 동일" 문구는 launchd 설정 원본이라 미수정; 필요 시 별도 결정
-- GitHub 계정 Actions 제한 여부와 자기호스팅 러너 서비스 정리는 별개 문제로 미확인 유지
+- GitHub 계정 플래그와 Actions 제한은 2026-10-31 해제 확인. 자기호스팅 러너 서비스 정리는 별개 문제로 미확인 유지
 - Repository Secrets·Variables 정리 여부는 사용자 결정 대기
 
 ## 최신 문서
